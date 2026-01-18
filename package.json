@@ -22,6 +22,7 @@
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.562.0",
     "zod": "^4.3.5"
   },
   "devDependencies": {

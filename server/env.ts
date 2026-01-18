@@ -13,9 +13,9 @@ const envSchema = z.object({
   DATABASE_PATH: z.string().default('./data/app.db'),
   JWT_SECRET: z.string().min(16).default('change-me-in-production-please'),
   FRONTEND_ORIGIN: z.string().optional(),
+  DEV_HOST: z.string().optional(),
 })
 
 export type Env = z.infer<typeof envSchema>
 
 export const env: Env = envSchema.parse(process.env)
-

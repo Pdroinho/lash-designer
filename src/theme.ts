@@ -1,8 +1,108 @@
 import type { TenantPublic } from './types'
 
+export type AppMode = 'public' | 'tenant' | 'admin' | 'dev'
+
+export type ThemeMode = 'light' | 'dark'
+
+export function initTheme() {
+  const root = document.documentElement
+  const fromStorage = (() => {
+    try {
+      const v = window.localStorage.getItem('theme')
+      if (v === 'light' || v === 'dark') return v
+      return null
+    } catch {
+      return null
+    }
+  })()
+
+  const preferred: ThemeMode =
+    fromStorage ?? 'light'
+
+  root.dataset.theme = preferred
+}
+
+export function getTheme(): ThemeMode {
+  const v = document.documentElement.dataset.theme
+  return v === 'dark' ? 'dark' : 'light'
+}
+
+export function setTheme(theme: ThemeMode) {
+  document.documentElement.dataset.theme = theme
+  try {
+    window.localStorage.setItem('theme', theme)
+  } catch {
+    void 0
+  }
+}
+
+export function toggleTheme(): ThemeMode {
+  const next: ThemeMode = getTheme() === 'dark' ? 'light' : 'dark'
+  setTheme(next)
+  return next
+}
+
+export function clearTenantTheme() {
+  const root = document.documentElement
+  for (const key of ['--primary', '--primaryText', '--accent2', '--accent3', '--ring']) {
+    root.style.removeProperty(key)
+  }
+}
+
+export function setAppMode(mode: AppMode) {
+  const root = document.documentElement
+  root.dataset.mode = mode
+  if (mode === 'public' || mode === 'dev') clearTenantTheme()
+}
+
 export function applyTenantTheme(tenant: TenantPublic | null) {
   const root = document.documentElement
   if (!tenant) return
-  root.style.setProperty('--primary', tenant.primaryColor)
-}
 
+  const normalizeHex = (hex: string) => {
+    const h = hex.trim().replace('#', '')
+    if (h.length === 3) return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`
+    if (h.length === 6) return `#${h}`
+    return '#ff6fb1'
+  }
+
+  const hexToRgb = (hex: string) => {
+    const n = normalizeHex(hex).slice(1)
+    const r = parseInt(n.slice(0, 2), 16)
+    const g = parseInt(n.slice(2, 4), 16)
+    const b = parseInt(n.slice(4, 6), 16)
+    return { r, g, b }
+  }
+
+  const mix = (a: string, b: string, t: number) => {
+    const c1 = hexToRgb(a)
+    const c2 = hexToRgb(b)
+    const r = Math.round(c1.r * (1 - t) + c2.r * t)
+    const g = Math.round(c1.g * (1 - t) + c2.g * t)
+    const b2 = Math.round(c1.b * (1 - t) + c2.b * t)
+    const toHex = (v: number) => v.toString(16).padStart(2, '0')
+    return `#${toHex(r)}${toHex(g)}${toHex(b2)}`
+  }
+
+  const srgbToLinear = (v: number) => {
+    const c = v / 255
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  }
+
+  const luminance = (hex: string) => {
+    const { r, g, b } = hexToRgb(hex)
+    const rl = srgbToLinear(r)
+    const gl = srgbToLinear(g)
+    const bl = srgbToLinear(b)
+    return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl
+  }
+
+  const primary = normalizeHex(tenant.primaryColor)
+  const primaryText = luminance(primary) > 0.62 ? '#0b0d12' : '#ffffff'
+
+  root.style.setProperty('--primary', primary)
+  root.style.setProperty('--primaryText', primaryText)
+  root.style.setProperty('--accent2', mix(primary, '#c7b2ff', 0.55))
+  root.style.setProperty('--accent3', mix(primary, '#ffd1e8', 0.55))
+  root.style.setProperty('--ring', mix(primary, '#ffffff', 0.25))
+}

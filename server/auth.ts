@@ -9,9 +9,15 @@ export type SessionUser = {
   tenantId: string | null
 }
 
+export type ResolvedTenant = {
+  id: string
+  slug: string
+}
+
 declare module 'express-serve-static-core' {
   interface Request {
     sessionUser?: SessionUser
+    resolvedTenant?: ResolvedTenant
   }
 }
 
