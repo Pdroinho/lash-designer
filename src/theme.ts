@@ -44,7 +44,26 @@ export function toggleTheme(): ThemeMode {
 
 export function clearTenantTheme() {
   const root = document.documentElement
-  for (const key of ['--primary', '--primaryText', '--accent2', '--accent3', '--ring']) {
+  for (const key of [
+    '--primary',
+    '--primary-rgb',
+    '--primary-fg',
+    '--primaryText',
+    '--primary-50',
+    '--primary-100',
+    '--primary-200',
+    '--primary-300',
+    '--primary-400',
+    '--primary-500',
+    '--primary-600',
+    '--primary-700',
+    '--primary-800',
+    '--primary-900',
+    '--primary-900-rgb',
+    '--accent2',
+    '--accent3',
+    '--ring',
+  ]) {
     root.style.removeProperty(key)
   }
 }
@@ -99,9 +118,38 @@ export function applyTenantTheme(tenant: TenantPublic | null) {
 
   const primary = normalizeHex(tenant.primaryColor)
   const primaryText = luminance(primary) > 0.62 ? '#0b0d12' : '#ffffff'
+  const primaryRgb = hexToRgb(primary)
+  const primaryRgbStr = `${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}`
+
+  const primary50 = mix(primary, '#ffffff', 0.92)
+  const primary100 = mix(primary, '#ffffff', 0.84)
+  const primary200 = mix(primary, '#ffffff', 0.72)
+  const primary300 = mix(primary, '#ffffff', 0.56)
+  const primary400 = mix(primary, '#ffffff', 0.38)
+  const primary600 = mix(primary, '#000000', 0.12)
+  const primary700 = mix(primary, '#000000', 0.24)
+  const primary800 = mix(primary, '#000000', 0.36)
+  const primary900 = mix(primary, '#000000', 0.5)
+
+  const primary900Rgb = hexToRgb(primary900)
+  const primary900RgbStr = `${primary900Rgb.r}, ${primary900Rgb.g}, ${primary900Rgb.b}`
 
   root.style.setProperty('--primary', primary)
+  root.style.setProperty('--primary-rgb', primaryRgbStr)
+  root.style.setProperty('--primary-fg', primaryText)
   root.style.setProperty('--primaryText', primaryText)
+  root.style.setProperty('--primary-50', primary50) // Fix typo if needed, but standard is 50
+  root.style.setProperty('--primary-50', primary50)
+  root.style.setProperty('--primary-100', primary100)
+  root.style.setProperty('--primary-200', primary200)
+  root.style.setProperty('--primary-300', primary300)
+  root.style.setProperty('--primary-400', primary400)
+  root.style.setProperty('--primary-500', primary)
+  root.style.setProperty('--primary-600', primary600)
+  root.style.setProperty('--primary-700', primary700)
+  root.style.setProperty('--primary-800', primary800)
+  root.style.setProperty('--primary-900', primary900)
+  root.style.setProperty('--primary-900-rgb', primary900RgbStr)
   root.style.setProperty('--accent2', mix(primary, '#c7b2ff', 0.55))
   root.style.setProperty('--accent3', mix(primary, '#ffd1e8', 0.55))
   root.style.setProperty('--ring', mix(primary, '#ffffff', 0.25))

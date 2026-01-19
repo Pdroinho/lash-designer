@@ -39,6 +39,9 @@ export function handleError(err: unknown, _req: Request, res: Response, _next: N
     return
   }
 
+  if (process.env.NODE_ENV !== 'production') {
+    console.error(err)
+  }
+
   res.status(500).json({ message: 'Erro interno', code: 'INTERNAL_ERROR' })
 }
-

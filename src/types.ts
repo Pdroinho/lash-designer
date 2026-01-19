@@ -21,3 +21,14 @@ export type SessionUser = {
   tenantId: string | null
   tenantSlug: string | null
 }
+
+export type CalendarEvent = {
+  id: string
+  title: string
+  clientName: string
+  start: string // ISO date string
+  end: string // ISO date string
+  color?: string
+  textColor?: string
+  status: 'confirmed' | 'pending' | 'cancelled'
+}

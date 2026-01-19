@@ -21,6 +21,7 @@ const app = express()
 const isDevHost = (hostname: string) => {
   const host = (hostname ?? '').toLowerCase()
   if (env.DEV_HOST) return host === env.DEV_HOST.toLowerCase()
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return env.NODE_ENV !== 'production'
   return host.startsWith('dev.')
 }
 
@@ -528,6 +529,89 @@ app.post('/api/auth/register-client', async (req, res, next) => {
   }
 })
 
+app.post('/api/auth/client-fast-login', async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        tenantSlug: z.string().min(1).optional(),
+        name: z.string().min(2),
+        phone: z.string().min(8), // Basic length check
+      })
+      .parse(req.body)
+
+    const slug = (body.tenantSlug ?? req.resolvedTenant?.slug ?? '').trim().toLowerCase()
+    if (!slug) return next(notFound('Tenant não encontrado', 'TENANT_NOT_FOUND'))
+
+    const tenant = db.prepare('SELECT id, slug FROM tenants WHERE slug = ?').get(slug) as
+      | { id: string; slug: string }
+      | undefined
+    if (!tenant) return next(notFound('Tenant não encontrado', 'TENANT_NOT_FOUND'))
+
+    const cleanPhone = body.phone.replace(/\D/g, '')
+    if (cleanPhone.length < 8) throw badRequest('Telefone inválido', 'INVALID_PHONE')
+
+    // Generate a deterministic dummy email for this phone + tenant
+    // Using phone@tenant-slug.client to avoid collisions with real emails and other tenants
+    const dummyEmail = `${cleanPhone}@${tenant.slug}.client`
+
+    const existingUser = db.prepare('SELECT id, password_hash, role FROM users WHERE email = ?').get(dummyEmail) as
+      | { id: string; password_hash: string; role: string }
+      | undefined
+
+    let userId = existingUser?.id
+    const now = new Date().toISOString()
+
+    const tx = db.transaction(async () => {
+      if (existingUser) {
+        // Update client name if needed
+        db.prepare('UPDATE clients SET name = ? WHERE user_id = ?').run(body.name, existingUser.id)
+      } else {
+        // Create new user
+        userId = randomUUID()
+        const clientId = randomUUID()
+        // Random high-entropy password since they won't use it
+        const passwordHash = await hashPassword(randomUUID() + randomUUID())
+
+        db.prepare(
+          `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at)
+           VALUES (?, ?, ?, ?, 'CLIENT', ?)`
+        ).run(userId, tenant.id, dummyEmail, passwordHash, now)
+
+        db.prepare(
+          `INSERT INTO clients (id, tenant_id, user_id, name, phone, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        ).run(clientId, tenant.id, userId, body.name, body.phone, now)
+      }
+    })
+
+    await tx()
+
+    if (!userId) throw new Error('Falha ao autenticar usuário')
+
+    const token = signSession({ sub: userId, role: 'CLIENT', tenantId: tenant.id })
+    res.cookie('session', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 1000 * 60 * 60 * 24 * 30 * 12, // 1 year for convenience
+    })
+
+    res.json({
+      user: {
+        id: userId,
+        email: dummyEmail,
+        role: 'CLIENT',
+        tenantId: tenant.id,
+        tenantSlug: tenant.slug,
+        name: body.name,
+      },
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
 app.post('/api/dev/bootstrap', requireDevHost, async (req, res, next) => {
   try {
     const allowDevBootstrap =
@@ -566,6 +650,28 @@ app.post('/api/dev/tenants', requireDevHost, requireRole('DEV'), async (req, res
           .min(2)
           .regex(/^[a-z0-9-]+$/),
         primaryColor: z.string().min(4),
+        logoUrl: z
+          .string()
+          .trim()
+          .optional()
+          .transform((v) => {
+            if (typeof v !== 'string') return null
+            const s = v.trim()
+            return s ? s : null
+          })
+          .refine(
+            (v) => {
+              if (v === null) return true
+              if (v.startsWith('data:image/')) return v.length <= 250_000
+              try {
+                new URL(v)
+                return true
+              } catch {
+                return false
+              }
+            },
+            { message: 'Logo inválida' },
+          ),
         adminEmail: z.string().email(),
         adminPassword: z.string().min(8),
       })
@@ -587,8 +693,8 @@ app.post('/api/dev/tenants', requireDevHost, requireRole('DEV'), async (req, res
     const tx = db.transaction(() => {
       db.prepare(
         `INSERT INTO tenants (id, slug, name, primary_color, logo_url, created_at)
-         VALUES (?, ?, ?, ?, NULL, ?)`
-      ).run(tenantId, slug, body.name, body.primaryColor, now)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(tenantId, slug, body.name, body.primaryColor, body.logoUrl ?? null, now)
 
       db.prepare(
         `INSERT INTO tenant_settings (tenant_id, secondary_color, timezone, currency, created_at, updated_at)
