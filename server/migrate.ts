@@ -269,4 +269,10 @@ export function migrate() {
       CREATE INDEX IF NOT EXISTS idx_tenant_domains_tenant ON tenant_domains(tenant_id);
     `)
   })
+
+  apply(7, () => {
+    db.exec(`
+      ALTER TABLE services ADD COLUMN cover_url TEXT;
+    `)
+  })
 }

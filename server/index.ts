@@ -906,7 +906,7 @@ app.get('/api/admin/services', requireRole('ADMIN'), (req, res, next) => {
     const services = db
       .prepare(
         `
-          SELECT id, name, duration_minutes as durationMinutes, price_cents as priceCents
+          SELECT id, name, duration_minutes as durationMinutes, price_cents as priceCents, cover_url as coverUrl
           FROM services
           WHERE tenant_id = ?
           ORDER BY created_at DESC
@@ -928,20 +928,21 @@ app.post('/api/admin/services', requireRole('ADMIN'), (req, res, next) => {
         name: z.string().min(2),
         durationMinutes: z.number().int().positive(),
         priceCents: z.number().int().nonnegative(),
+        coverUrl: z.string().max(350_000).optional(),
       })
       .parse(req.body)
 
     const now = new Date().toISOString()
     const id = randomUUID()
     db.prepare(
-      `INSERT INTO services (id, tenant_id, name, duration_minutes, price_cents, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(id, tenantId, body.name, body.durationMinutes, body.priceCents, now)
+      `INSERT INTO services (id, tenant_id, name, duration_minutes, price_cents, cover_url, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, tenantId, body.name, body.durationMinutes, body.priceCents, body.coverUrl ?? null, now)
 
     const service = db
       .prepare(
         `
-          SELECT id, name, duration_minutes as durationMinutes, price_cents as priceCents
+          SELECT id, name, duration_minutes as durationMinutes, price_cents as priceCents, cover_url as coverUrl
           FROM services
           WHERE id = ?
         `,

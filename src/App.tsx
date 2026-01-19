@@ -31,7 +31,11 @@ import {
   Trash2,
   ShieldCheck,
   Eye,
-  EyeOff
+  EyeOff,
+  MessageSquare,
+  Megaphone,
+  QrCode,
+  Smartphone
 } from 'lucide-react'
 
 function withBasePath(basePath: string, path: string) {
@@ -54,6 +58,11 @@ type AdminService = {
   name: string
   durationMinutes: number
   priceCents: number
+  coverUrl?: string | null
+}
+
+function formatBRL(n: number) {
+  return 'R$' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 type ClientAppointment = {
@@ -61,6 +70,30 @@ type ClientAppointment = {
   serviceName: string
   startsAt: string
   status: string
+}
+
+function WhatsAppIcon({ size = 18, style }: { size?: number; style?: CSSProperties }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      style={style}
+    >
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+    </svg>
+  )
+}
+
+function Switch({ checked, onChange }: { checked: boolean; onChange: (c: boolean) => void }) {
+  return (
+    <label className="switch-toggle">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className="switch-toggle-slider" />
+    </label>
+  )
 }
 
 function SidebarItem(props: { active?: boolean; icon: ReactNode; label: string; onClick: () => void }) {
@@ -321,8 +354,14 @@ function AdminServices() {
     const [services, setServices] = useState<AdminService[]>([])
     const [loading, setLoading] = useState(true)
     const [modalOpen, setModalOpen] = useState(false)
-    const [newService, setNewService] = useState({ name: '', duration: 60, price: 0 })
+    const [newService, setNewService] = useState({ name: '', duration: 60, price: 0, coverUrl: '' })
     const [saving, setSaving] = useState(false)
+
+    const coverFileInputRef = useRef<HTMLInputElement | null>(null)
+    const [coverBusy, setCoverBusy] = useState(false)
+    const [coverFileName, setCoverFileName] = useState<string | null>(null)
+    const [coverError, setCoverError] = useState<string | null>(null)
+    const [coverDragOver, setCoverDragOver] = useState(false)
 
     useEffect(() => {
         load()
@@ -335,15 +374,113 @@ function AdminServices() {
         setLoading(false)
     }
 
+    function openCreateModal() {
+        setCoverBusy(false)
+        setCoverFileName(null)
+        setCoverError(null)
+        setNewService({ name: '', duration: 60, price: 0, coverUrl: '' })
+        if (coverFileInputRef.current) coverFileInputRef.current.value = ''
+        setModalOpen(true)
+    }
+
+    function loadImageFromObjectUrl(src: string) {
+        return new Promise<HTMLImageElement>((resolve, reject) => {
+            const img = new Image()
+            img.onload = () => resolve(img)
+            img.onerror = () => reject(new Error('Falha ao carregar imagem'))
+            img.src = src
+        })
+    }
+
+    function drawToCanvas(img: HTMLImageElement, maxDim: number) {
+        const w = img.naturalWidth || img.width
+        const h = img.naturalHeight || img.height
+        const largest = Math.max(w, h)
+        const scale = largest > maxDim ? maxDim / largest : 1
+        const cw = Math.max(1, Math.round(w * scale))
+        const ch = Math.max(1, Math.round(h * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = cw
+        canvas.height = ch
+        const ctx = canvas.getContext('2d')
+        if (!ctx) throw new Error('Canvas indisponível')
+        ctx.clearRect(0, 0, cw, ch)
+        ctx.drawImage(img, 0, 0, cw, ch)
+        return canvas
+    }
+
+    function canvasToDataUrl(canvas: HTMLCanvasElement, type: string, quality?: number) {
+        try {
+            return canvas.toDataURL(type, quality)
+        } catch {
+            return canvas.toDataURL('image/png')
+        }
+    }
+
+    async function fileToOptimizedDataUrl(file: File) {
+        const objectUrl = URL.createObjectURL(file)
+        try {
+            const img = await loadImageFromObjectUrl(objectUrl)
+            const attempts: Array<{ maxDim: number; quality: number }> = [
+                { maxDim: 768, quality: 0.86 },
+                { maxDim: 640, quality: 0.8 },
+                { maxDim: 512, quality: 0.78 },
+                { maxDim: 512, quality: 0.7 },
+                { maxDim: 384, quality: 0.7 }
+            ]
+
+            for (const a of attempts) {
+                const canvas = drawToCanvas(img, a.maxDim)
+                const webp = canvasToDataUrl(canvas, 'image/webp', a.quality)
+                if (webp.startsWith('data:image/') && webp.length <= 350_000) return webp
+                const png = canvasToDataUrl(canvas, 'image/png')
+                if (png.startsWith('data:image/') && png.length <= 350_000) return png
+            }
+
+            return canvasToDataUrl(drawToCanvas(img, 384), 'image/png')
+        } finally {
+            URL.revokeObjectURL(objectUrl)
+        }
+    }
+
+    async function handleCoverFile(file: File) {
+        setCoverBusy(true)
+        setCoverError(null)
+        try {
+            if (!file.type.startsWith('image/')) {
+                setCoverError('Arquivo inválido (envie uma imagem)')
+                return
+            }
+            const dataUrl = await fileToOptimizedDataUrl(file)
+            if (!dataUrl.startsWith('data:image/')) {
+                setCoverError('Falha ao processar a imagem')
+                return
+            }
+            if (dataUrl.length > 350_000) {
+                setCoverError('Imagem muito grande. Use uma menor.')
+                return
+            }
+            setCoverFileName(file.name)
+            setNewService((s) => ({ ...s, coverUrl: dataUrl }))
+        } catch {
+            setCoverError('Falha ao processar a imagem')
+        } finally {
+            setCoverBusy(false)
+        }
+    }
+
     async function handleCreate() {
         setSaving(true)
+        const payload: { name: string; durationMinutes: number; priceCents: number; coverUrl?: string } = {
+            name: newService.name,
+            durationMinutes: Number(newService.duration),
+            priceCents: Math.round(Number(newService.price) * 100)
+        }
+        if (newService.coverUrl) payload.coverUrl = newService.coverUrl
+
         await api('/api/admin/services', {
             method: 'POST',
-            body: JSON.stringify({
-                name: newService.name,
-                durationMinutes: Number(newService.duration),
-                priceCents: Number(newService.price) * 100
-            })
+            body: JSON.stringify(payload)
         })
         setSaving(false)
         setModalOpen(false)
@@ -358,7 +495,7 @@ function AdminServices() {
                         <h2 className="cardTitle">Serviços</h2>
                         <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4}}>Gerencie os serviços oferecidos no seu espaço.</p>
                     </div>
-                    <button className="btn btnPrimary" onClick={() => setModalOpen(true)}>
+                    <button className="btn btnPrimary" onClick={openCreateModal}>
                         <Plus size={16} style={{marginRight: 8}}/> Novo Serviço
                     </button>
                 </div>
@@ -397,25 +534,154 @@ function AdminServices() {
             {modalOpen && (
                 <div className="modal-overlay" onClick={() => setModalOpen(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
-                        <div className="cardHeader"><h3 className="cardTitle">Novo Serviço</h3></div>
+                        <div className="cardHeader" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                            <h3 className="cardTitle">Novo Serviço</h3>
+                            <button className="icon-btn" onClick={() => setModalOpen(false)} style={{width: 32, height: 32, border: 'none'}}>
+                                <XCircle size={20} />
+                            </button>
+                        </div>
                         <div className="cardBody">
-                            <div className="input-group">
-                                <label className="label">Nome do Serviço</label>
-                                <input className="input" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} placeholder="Ex: Cílios Volume Russo" />
-                            </div>
-                            <div className="row">
+                            <div className="form-stack">
                                 <div className="input-group">
-                                    <label className="label">Duração (min)</label>
-                                    <input className="input" type="number" value={newService.duration} onChange={e => setNewService({...newService, duration: Number(e.target.value)})} />
+                                    <label className="label">Capa do Serviço (Opcional)</label>
+                                    <div 
+                                        className={`cover-uploader ${coverDragOver ? 'dragover' : ''}`}
+                                        onDragOver={(e) => { e.preventDefault(); setCoverDragOver(true) }}
+                                        onDragLeave={() => setCoverDragOver(false)}
+                                        onDrop={(e) => {
+                                            e.preventDefault()
+                                            setCoverDragOver(false)
+                                            const f = e.dataTransfer.files?.[0]
+                                            if (f) handleCoverFile(f)
+                                        }}
+                                    >
+                                        <div 
+                                            className="cover-preview"
+                                            onClick={() => !coverBusy && coverFileInputRef.current?.click()}
+                                            style={{cursor: coverBusy ? 'default' : 'pointer'}}
+                                        >
+                                            {newService.coverUrl ? (
+                                                <img
+                                                    src={newService.coverUrl}
+                                                    alt="Capa do serviço"
+                                                    onError={() => setCoverError('Imagem inválida')}
+                                                />
+                                            ) : (
+                                                <ImageIcon size={18} style={{color: 'var(--gray-400)'}} />
+                                            )}
+                                            {newService.coverUrl && !coverBusy && (
+                                                <div className="cover-preview-overlay">
+                                                    <button type="button" className="btn" onClick={() => coverFileInputRef.current?.click()}>
+                                                        <Upload size={16} style={{marginRight: 8}} /> Trocar
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {coverBusy && (
+                                                <div className="cover-preview-overlay">
+                                                    <div className="spinner" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="cover-meta">
+                                            <div style={{fontWeight: 700, color: 'var(--gray-900)', lineHeight: 1.1}}>
+                                                {newService.coverUrl ? 'Capa selecionada' : 'Adicionar uma capa'}
+                                            </div>
+                                            <div style={{fontSize: '0.85rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                                                {coverFileName ? coverFileName : 'PNG/JPG/WebP'}
+                                            </div>
+                                            <div className="cover-actions">
+                                                <button type="button" className="btn" disabled={coverBusy} onClick={() => coverFileInputRef.current?.click()}>
+                                                    <Upload size={16} style={{marginRight: 8}} />
+                                                    {coverBusy ? 'Processando...' : 'Enviar'}
+                                                </button>
+                                                {newService.coverUrl && (
+                                                    <button
+                                                        type="button"
+                                                        className="btn"
+                                                        onClick={() => {
+                                                            setCoverError(null)
+                                                            setCoverFileName(null)
+                                                            setNewService((s) => ({ ...s, coverUrl: '' }))
+                                                            if (coverFileInputRef.current) coverFileInputRef.current.value = ''
+                                                        }}
+                                                    >
+                                                        <Trash2 size={16} style={{marginRight: 8}} /> Remover
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <input
+                                            ref={coverFileInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            style={{display: 'none'}}
+                                            onChange={(e) => {
+                                                const f = e.target.files?.[0]
+                                                if (!f) return
+                                                handleCoverFile(f)
+                                            }}
+                                        />
+                                    </div>
+                                    {coverError && (
+                                        <div style={{marginTop: 10, color: 'var(--danger)', fontSize: '0.85rem'}}>{coverError}</div>
+                                    )}
                                 </div>
+
                                 <div className="input-group">
-                                    <label className="label">Preço (R$)</label>
-                                    <input className="input" type="number" value={newService.price} onChange={e => setNewService({...newService, price: Number(e.target.value)})} />
+                                    <label className="label">Nome do Serviço</label>
+                                    <div className="input-wrapper">
+                                        <Sparkles size={16} className="input-icon" />
+                                        <input
+                                            className="input has-icon"
+                                            value={newService.name}
+                                            onChange={e => setNewService({...newService, name: e.target.value})}
+                                            placeholder="Ex: Cílios Volume Russo"
+                                            autoFocus
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="row" style={{marginTop: 20}}>
-                                <button className="btn w-full" onClick={() => setModalOpen(false)}>Cancelar</button>
-                                <button className="btn btnPrimary w-full" onClick={handleCreate} disabled={saving}>{saving ? 'Salvando...' : 'Criar'}</button>
+
+                                <div className="row">
+                                    <div className="input-group">
+                                        <label className="label">Duração (min)</label>
+                                        <div className="input-wrapper">
+                                            <Clock size={16} className="input-icon" />
+                                            <input
+                                                className="input has-icon"
+                                                type="number"
+                                                value={newService.duration}
+                                                onChange={e => setNewService({...newService, duration: Number(e.target.value)})}
+                                                min={1}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="input-group">
+                                        <label className="label">Preço (R$)</label>
+                                        <div className="input-wrapper">
+                                            <Wallet size={16} className="input-icon" />
+                                            <input
+                                                className="input has-icon"
+                                                type="text"
+                                                inputMode="decimal"
+                                                autoComplete="off"
+                                                placeholder="R$0,00"
+                                                value={formatBRL(newService.price)}
+                                                onChange={e => {
+                                                    const digits = e.target.value.replace(/\D/g, '')
+                                                    const units = digits ? parseInt(digits, 10) / 100 : 0
+                                                    setNewService({ ...newService, price: units })
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="row" style={{marginTop: 10}}>
+                                    <button className="btn w-full" onClick={() => setModalOpen(false)}>Cancelar</button>
+                                    <button className="btn btnPrimary w-full" onClick={handleCreate} disabled={saving}>
+                                        {saving ? 'Salvando...' : 'Criar'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -901,7 +1167,7 @@ function AdminCalendar() {
                                 </div>
                                 
                                 <div className="calendar-body">
-                                    {weekDays.map((date, i) => (
+                                    {weekDays.map((date) => (
                                         <div key={date.toISOString()} className="calendar-day-column">
                                             {hours.map(h => (
                                                 <div key={h} className="calendar-grid-cell"></div>
@@ -1049,6 +1315,716 @@ function AdminClients() {
     )
 }
 
+function AdminEvolutionAPI() {
+    const [status, setStatus] = useState<'disconnected' | 'qr_scan' | 'connected'>('disconnected')
+    const [remindersEnabled, setRemindersEnabled] = useState(true)
+    const [reminderOffset, setReminderOffset] = useState('24')
+    const [reminderMessage, setReminderMessage] = useState(
+        'Oi {{nome}}, tudo bem? Só passando para lembrar do seu horário amanhã às {{hora}} aqui no {{espaco}}. Até lá!'
+    )
+    const [promoEnabled, setPromoEnabled] = useState(false)
+    const [promoMessage, setPromoMessage] = useState(
+        'Oi {{nome}}, temos uma novidade especial para você esta semana no {{espaco}}. Responda esta mensagem para saber mais.'
+    )
+
+    // Helper to format preview message
+    const formatPreview = (msg: string) => {
+        return msg
+            .replace(/{{nome}}/g, 'Maria')
+            .replace(/{{data}}/g, '15/10')
+            .replace(/{{hora}}/g, '14:00')
+            .replace(/{{espaco}}/g, 'Studio Bella')
+    }
+
+    return (
+        <div className="grid" style={{gridTemplateColumns: '1fr 400px', gap: '2rem', alignItems: 'start'}}>
+            {/* Left Column: Configuration */}
+            <div className="column" style={{gap: '1.5rem'}}>
+                {/* Connection Status Card */}
+                <div className="card">
+                    <div className="cardHeader" style={{background: status === 'connected' ? '#dcfce7' : '#fee2e2'}}>
+                        <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                             <div style={{
+                                 width: 40, height: 40, borderRadius: '50%', 
+                                 background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                 color: status === 'connected' ? '#166534' : '#991b1b'
+                             }}>
+                                 {status === 'connected' ? <Smartphone size={20} /> : <LogOut size={20} />}
+                             </div>
+                             <div>
+                                 <h3 className="cardTitle" style={{color: status === 'connected' ? '#14532d' : '#7f1d1d'}}>
+                                     {status === 'connected' ? 'WhatsApp Conectado' : 'WhatsApp Desconectado'}
+                                 </h3>
+                                 <div style={{fontSize: '0.8rem', color: status === 'connected' ? '#166534' : '#991b1b'}}>
+                                     {status === 'connected' ? 'Pronto para enviar mensagens.' : 'Escaneie o QR Code para conectar.'}
+                                 </div>
+                             </div>
+                        </div>
+                        {status === 'connected' ? (
+                            <button className="btn btn-ghost" style={{background: 'white'}} onClick={() => setStatus('disconnected')}>Desconectar</button>
+                        ) : (
+                            <button className="btn btnPrimary" onClick={() => setStatus(status === 'qr_scan' ? 'connected' : 'qr_scan')}>
+                                {status === 'qr_scan' ? 'Simular Conexão' : 'Conectar'}
+                            </button>
+                        )}
+                    </div>
+                    {status === 'qr_scan' && (
+                        <div className="cardBody" style={{textAlign: 'center'}}>
+                            <div style={{background: '#1f2937', padding: 16, borderRadius: 12, display: 'inline-block', marginBottom: 16}}>
+                                <QrCode size={120} color="white" />
+                            </div>
+                            <p style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>Abra o WhatsApp &gt; Aparelhos Conectados &gt; Conectar Aparelho</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Reminders Config */}
+                <div className="card">
+                    <div className="cardHeader">
+                        <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
+                            <div style={{width: 32, height: 32, borderRadius: 8, background: 'var(--primary-50)', color: 'var(--primary-600)', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                <Bell size={18} />
+                            </div>
+                            <h3 className="cardTitle">Lembretes Automáticos</h3>
+                        </div>
+                        <Switch checked={remindersEnabled} onChange={setRemindersEnabled} />
+                    </div>
+                    {remindersEnabled && (
+                        <div className="cardBody" style={{animation: 'fadeIn 0.3s ease'}}>
+                             <div className="input-group" style={{marginBottom: 16}}>
+                                <label className="label">Enviar lembrete com antecedência de:</label>
+                                <div style={{display: 'flex', gap: 8}}>
+                                    {['3', '24', '48'].map(h => (
+                                        <button 
+                                            key={h}
+                                            className={`btn ${reminderOffset === h ? 'btnPrimary' : 'btn-ghost'}`}
+                                            onClick={() => setReminderOffset(h)}
+                                            style={{flex: 1, border: reminderOffset === h ? 'none' : '1px solid var(--gray-200)'}}
+                                        >
+                                            {h} horas
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="input-group">
+                                <label className="label">Mensagem Personalizada</label>
+                                <textarea 
+                                    className="input" 
+                                    style={{height: 'auto', minHeight: 100, padding: 12, lineHeight: 1.5}}
+                                    value={reminderMessage}
+                                    onChange={e => setReminderMessage(e.target.value)}
+                                />
+                                <div style={{fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap'}}>
+                                    <span style={{fontWeight: 600}}>Variáveis:</span>
+                                    {['{{nome}}', '{{data}}', '{{hora}}', '{{espaco}}'].map(v => (
+                                        <span key={v} className="pill" style={{fontSize: '0.7rem', cursor: 'pointer'}} onClick={() => setReminderMessage(prev => prev + ' ' + v)}>{v}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Campaigns Config */}
+                <div className="card">
+                    <div className="cardHeader">
+                        <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
+                            <div style={{width: 32, height: 32, borderRadius: 8, background: 'var(--primary-50)', color: 'var(--primary-600)', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                <Megaphone size={18} />
+                            </div>
+                            <h3 className="cardTitle">Campanhas de Marketing</h3>
+                        </div>
+                        <Switch checked={promoEnabled} onChange={setPromoEnabled} />
+                    </div>
+                    {promoEnabled && (
+                        <div className="cardBody" style={{animation: 'fadeIn 0.3s ease'}}>
+                            <div className="input-group">
+                                <label className="label">Conteúdo da Promoção</label>
+                                <textarea 
+                                    className="input" 
+                                    style={{height: 'auto', minHeight: 100, padding: 12, lineHeight: 1.5}}
+                                    value={promoMessage}
+                                    onChange={e => setPromoMessage(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Right Column: Phone Preview */}
+            <div className="column">
+                <div style={{position: 'sticky', top: 20}}>
+                    <h3 style={{fontSize: '1rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700}}>
+                        Visualização em Tempo Real
+                    </h3>
+                    
+                    <div className="phone-mockup">
+                        <div className="phone-notch" />
+                        <div className="phone-header">
+                            <ChevronLeft size={24} style={{marginRight: 4}} />
+                            <div style={{width: 36, height: 36, borderRadius: '50%', background: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, color: '#475569', fontSize: '0.8rem'}}>
+                                MJ
+                            </div>
+                            <div style={{flex: 1, marginLeft: 8}}>
+                                <div style={{fontWeight: 600, fontSize: '0.95rem'}}>Maria Julia</div>
+                                <div style={{fontSize: '0.75rem', opacity: 0.8}}>Online</div>
+                            </div>
+                            <Smartphone size={20} style={{marginRight: 16}} />
+                            <MoreHorizontal size={20} />
+                        </div>
+                        <div className="phone-body">
+                            <div className="wa-date-divider">
+                                <span className="wa-date-pill">Ontem</span>
+                            </div>
+                            
+                            <div className="wa-bubble in">
+                                Oi, gostaria de marcar um horário para cílios.
+                                <div className="wa-time">10:30</div>
+                            </div>
+                            
+                            <div className="wa-bubble out">
+                                Olá Maria! Claro, temos horário para amanhã às 14h. Pode ser?
+                                <div className="wa-time">10:35 <span className="wa-ticks"><Check size={12} strokeWidth={3} /></span></div>
+                            </div>
+
+                            <div className="wa-bubble in">
+                                Pode sim! Confirmado.
+                                <div className="wa-time">10:40</div>
+                            </div>
+
+                            <div className="wa-date-divider">
+                                <span className="wa-date-pill">Hoje</span>
+                            </div>
+
+                            {remindersEnabled && (
+                                <div className="wa-bubble out" style={{animation: 'fadeIn 0.3s ease'}}>
+                                    {formatPreview(reminderMessage)}
+                                    <div className="wa-time">09:00 <span className="wa-ticks"><Check size={12} strokeWidth={3} /></span></div>
+                                </div>
+                            )}
+
+                            {promoEnabled && (
+                                <div className="wa-bubble out" style={{animation: 'fadeIn 0.3s ease'}}>
+                                    {formatPreview(promoMessage)}
+                                    <div className="wa-time">12:00 <span className="wa-ticks"><Check size={12} strokeWidth={3} /></span></div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// --- Image Helpers (Shared) ---
+
+async function loadImageFromObjectUrl(objectUrl: string) {
+    const img = new Image()
+    img.decoding = 'async'
+    img.src = objectUrl
+    await img.decode()
+    return img
+}
+
+function drawToCanvas(img: HTMLImageElement, maxDim: number) {
+    const w = img.naturalWidth || img.width
+    const h = img.naturalHeight || img.height
+    const largest = Math.max(w, h)
+    const scale = largest > maxDim ? maxDim / largest : 1
+    const cw = Math.max(1, Math.round(w * scale))
+    const ch = Math.max(1, Math.round(h * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = cw
+    canvas.height = ch
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas indisponível')
+    ctx.clearRect(0, 0, cw, ch)
+    ctx.drawImage(img, 0, 0, cw, ch)
+    return canvas
+}
+
+function canvasToDataUrl(canvas: HTMLCanvasElement, type: string, quality?: number) {
+    try {
+        return canvas.toDataURL(type, quality)
+    } catch {
+        return canvas.toDataURL('image/png')
+    }
+}
+
+async function fileToOptimizedDataUrl(file: File) {
+    const objectUrl = URL.createObjectURL(file)
+    try {
+        const img = await loadImageFromObjectUrl(objectUrl)
+        const attempts: Array<{ maxDim: number; quality: number }> = [
+            { maxDim: 512, quality: 0.86 },
+            { maxDim: 512, quality: 0.78 },
+            { maxDim: 384, quality: 0.78 },
+            { maxDim: 384, quality: 0.7 },
+            { maxDim: 256, quality: 0.7 }
+        ]
+
+        for (const a of attempts) {
+            const canvas = drawToCanvas(img, a.maxDim)
+            const webp = canvasToDataUrl(canvas, 'image/webp', a.quality)
+            if (webp.startsWith('data:image/') && webp.length <= 250_000) return webp
+            const png = canvasToDataUrl(canvas, 'image/png')
+            if (png.startsWith('data:image/') && png.length <= 250_000) return png
+        }
+
+        const fallback = canvasToDataUrl(drawToCanvas(img, 256), 'image/png')
+        return fallback
+    } finally {
+        URL.revokeObjectURL(objectUrl)
+    }
+}
+
+function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUpdate?: () => void }) {
+    const [name, setName] = useState(tenant?.name ?? '')
+    const [primaryColor, setPrimaryColor] = useState(tenant?.primaryColor ?? '#ec4899')
+    const [logoUrl, setLogoUrl] = useState(tenant?.logoUrl ?? '')
+    const [saving, setSaving] = useState(false)
+    
+    // Logo state
+    const [logoBusy, setLogoBusy] = useState(false)
+    const [logoError, setLogoError] = useState<string | null>(null)
+    const logoInputRef = useRef<HTMLInputElement>(null)
+
+    // Update state when tenant changes
+    useEffect(() => {
+        if(tenant) {
+            setName(tenant.name)
+            setPrimaryColor(tenant.primaryColor)
+            setLogoUrl(tenant.logoUrl || '')
+        }
+    }, [tenant])
+
+    async function handleLogoFile(file: File) {
+        setLogoBusy(true)
+        setLogoError(null)
+        try {
+            if (!file.type.startsWith('image/')) {
+                setLogoError('Arquivo inválido (envie uma imagem)')
+                return
+            }
+            const dataUrl = await fileToOptimizedDataUrl(file)
+            setLogoUrl(dataUrl)
+        } catch {
+            setLogoError('Falha ao processar a imagem')
+        } finally {
+            setLogoBusy(false)
+        }
+    }
+
+    async function handleSave() {
+        setSaving(true)
+        // Mock API call to update tenant
+        // In real app: await api.put('/api/admin/tenant', { name, primaryColor, logoUrl })
+        
+        // Simulate network delay
+        await new Promise(r => setTimeout(r, 800))
+        
+        // Update local theme immediately for better UX
+        const root = document.documentElement
+        root.style.setProperty('--primary-500', primaryColor)
+        // Note: In a real app we would need to generate the full palette or rely on the backend/theme helper
+        
+        setSaving(false)
+        if (onUpdate) onUpdate()
+        alert('Configurações salvas com sucesso!')
+    }
+
+    return (
+        <div className="grid" style={{gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start'}}>
+            <div className="column" style={{gap: '1.5rem'}}>
+                <div className="card">
+                    <div className="cardHeader">
+                        <h2 className="cardTitle">Identidade Visual</h2>
+                        <p style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>Personalize a aparência do seu espaço.</p>
+                    </div>
+                    <div className="cardBody">
+                        <div className="form-stack">
+                            <div className="input-group">
+                                <label className="label">Nome do Espaço</label>
+                                <input className="input" value={name} onChange={e => setName(e.target.value)} />
+                            </div>
+
+                            <div className="input-group">
+                                <label className="label">Logo</label>
+                                <div style={{display: 'flex', alignItems: 'center', gap: 16}}>
+                                    <div style={{
+                                        width: 80, height: 80, borderRadius: 16, border: '1px solid var(--gray-200)',
+                                        background: 'var(--gray-50)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        overflow: 'hidden', position: 'relative'
+                                    }}>
+                                        {logoUrl ? (
+                                            <img src={logoUrl} alt="Logo" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                                        ) : (
+                                            <ImageIcon size={24} color="var(--gray-400)" />
+                                        )}
+                                        {logoBusy && <div className="spinner" style={{position: 'absolute'}} />}
+                                    </div>
+                                    <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>
+                                        <div style={{display: 'flex', gap: 8}}>
+                                            <button className="btn" onClick={() => logoInputRef.current?.click()} disabled={logoBusy}>
+                                                <Upload size={16} style={{marginRight: 8}} /> Trocar Logo
+                                            </button>
+                                            {logoUrl && (
+                                                <button className="btn" onClick={() => setLogoUrl('')} style={{color: 'var(--danger)', borderColor: 'var(--danger)'}}>
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div style={{fontSize: '0.75rem', color: 'var(--text-muted)'}}>Recomendado: 512x512px (PNG/JPG)</div>
+                                        {logoError && <div style={{fontSize: '0.75rem', color: 'var(--danger)'}}>{logoError}</div>}
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        ref={logoInputRef} 
+                                        style={{display: 'none'}} 
+                                        accept="image/*"
+                                        onChange={e => {
+                                            const f = e.target.files?.[0]
+                                            if(f) handleLogoFile(f)
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="input-group">
+                                <label className="label">Cor Principal</label>
+                                <div style={{display: 'flex', gap: 12, flexWrap: 'wrap'}}>
+                                    {['#ec4899', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#111827'].map(c => (
+                                        <div 
+                                            key={c}
+                                            onClick={() => setPrimaryColor(c)}
+                                            style={{
+                                                width: 32, height: 32, borderRadius: '50%', background: c, cursor: 'pointer',
+                                                border: primaryColor === c ? '2px solid var(--gray-900)' : '2px solid transparent',
+                                                boxShadow: primaryColor === c ? '0 0 0 2px white' : 'none',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                            }}
+                                        >
+                                            {primaryColor === c && <Check size={14} color="white" />}
+                                        </div>
+                                    ))}
+                                    <div style={{width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', position: 'relative', border: '1px solid var(--gray-200)'}}>
+                                        <input 
+                                            type="color" 
+                                            value={primaryColor} 
+                                            onChange={e => setPrimaryColor(e.target.value)}
+                                            style={{opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer'}} 
+                                        />
+                                        <div style={{width: '100%', height: '100%', background: primaryColor}} />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style={{marginTop: 16}}>
+                                <button className="btn btnPrimary" onClick={handleSave} disabled={saving}>
+                                    {saving ? 'Salvando...' : 'Salvar Alterações'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="column" style={{gap: '1.5rem'}}>
+                <div className="card">
+                    <div className="cardHeader">
+                        <h2 className="cardTitle">Assinatura</h2>
+                        <span className="status-badge status-success">Ativa</span>
+                    </div>
+                    <div className="cardBody">
+                        <div style={{background: 'linear-gradient(135deg, var(--gray-900), var(--gray-800))', borderRadius: 12, padding: 20, color: 'white', marginBottom: 20}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
+                                <div>
+                                    <div style={{fontSize: '0.85rem', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em'}}>Plano Atual</div>
+                                    <div style={{fontSize: '1.5rem', fontWeight: 700, margin: '4px 0'}}>Lash Space Pro</div>
+                                    <div style={{fontSize: '0.9rem', opacity: 0.9}}>R$ 97,00 / mês</div>
+                                </div>
+                                <div style={{background: 'rgba(255,255,255,0.1)', padding: 8, borderRadius: 8}}>
+                                    <Sparkles size={24} color="#f472b6" />
+                                </div>
+                            </div>
+                            <div style={{marginTop: 24, display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', opacity: 0.8}}>
+                                <Check size={14} /> Próxima cobrança em 15/02/2026
+                            </div>
+                        </div>
+
+                        <div style={{marginBottom: 20}}>
+                            <div style={{fontWeight: 600, fontSize: '0.9rem', marginBottom: 12}}>Forma de Pagamento</div>
+                            <div style={{display: 'flex', alignItems: 'center', gap: 12, padding: 12, border: '1px solid var(--gray-200)', borderRadius: 12}}>
+                                <div style={{width: 36, height: 24, background: '#1f2937', borderRadius: 4}} />
+                                <div style={{flex: 1}}>
+                                    <div style={{fontSize: '0.9rem', fontWeight: 500}}>Mastercard final 4242</div>
+                                    <div style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>Expira em 12/28</div>
+                                </div>
+                                <button className="btn btn-ghost" style={{fontSize: '0.8rem'}}>Trocar</button>
+                            </div>
+                        </div>
+
+                        <button className="btn w-full" style={{border: '1px solid var(--danger)', color: 'var(--danger)'}}>Cancelar Assinatura</button>
+                    </div>
+                </div>
+
+                <div className="card">
+                    <div className="cardHeader">
+                        <h2 className="cardTitle">Histórico de Faturas</h2>
+                    </div>
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Valor</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>15/01/2026</td>
+                                <td>R$ 97,00</td>
+                                <td><span className="status-badge status-success" style={{fontSize: '0.7rem'}}>Pago</span></td>
+                                <td><button className="icon-btn" style={{width: 28, height: 28}}><Upload size={14} style={{transform: 'rotate(180deg)'}} /></button></td>
+                            </tr>
+                            <tr>
+                                <td>15/12/2025</td>
+                                <td>R$ 97,00</td>
+                                <td><span className="status-badge status-success" style={{fontSize: '0.7rem'}}>Pago</span></td>
+                                <td><button className="icon-btn" style={{width: 28, height: 28}}><Upload size={14} style={{transform: 'rotate(180deg)'}} /></button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function AdminFinance() {
+    const [loading, setLoading] = useState(true)
+    const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all')
+
+    // Mock Data
+    const stats = {
+        revenue: 1258050, // R$ 12.580,50
+        expenses: 345000, // R$ 3.450,00
+        profit: 913050,   // R$ 9.130,50
+        growth: 12.5      // +12.5%
+    }
+
+    const monthlyRevenue = [
+        { month: 'Ago', value: 8500 },
+        { month: 'Set', value: 9200 },
+        { month: 'Out', value: 10500 },
+        { month: 'Nov', value: 9800 },
+        { month: 'Dez', value: 14500 },
+        { month: 'Jan', value: 12580 }
+    ]
+
+    const maxRevenue = Math.max(...monthlyRevenue.map(m => m.value))
+
+    const transactions = [
+        { id: 1, title: 'Pagamento - Maria Julia', type: 'income', amount: 12000, date: 'Hoje, 14:30', category: 'Serviço' },
+        { id: 2, title: 'Compra de Materiais', type: 'expense', amount: 45000, date: 'Hoje, 10:00', category: 'Insumos' },
+        { id: 3, title: 'Pagamento - Ana Silva', type: 'income', amount: 8500, date: 'Ontem', category: 'Serviço' },
+        { id: 4, title: 'Aluguel do Espaço', type: 'expense', amount: 250000, date: '15/01', category: 'Fixo' },
+        { id: 5, title: 'Pagamento - Carla Perez', type: 'income', amount: 15000, date: '15/01', category: 'Serviço' },
+    ]
+
+    useEffect(() => {
+        setTimeout(() => setLoading(false), 600)
+    }, [])
+
+    if (loading) {
+        return (
+            <div style={{display: 'flex', justifyContent: 'center', padding: 40}}>
+                <div className="spinner" />
+            </div>
+        )
+    }
+
+    const filteredTransactions = transactions.filter(t => {
+        if (filter === 'all') return true
+        return t.type === filter
+    })
+
+    return (
+        <div className="finance-grid">
+            {/* Summary Cards */}
+            <div className="finance-col-full">
+                <div className="grid" style={{gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))'}}>
+                    <div className="finance-stat-card">
+                        <div className="finance-stat-icon" style={{background: '#dcfce7', color: '#166534'}}>
+                            <Wallet size={24} />
+                        </div>
+                        <div className="finance-stat-info">
+                            <div className="finance-stat-label">Faturamento (Jan)</div>
+                            <div className="finance-stat-value" style={{color: '#166534'}}>{formatBRL(stats.revenue / 100)}</div>
+                            <div className="finance-stat-trend" style={{color: '#166534'}}>
+                                <Sparkles size={14} />
+                                +{stats.growth}% vs. mês anterior
+                            </div>
+                        </div>
+                    </div>
+                    <div className="finance-stat-card">
+                        <div className="finance-stat-icon" style={{background: '#fee2e2', color: '#991b1b'}}>
+                            <Trash2 size={24} />
+                        </div>
+                        <div className="finance-stat-info">
+                            <div className="finance-stat-label">Despesas (Jan)</div>
+                            <div className="finance-stat-value" style={{color: '#991b1b'}}>{formatBRL(stats.expenses / 100)}</div>
+                        </div>
+                    </div>
+                    <div className="finance-stat-card">
+                        <div className="finance-stat-icon" style={{background: '#e0f2fe', color: '#0369a1'}}>
+                            <Wallet size={24} />
+                        </div>
+                        <div className="finance-stat-info">
+                            <div className="finance-stat-label">Lucro Líquido</div>
+                            <div className="finance-stat-value" style={{color: '#0369a1'}}>{formatBRL(stats.profit / 100)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="finance-col-main" style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                {/* Revenue Chart */}
+                <div className="card">
+                    <div className="cardHeader">
+                        <h3 className="cardTitle">Faturamento Semestral</h3>
+                    </div>
+                    <div className="cardBody">
+                        <div className="finance-chart-container">
+                            {monthlyRevenue.map((item, i) => (
+                                <div key={i} className="finance-chart-col">
+                                    <div 
+                                        className="finance-chart-bar"
+                                        style={{
+                                            height: `${(item.value / maxRevenue) * 100}%`, 
+                                            background: i === monthlyRevenue.length - 1 ? 'var(--primary-600)' : 'var(--primary-200)',
+                                        }}
+                                    >
+                                        <div className="tooltip">{formatBRL(item.value)}</div>
+                                    </div>
+                                    <div className="finance-chart-label">{item.month}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Transactions */}
+                <div className="card">
+                    <div className="cardHeader" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                        <h3 className="cardTitle">Transações Recentes</h3>
+                        <div style={{display: 'flex', gap: 8}}>
+                            {['all', 'income', 'expense'].map(f => (
+                                <button
+                                    key={f}
+                                    onClick={() => setFilter(f as any)}
+                                    className={`finance-filter-btn ${filter === f ? 'active' : ''}`}
+                                >
+                                    {f === 'all' ? 'Todas' : f === 'income' ? 'Entradas' : 'Saídas'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div style={{overflowX: 'auto'}}>
+                        <table className="data-table finance-transaction-table">
+                            <thead>
+                                <tr>
+                                    <th>Descrição</th>
+                                    <th>Categoria</th>
+                                    <th>Data</th>
+                                    <th style={{textAlign: 'right'}}>Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredTransactions.map(t => (
+                                    <tr key={t.id}>
+                                        <td>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: 16}}>
+                                                <div className="finance-transaction-icon" style={{
+                                                    background: t.type === 'income' ? '#dcfce7' : '#fee2e2',
+                                                    color: t.type === 'income' ? '#166534' : '#991b1b',
+                                                }}>
+                                                    {t.type === 'income' ? <Check size={20} /> : <Trash2 size={20} />}
+                                                </div>
+                                                <span style={{fontWeight: 600, color: 'var(--gray-900)'}}>{t.title}</span>
+                                            </div>
+                                        </td>
+                                        <td><span className="pill">{t.category}</span></td>
+                                        <td style={{color: 'var(--gray-500)'}}>{t.date}</td>
+                                        <td style={{
+                                            textAlign: 'right', 
+                                            fontWeight: 700, 
+                                            color: t.type === 'income' ? '#166534' : '#991b1b'
+                                        }}>
+                                            {t.type === 'income' ? '+' : '-'}{formatBRL(t.amount / 100)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {/* Side Column */}
+            <div className="finance-col-side" style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                <div className="finance-cashflow-card">
+                    <h3 style={{fontSize: '1.2rem', marginBottom: 8, fontWeight: 700, position: 'relative', zIndex: 1}}>Fluxo de Caixa</h3>
+                    <p style={{opacity: 0.9, fontSize: '0.95rem', marginBottom: 24, position: 'relative', zIndex: 1}}>
+                        Saldo disponível para saque imediato.
+                    </p>
+                    <div style={{fontSize: '2.5rem', fontWeight: 800, marginBottom: 24, position: 'relative', zIndex: 1}}>
+                        {formatBRL(stats.profit / 100)}
+                    </div>
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, position: 'relative', zIndex: 1}}>
+                        <button className="btn" style={{background: 'white', color: 'var(--primary-600)', border: 'none', fontWeight: 600, height: 48}}>
+                            Sacar
+                        </button>
+                        <button className="btn" style={{background: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 600, height: 48}}>
+                            Extrato
+                        </button>
+                    </div>
+                </div>
+
+                <div className="card">
+                    <div className="cardHeader">
+                        <h3 className="cardTitle">Metas do Mês</h3>
+                    </div>
+                    <div className="cardBody">
+                        <div style={{marginBottom: 20}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8}}>
+                                <span style={{fontWeight: 500, color: 'var(--gray-700)'}}>Faturamento</span>
+                                <span style={{fontWeight: 700, color: 'var(--success)'}}>85%</span>
+                            </div>
+                            <div style={{height: 10, background: 'var(--gray-100)', borderRadius: 5, overflow: 'hidden'}}>
+                                <div style={{width: '85%', height: '100%', background: 'var(--success)', borderRadius: 5}} />
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8}}>
+                                <span style={{fontWeight: 500, color: 'var(--gray-700)'}}>Novos Clientes</span>
+                                <span style={{fontWeight: 700, color: 'var(--primary-600)'}}>60%</span>
+                            </div>
+                            <div style={{height: 10, background: 'var(--gray-100)', borderRadius: 5, overflow: 'hidden'}}>
+                                <div style={{width: '60%', height: '100%', background: 'var(--primary-500)', borderRadius: 5}} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: string } = {}) {
   const { tenantSlug } = useParams()
   const nav = useNavigate()
@@ -1056,7 +2032,7 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
   const [me, setMe] = useState<SessionUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [tenant, setTenant] = useState<TenantPublic | null>(null)
-  const [tab, setTab] = useState<'dashboard' | 'calendar' | 'services' | 'clients' | 'finance' | 'settings'>('dashboard')
+  const [tab, setTab] = useState<'dashboard' | 'calendar' | 'services' | 'clients' | 'finance' | 'settings' | 'evolution'>('dashboard')
 
   const [stats, setStats] = useState<AdminStats | null>(null)
 
@@ -1120,6 +2096,7 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
                 <SidebarItem active={tab === 'finance'} icon={<Wallet size={18}/>} label="Financeiro" onClick={() => setTab('finance')} />
                 
                 <div className="nav-label" style={{marginTop: 16}}>Sistema</div>
+                <SidebarItem active={tab === 'evolution'} icon={<WhatsAppIcon size={18}/>} label="WhatsApp" onClick={() => setTab('evolution')} />
                 <SidebarItem active={tab === 'settings'} icon={<Settings size={18}/>} label="Configurações" onClick={() => setTab('settings')} />
                 <SidebarItem icon={<LogOut size={18}/>} label="Sair" onClick={async () => {
                      await api('/api/auth/logout', {method: 'POST'})
@@ -1136,48 +2113,23 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
         {tab === 'clients' ? <AdminClients /> : null}
         
         {/* Placeholders for other tabs */}
-        {tab === 'finance' ? (
-            <div className="data-table-container">
-                <div style={{padding: '2rem', textAlign: 'center', color: 'var(--text-muted)'}}>
-                    Módulo Financeiro em desenvolvimento.
-                </div>
-            </div>
-        ) : null}
+        {tab === 'finance' ? <AdminFinance /> : null}
 
         {tab === 'calendar' ? <AdminCalendar /> : null}
 
+        {tab === 'evolution' ? <AdminEvolutionAPI /> : null}
+
         {tab === 'settings' ? (
-            <div className="card">
-                 <div className="cardHeader"><h2 className="cardTitle">Configurações</h2></div>
-                 <div className="cardBody">
-                     <div className="row" style={{marginBottom: 20}}>
-                        <div className="input-group" style={{flex: 1}}>
-                            <label className="label">Nome do Espaço</label>
-                            <input className="input" value={tenant?.name} disabled />
-                        </div>
-                        <div className="input-group" style={{flex: 1}}>
-                            <label className="label">URL (Slug)</label>
-                            <input className="input" value={tenant?.slug} disabled />
-                        </div>
-                     </div>
-                     
-                     <div className="sectionTitle" style={{fontSize: '1rem', marginTop: 20}}>Aparência</div>
-                     <div className="row">
-                        <div className="card" style={{padding: 20, flex: 1, textAlign: 'center', cursor: 'pointer', border: '2px solid var(--primary-500)'}}>
-                             <div style={{width: 40, height: 40, borderRadius: '50%', background: '#ec4899', margin: '0 auto 10px'}}/>
-                             <div style={{fontWeight: 600}}>Rosa (Padrão)</div>
-                        </div>
-                        <div className="card" style={{padding: 20, flex: 1, textAlign: 'center', cursor: 'pointer', opacity: 0.6}}>
-                             <div style={{width: 40, height: 40, borderRadius: '50%', background: '#8b5cf6', margin: '0 auto 10px'}}/>
-                             <div style={{fontWeight: 600}}>Roxo</div>
-                        </div>
-                        <div className="card" style={{padding: 20, flex: 1, textAlign: 'center', cursor: 'pointer', opacity: 0.6}}>
-                             <div style={{width: 40, height: 40, borderRadius: '50%', background: '#0ea5e9', margin: '0 auto 10px'}}/>
-                             <div style={{fontWeight: 600}}>Azul</div>
-                        </div>
-                     </div>
-                 </div>
-            </div>
+            <AdminSettings tenant={tenant} onUpdate={() => {
+                if(slug) {
+                    api<{ tenant: TenantPublic }>(`/api/public/tenant/${slug}`).then(res => {
+                        if(res.ok) {
+                            setTenant(res.data.tenant)
+                            applyTenantTheme(res.data.tenant)
+                        }
+                    })
+                }
+            }} />
         ) : null}
     </Shell>
   )
