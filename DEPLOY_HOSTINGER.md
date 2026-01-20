@@ -91,7 +91,8 @@ Se você não usa Git, pode subir os arquivos manualmente.
 
 - **Erro de Permissão:** Se tiver problemas com permissão, rode `chmod +x node_modules/.bin/vite` ou `chmod +x node_modules/.bin/tsc`.
 - **Porta em Uso:** Se a porta 3000 estiver ocupada, mude no arquivo `.env` para outra (ex: 8080 ou 4000).
-- **Banco de Dados:** O sistema usa SQLite (`data/app.db`). Este arquivo será criado automaticamente dentro da pasta `data`. **Certifique-se de que a pasta `data` não seja sobrescrita durante os deploys.**
+- **Banco de Dados:** O sistema usa SQLite. Em produção, ele será salvo automaticamente em `../db_data/app.db` (fora da pasta `public_html`). Isso garante que seus dados **não sejam apagados** quando você fizer um novo deploy do código.
+  - A pasta `db_data` será criada automaticamente no nível superior do seu domínio.
 
 ---
 
