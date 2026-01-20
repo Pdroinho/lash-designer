@@ -12,7 +12,6 @@ import { env } from './env.js'
 import { badRequest, handleError, notFound, unauthorized } from './http.js'
 import { migrate } from './migrate.js'
 import { hashPassword, signSession, verifyPassword } from './security.js'
-import { createHostingerSubdomain } from './hostinger.js'
 
 console.log(`[Startup] DATABASE_PATH: ${env.DATABASE_PATH}`)
 console.log(`[Startup] NODE_ENV: ${env.NODE_ENV}`)
@@ -1055,27 +1054,23 @@ app.post('/api/dev/tenants', requireDevHost, requireRole('DEV'), async (req, res
 
     tx()
 
-    // Hostinger Integration
+    // Hostinger Integration (Removed as per request)
+    // The previous automation logic was here. Now we just proceed.
+    // If we need to re-enable, we can uncomment or restore the logic.
+    /*
     let hostingerLogs: string[] = []
     try {
         const hToken = (db.prepare("SELECT value FROM platform_settings WHERE key = 'hostinger_api_token'").get() as { value: string } | undefined)?.value
-        
-        console.log(`[Hostinger] Token found: ${!!hToken}`)
         
         if (hToken) {
             console.log(`[Hostinger] Triggering subdomain creation for ${body.slug}`)
             const result = await createHostingerSubdomain(body.slug, hToken)
             hostingerLogs = result.logs
-        } else {
-            const msg = '[Hostinger] No token found, skipping subdomain creation'
-            console.log(msg)
-            hostingerLogs.push(msg)
         }
     } catch (err) {
-        const msg = `[Hostinger] Error triggering subdomain creation: ${err}`
-        console.error(msg)
-        hostingerLogs.push(msg)
+        console.error(`[Hostinger] Error: ${err}`)
     }
+    */
 
     const tenant = db
       .prepare(
@@ -1095,8 +1090,7 @@ app.post('/api/dev/tenants', requireDevHost, requireRole('DEV'), async (req, res
         role: 'ADMIN',
         tenantId,
         tenantSlug: slug,
-      },
-      debugLogs: hostingerLogs
+      }
     })
   } catch (err) {
     next(err)

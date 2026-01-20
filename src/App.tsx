@@ -4191,7 +4191,6 @@ function NewTenantModal({
     const [step, setStep] = useState(1)
     const [loading, setLoading] = useState(false)
     const [submitError, setSubmitError] = useState<string | null>(null)
-    const [debugLogs, setDebugLogs] = useState<string[] | null>(null)
     const [logoError, setLogoError] = useState<string | null>(null)
     const [logoBusy, setLogoBusy] = useState(false)
     const [logoMode, setLogoMode] = useState<'upload' | 'url'>('upload')
@@ -4299,7 +4298,7 @@ function NewTenantModal({
         setLoading(true)
         setSubmitError(null)
         try {
-            const res = await api<{ tenant: TenantPublic, debugLogs?: string[] } | { tenant: TenantDev, debugLogs?: string[] }>('/api/dev/tenants', {
+            const res = await api<{ tenant: TenantPublic } | { tenant: TenantDev }>('/api/dev/tenants', {
                 method: 'POST',
                 body: JSON.stringify({
                     name: data.name,
@@ -4315,85 +4314,13 @@ function NewTenantModal({
                 setSubmitError(res.error.message)
                 return
             }
-
-            if (res.data.debugLogs && res.data.debugLogs.length > 0) {
-                setDebugLogs(res.data.debugLogs)
-            } else {
-                onSuccess()
-                onClose()
-            }
+            onSuccess()
+            onClose()
         } catch {
             setSubmitError('Erro ao criar espaço')
         } finally {
             setLoading(false)
         }
-    }
-
-    if (debugLogs) {
-        return (
-            <div className="modal-overlay">
-                <div className="modal-content" style={{maxWidth: 650}} onClick={e => e.stopPropagation()}>
-                    <div style={{padding: '2rem 2rem 1.5rem', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)'}}>
-                        <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
-                            <div style={{width: 40, height: 40, borderRadius: '50%', background: '#22c55e20', color: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                                <Check size={24} />
-                            </div>
-                            <div>
-                                <h3 className="cardTitle" style={{fontSize: '1.25rem'}}>Espaço Criado!</h3>
-                                <p style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>O subdomínio está sendo configurado. Veja os logs abaixo:</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style={{padding: '1.5rem'}}>
-                        <div style={{
-                            background: '#0f172a', 
-                            borderRadius: 8, 
-                            border: '1px solid #334155',
-                            overflow: 'hidden'
-                        }}>
-                            <div style={{
-                                padding: '0.5rem 1rem', 
-                                background: '#1e293b', 
-                                borderBottom: '1px solid #334155',
-                                fontSize: '0.75rem',
-                                color: '#94a3b8',
-                                display: 'flex',
-                                justifyContent: 'space-between'
-                            }}>
-                                <span>Terminal Log</span>
-                                <span>Hostinger API</span>
-                            </div>
-                            <div style={{
-                                padding: '1rem',
-                                maxHeight: 300,
-                                overflowY: 'auto',
-                                fontFamily: 'monospace',
-                                fontSize: '0.8rem',
-                                color: '#e2e8f0',
-                                lineHeight: 1.6
-                            }}>
-                                {debugLogs.map((log, i) => (
-                                    <div key={i} style={{marginBottom: 2, display: 'flex', gap: 8}}>
-                                        <span style={{color: '#64748b', userSelect: 'none'}}>{(i + 1).toString().padStart(2, '0')}</span>
-                                        <span>{log}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style={{padding: '1.5rem 2rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end'}}>
-                        <button className="btn btnPrimary" onClick={() => {
-                            onSuccess()
-                            onClose()
-                        }}>
-                            Concluir
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )
     }
 
     return (
