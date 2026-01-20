@@ -4,6 +4,8 @@ export type AppMode = 'public' | 'tenant' | 'admin' | 'dev'
 
 export type ThemeMode = 'light' | 'dark'
 
+export type DevThemeMode = ThemeMode
+
 export function initTheme() {
   const root = document.documentElement
   const fromStorage = (() => {
@@ -42,6 +44,61 @@ export function toggleTheme(): ThemeMode {
   return next
 }
 
+export function initDevTheme(defaultTheme: DevThemeMode = 'dark') {
+  const root = document.documentElement
+  const fromStorage = (() => {
+    try {
+      const v = window.localStorage.getItem('devTheme')
+      if (v === 'light' || v === 'dark') return v
+      return null
+    } catch {
+      return null
+    }
+  })()
+
+  root.dataset.devTheme = fromStorage ?? defaultTheme
+
+  const color = getDevPrimaryColor()
+  if (color) applyPrimaryColor(color)
+}
+
+export function getDevTheme(): DevThemeMode {
+  const v = document.documentElement.dataset.devTheme
+  return v === 'light' ? 'light' : 'dark'
+}
+
+export function getDevPrimaryColor(): string | null {
+  try {
+    return window.localStorage.getItem('devPrimaryColor')
+  } catch {
+    return null
+  }
+}
+
+export function setDevPrimaryColor(color: string) {
+  try {
+    window.localStorage.setItem('devPrimaryColor', color)
+    applyPrimaryColor(color)
+  } catch {
+    void 0
+  }
+}
+
+export function setDevTheme(theme: DevThemeMode) {
+  document.documentElement.dataset.devTheme = theme
+  try {
+    window.localStorage.setItem('devTheme', theme)
+  } catch {
+    void 0
+  }
+}
+
+export function toggleDevTheme(): DevThemeMode {
+  const next: DevThemeMode = getDevTheme() === 'dark' ? 'light' : 'dark'
+  setDevTheme(next)
+  return next
+}
+
 export function clearTenantTheme() {
   const root = document.documentElement
   for (const key of [
@@ -71,13 +128,17 @@ export function clearTenantTheme() {
 export function setAppMode(mode: AppMode) {
   const root = document.documentElement
   root.dataset.mode = mode
-  if (mode === 'public' || mode === 'dev') clearTenantTheme()
+  if (mode === 'public') clearTenantTheme()
+  if (mode === 'dev') {
+     const c = getDevPrimaryColor()
+     if (c) applyPrimaryColor(c)
+     else clearTenantTheme()
+  }
 }
 
-export function applyTenantTheme(tenant: TenantPublic | null) {
+export function applyPrimaryColor(hexColor: string) {
   const root = document.documentElement
-  if (!tenant) return
-
+  
   const normalizeHex = (hex: string) => {
     const h = hex.trim().replace('#', '')
     if (h.length === 3) return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`
@@ -116,7 +177,7 @@ export function applyTenantTheme(tenant: TenantPublic | null) {
     return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl
   }
 
-  const primary = normalizeHex(tenant.primaryColor)
+  const primary = normalizeHex(hexColor)
   const primaryText = luminance(primary) > 0.62 ? '#0b0d12' : '#ffffff'
   const primaryRgb = hexToRgb(primary)
   const primaryRgbStr = `${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}`
@@ -138,7 +199,6 @@ export function applyTenantTheme(tenant: TenantPublic | null) {
   root.style.setProperty('--primary-rgb', primaryRgbStr)
   root.style.setProperty('--primary-fg', primaryText)
   root.style.setProperty('--primaryText', primaryText)
-  root.style.setProperty('--primary-50', primary50) // Fix typo if needed, but standard is 50
   root.style.setProperty('--primary-50', primary50)
   root.style.setProperty('--primary-100', primary100)
   root.style.setProperty('--primary-200', primary200)
@@ -153,4 +213,9 @@ export function applyTenantTheme(tenant: TenantPublic | null) {
   root.style.setProperty('--accent2', mix(primary, '#c7b2ff', 0.55))
   root.style.setProperty('--accent3', mix(primary, '#ffd1e8', 0.55))
   root.style.setProperty('--ring', mix(primary, '#ffffff', 0.25))
+}
+
+export function applyTenantTheme(tenant: TenantPublic | null) {
+  if (!tenant) return
+  applyPrimaryColor(tenant.primaryColor)
 }

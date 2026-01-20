@@ -39,6 +39,7 @@ export function migrate() {
         name TEXT NOT NULL,
         primary_color TEXT NOT NULL,
         logo_url TEXT,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
         created_at TEXT NOT NULL
       );
 
@@ -273,6 +274,80 @@ export function migrate() {
   apply(7, () => {
     db.exec(`
       ALTER TABLE services ADD COLUMN cover_url TEXT;
+    `)
+  })
+
+  apply(8, () => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS whatsapp_settings (
+        tenant_id TEXT PRIMARY KEY,
+        reminders_enabled INTEGER NOT NULL,
+        reminder_offset_hours INTEGER NOT NULL,
+        reminder_message TEXT NOT NULL,
+        promo_enabled INTEGER NOT NULL,
+        promo_message TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      );
+    `)
+  })
+
+  apply(9, () => {
+    const cols = db.prepare('PRAGMA table_info(tenants)').all() as Array<{ name: string }>
+    const hasStatus = cols.some((c) => c.name === 'status')
+    if (hasStatus) return
+    db.exec(`ALTER TABLE tenants ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE';`)
+  })
+
+  apply(10, () => {
+    const indexes = db.prepare(`PRAGMA index_list('users')`).all() as Array<{ name: string }>
+    const hasTenantEmail = indexes.some((i) => i.name === 'idx_users_tenant_email')
+    const hasDevEmail = indexes.some((i) => i.name === 'idx_users_dev_email')
+    const cols = db.prepare(`PRAGMA table_info('users')`).all() as Array<{ name: string }>
+    const hasTenantId = cols.some((c) => c.name === 'tenant_id')
+    if (hasTenantEmail && hasDevEmail && hasTenantId) return
+
+    db.exec(`PRAGMA foreign_keys = OFF;`)
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS users_new (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT,
+          email TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          role TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+        );
+      `)
+
+      db.exec(`
+        INSERT INTO users_new (id, tenant_id, email, password_hash, role, created_at)
+        SELECT id, tenant_id, email, password_hash, role, created_at
+        FROM users;
+      `)
+
+      db.exec(`DROP TABLE users;`)
+      db.exec(`ALTER TABLE users_new RENAME TO users;`)
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);`)
+      db.exec(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_email ON users(tenant_id, email) WHERE tenant_id IS NOT NULL;`,
+      )
+      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_dev_email ON users(email) WHERE tenant_id IS NULL;`)
+    } finally {
+      db.exec(`PRAGMA foreign_keys = ON;`)
+    }
+  })
+
+  apply(11, () => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS platform_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
     `)
   })
 }

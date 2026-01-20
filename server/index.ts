@@ -6,7 +6,7 @@ import helmet from 'helmet'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { z } from 'zod'
-import { sessionMiddleware, requireRole } from './auth.js'
+import { sessionMiddleware, requireRole, requireActiveSubscription } from './auth.js'
 import { getDb } from './db.js'
 import { env } from './env.js'
 import { badRequest, handleError, notFound, unauthorized } from './http.js'
@@ -116,6 +116,69 @@ const normalizeCustomDomain = (raw: string) => {
   if (!/^[a-z0-9.-]+$/.test(url.hostname)) throw badRequest('Domínio inválido', 'INVALID_DOMAIN')
 
   return url.hostname
+}
+
+const utcForLocalTime = (input: {
+  timeZone: string
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second?: number
+}) => {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: input.timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+
+  const targetUtc = Date.UTC(
+    input.year,
+    input.month - 1,
+    input.day,
+    input.hour,
+    input.minute,
+    input.second ?? 0,
+  )
+
+  let utc = new Date(targetUtc)
+  for (let i = 0; i < 4; i++) {
+    const parts = fmt.formatToParts(utc)
+    const get = (type: string) => parts.find((p) => p.type === type)?.value
+    const y = Number(get('year'))
+    const m = Number(get('month'))
+    const d = Number(get('day'))
+    const hh = Number(get('hour'))
+    const mm = Number(get('minute'))
+    const ss = Number(get('second'))
+    if (![y, m, d, hh, mm, ss].every(Number.isFinite)) return utc
+
+    const seenUtc = Date.UTC(y, m - 1, d, hh, mm, ss)
+    const diff = targetUtc - seenUtc
+    if (diff === 0) break
+    utc = new Date(utc.getTime() + diff)
+  }
+  return utc
+}
+
+const dayBoundsUtc = (input: { timeZone: string; ymd: string }) => {
+  const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(input.ymd)
+  if (!m) throw badRequest('Data inválida', 'INVALID_DATE')
+  const year = Number(m[1])
+  const month = Number(m[2])
+  const day = Number(m[3])
+  if (![year, month, day].every(Number.isFinite)) throw badRequest('Data inválida', 'INVALID_DATE')
+
+  const start = utcForLocalTime({ timeZone: input.timeZone, year, month, day, hour: 0, minute: 0, second: 0 })
+  const nextDay = utcForLocalTime({ timeZone: input.timeZone, year, month, day: day + 1, hour: 0, minute: 0, second: 0 })
+
+  return { start, endExclusive: nextDay }
 }
 
 app.disable('x-powered-by')
@@ -279,6 +342,62 @@ app.get('/api/public/booking', (req, res, next) => {
   }
 })
 
+app.get('/api/public/availability', (req, res, next) => {
+  try {
+    const t = req.resolvedTenant
+    if (!t) return next(notFound('Tenant não encontrado', 'TENANT_NOT_FOUND'))
+
+    const q = z
+      .object({
+        date: z.string().min(10).max(10),
+      })
+      .parse({ date: typeof req.query.date === 'string' ? req.query.date : '' })
+
+    const settings = db
+      .prepare(
+        `
+          SELECT timezone
+          FROM tenant_settings
+          WHERE tenant_id = ?
+        `,
+      )
+      .get(t.id) as { timezone: string } | undefined
+
+    const timeZone = settings?.timezone ?? 'America/Sao_Paulo'
+    const { start, endExclusive } = dayBoundsUtc({ timeZone, ymd: q.date })
+
+    const appointments = db
+      .prepare(
+        `
+          SELECT starts_at as startsAt, ends_at as endsAt, 'appointment' as kind
+          FROM appointments
+          WHERE tenant_id = ?
+            AND status IN ('CONFIRMED', 'PENDING')
+            AND starts_at < ?
+            AND ends_at > ?
+        `,
+      )
+      .all(t.id, endExclusive.toISOString(), start.toISOString()) as Array<{ startsAt: string; endsAt: string }>
+
+    const timeOff = db
+      .prepare(
+        `
+          SELECT starts_at as startsAt, ends_at as endsAt, 'time_off' as kind
+          FROM time_off
+          WHERE tenant_id = ?
+            AND starts_at < ?
+            AND ends_at > ?
+        `,
+      )
+      .all(t.id, endExclusive.toISOString(), start.toISOString()) as Array<{ startsAt: string; endsAt: string }>
+
+    // Combine and return blocks
+    res.json({ blocks: [...appointments, ...timeOff] })
+  } catch (err) {
+    next(err)
+  }
+})
+
 app.get('/api/public/tenant/:slug/services', (req, res, next) => {
   try {
     const slug = z.string().min(1).parse(req.params.slug).trim().toLowerCase()
@@ -290,7 +409,7 @@ app.get('/api/public/tenant/:slug/services', (req, res, next) => {
     const services = db
       .prepare(
         `
-          SELECT id, name, duration_minutes as durationMinutes, price_cents as priceCents
+          SELECT id, name, duration_minutes as durationMinutes, price_cents as priceCents, cover_url as coverUrl
           FROM services
           WHERE tenant_id = ?
           ORDER BY created_at DESC
@@ -358,6 +477,64 @@ app.get('/api/public/tenant/:slug/booking', (req, res, next) => {
   }
 })
 
+app.get('/api/public/tenant/:slug/availability', (req, res, next) => {
+  try {
+    const slug = z.string().min(1).parse(req.params.slug).trim().toLowerCase()
+    const tenant = db.prepare('SELECT id FROM tenants WHERE slug = ?').get(slug) as
+      | { id: string }
+      | undefined
+    if (!tenant) return next(notFound('Tenant não encontrado', 'TENANT_NOT_FOUND'))
+
+    const q = z
+      .object({
+        date: z.string().min(10).max(10),
+      })
+      .parse({ date: typeof req.query.date === 'string' ? req.query.date : '' })
+
+    const settings = db
+      .prepare(
+        `
+          SELECT timezone
+          FROM tenant_settings
+          WHERE tenant_id = ?
+        `,
+      )
+      .get(tenant.id) as { timezone: string } | undefined
+
+    const timeZone = settings?.timezone ?? 'America/Sao_Paulo'
+    const { start, endExclusive } = dayBoundsUtc({ timeZone, ymd: q.date })
+
+    const appointments = db
+      .prepare(
+        `
+          SELECT starts_at as startsAt, ends_at as endsAt, 'appointment' as kind
+          FROM appointments
+          WHERE tenant_id = ?
+            AND status IN ('CONFIRMED', 'PENDING')
+            AND starts_at < ?
+            AND ends_at > ?
+        `,
+      )
+      .all(tenant.id, endExclusive.toISOString(), start.toISOString()) as Array<{ startsAt: string; endsAt: string }>
+
+    const timeOff = db
+      .prepare(
+        `
+          SELECT starts_at as startsAt, ends_at as endsAt, 'time_off' as kind
+          FROM time_off
+          WHERE tenant_id = ?
+            AND starts_at < ?
+            AND ends_at > ?
+        `,
+      )
+      .all(tenant.id, endExclusive.toISOString(), start.toISOString()) as Array<{ startsAt: string; endsAt: string }>
+
+    res.json({ blocks: [...appointments, ...timeOff] })
+  } catch (err) {
+    next(err)
+  }
+})
+
 app.get('/api/auth/me', (req, res, next) => {
   try {
     const allowDevBootstrap =
@@ -373,7 +550,13 @@ app.get('/api/auth/me', (req, res, next) => {
       .prepare(
         `
           SELECT u.id, u.email, u.role, u.tenant_id as tenantId,
-                 t.slug as tenantSlug
+                 t.slug as tenantSlug,
+                 (
+                   SELECT status 
+                   FROM appmax_subscriptions 
+                   WHERE tenant_id = u.tenant_id 
+                   ORDER BY updated_at DESC LIMIT 1
+                 ) as subscriptionStatus
           FROM users u
           LEFT JOIN tenants t ON t.id = u.tenant_id
           WHERE u.id = ?
@@ -381,7 +564,9 @@ app.get('/api/auth/me', (req, res, next) => {
       )
       .get(req.sessionUser.id)
 
-    res.json({ user: u ?? null, allowDevBootstrap })
+    const testMode = (db.prepare(`SELECT value FROM platform_settings WHERE key = 'test_mode'`).get() as { value: string } | undefined)?.value === 'true'
+
+    res.json({ user: u ?? null, allowDevBootstrap, isTestMode: testMode })
   } catch (err) {
     next(err)
   }
@@ -396,15 +581,11 @@ app.post('/api/auth/login', async (req, res, next) => {
       })
       .parse(req.body)
 
-    const row = db
-      .prepare(
-        `
-          SELECT id, tenant_id as tenantId, email, password_hash as passwordHash, role
-          FROM users
-          WHERE email = ?
-        `,
-      )
-      .get(body.email.toLowerCase()) as
+    const email = body.email.toLowerCase()
+    const isDev = isDevHost(req.hostname)
+    const tenantId = req.resolvedTenant?.id ?? null
+
+    const row = (():
       | {
           id: string
           tenantId: string | null
@@ -412,7 +593,51 @@ app.post('/api/auth/login', async (req, res, next) => {
           passwordHash: string
           role: 'DEV' | 'ADMIN' | 'CLIENT'
         }
-      | undefined
+      | undefined => {
+      if (isDev) {
+        return db
+          .prepare(
+            `
+              SELECT id, tenant_id as tenantId, email, password_hash as passwordHash, role
+              FROM users
+              WHERE email = ?
+                AND tenant_id IS NULL
+              LIMIT 1
+            `,
+          )
+          .get(email) as
+          | {
+              id: string
+              tenantId: string | null
+              email: string
+              passwordHash: string
+              role: 'DEV' | 'ADMIN' | 'CLIENT'
+            }
+          | undefined
+      }
+
+      if (!tenantId) throw unauthorized('Use o subdomínio do seu espaço para entrar.', 'TENANT_REQUIRED')
+
+      return db
+        .prepare(
+          `
+            SELECT id, tenant_id as tenantId, email, password_hash as passwordHash, role
+            FROM users
+            WHERE email = ?
+              AND tenant_id = ?
+            LIMIT 1
+          `,
+        )
+        .get(email, tenantId) as
+        | {
+            id: string
+            tenantId: string | null
+            email: string
+            passwordHash: string
+            role: 'DEV' | 'ADMIN' | 'CLIENT'
+          }
+        | undefined
+    })()
 
     if (!row) throw badRequest('E-mail ou senha inválidos', 'INVALID_CREDENTIALS')
     const ok = await verifyPassword(body.password, row.passwordHash)
@@ -422,7 +647,7 @@ app.post('/api/auth/login', async (req, res, next) => {
       throw unauthorized('Acesso DEV somente no subdomínio dev.', 'DEV_SUBDOMAIN_ONLY')
     }
 
-    if (row.role !== 'DEV' && req.resolvedTenant && row.tenantId && req.resolvedTenant.id !== row.tenantId) {
+    if (row.role !== 'DEV' && tenantId && row.tenantId && tenantId !== row.tenantId) {
       throw unauthorized('Use o subdomínio da sua loja para entrar.', 'TENANT_HOST_MISMATCH')
     }
 
@@ -484,7 +709,9 @@ app.post('/api/auth/register-client', async (req, res, next) => {
     if (!tenant) return next(notFound('Tenant não encontrado', 'TENANT_NOT_FOUND'))
 
     const email = body.email.toLowerCase()
-    const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+    const exists = db
+      .prepare('SELECT id FROM users WHERE email = ? AND tenant_id = ? LIMIT 1')
+      .get(email, tenant.id)
     if (exists) throw badRequest('E-mail já cadastrado', 'EMAIL_ALREADY_USED')
 
     const now = new Date().toISOString()
@@ -554,37 +781,49 @@ app.post('/api/auth/client-fast-login', async (req, res, next) => {
     // Using phone@tenant-slug.client to avoid collisions with real emails and other tenants
     const dummyEmail = `${cleanPhone}@${tenant.slug}.client`
 
-    const existingUser = db.prepare('SELECT id, password_hash, role FROM users WHERE email = ?').get(dummyEmail) as
+    const existingUser = db
+      .prepare('SELECT id, password_hash, role FROM users WHERE email = ? AND tenant_id = ? LIMIT 1')
+      .get(dummyEmail, tenant.id) as
       | { id: string; password_hash: string; role: string }
       | undefined
 
     let userId = existingUser?.id
     const now = new Date().toISOString()
 
-    const tx = db.transaction(async () => {
+    const newUser = existingUser
+      ? null
+      : {
+          userId: randomUUID(),
+          clientId: randomUUID(),
+          passwordHash: await hashPassword(randomUUID() + randomUUID()),
+        }
+
+    const tx = db.transaction(() => {
       if (existingUser) {
-        // Update client name if needed
-        db.prepare('UPDATE clients SET name = ? WHERE user_id = ?').run(body.name, existingUser.id)
-      } else {
-        // Create new user
-        userId = randomUUID()
-        const clientId = randomUUID()
-        // Random high-entropy password since they won't use it
-        const passwordHash = await hashPassword(randomUUID() + randomUUID())
-
-        db.prepare(
-          `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at)
-           VALUES (?, ?, ?, ?, 'CLIENT', ?)`
-        ).run(userId, tenant.id, dummyEmail, passwordHash, now)
-
-        db.prepare(
-          `INSERT INTO clients (id, tenant_id, user_id, name, phone, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`
-        ).run(clientId, tenant.id, userId, body.name, body.phone, now)
+        db.prepare('UPDATE clients SET name = ? WHERE user_id = ? AND tenant_id = ?').run(
+          body.name,
+          existingUser.id,
+          tenant.id,
+        )
+        userId = existingUser.id
+        return
       }
+
+      if (!newUser) throw new Error('Falha ao criar cliente')
+
+      userId = newUser.userId
+      db.prepare(
+        `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at)
+         VALUES (?, ?, ?, ?, 'CLIENT', ?)`
+      ).run(newUser.userId, tenant.id, dummyEmail, newUser.passwordHash, now)
+
+      db.prepare(
+        `INSERT INTO clients (id, tenant_id, user_id, name, phone, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(newUser.clientId, tenant.id, newUser.userId, body.name, body.phone, now)
     })
 
-    await tx()
+    tx()
 
     if (!userId) throw new Error('Falha ao autenticar usuário')
 
@@ -624,7 +863,9 @@ app.post('/api/dev/bootstrap', requireDevHost, async (req, res, next) => {
       .parse(req.body)
 
     const email = body.email.toLowerCase()
-    const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+    const exists = db
+      .prepare(`SELECT id FROM users WHERE email = ? AND tenant_id IS NULL LIMIT 1`)
+      .get(email)
     if (exists) throw badRequest('E-mail já cadastrado', 'EMAIL_ALREADY_USED')
 
     const now = new Date().toISOString()
@@ -682,8 +923,10 @@ app.post('/api/dev/tenants', requireDevHost, requireRole('DEV'), async (req, res
     if (existsTenant) throw badRequest('Slug já existe', 'TENANT_SLUG_TAKEN')
 
     const adminEmail = body.adminEmail.toLowerCase()
-    const existsUser = db.prepare('SELECT id FROM users WHERE email = ?').get(adminEmail)
-    if (existsUser) throw badRequest('E-mail do admin já existe', 'EMAIL_ALREADY_USED')
+    const existsUser = db
+      .prepare(`SELECT id FROM users WHERE email = ? AND tenant_id IS NULL LIMIT 1`)
+      .get(adminEmail)
+    if (existsUser) throw badRequest('E-mail do admin já existe (usuário DEV)', 'EMAIL_ALREADY_USED')
 
     const now = new Date().toISOString()
     const tenantId = randomUUID()
@@ -704,7 +947,7 @@ app.post('/api/dev/tenants', requireDevHost, requireRole('DEV'), async (req, res
       db.prepare(
         `INSERT INTO booking_rules (tenant_id, min_notice_minutes, max_future_days, slot_step_minutes, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?)`
-      ).run(tenantId, 60, 60, 15, now, now)
+      ).run(tenantId, 60, 60, 30, now, now)
 
       const insertBusinessHours = db.prepare(
         `INSERT INTO business_hours (id, tenant_id, weekday, start_minute, end_minute, created_at)
@@ -758,6 +1001,7 @@ app.get('/api/dev/tenants', requireDevHost, requireRole('DEV'), (req, res, next)
                  t.name,
                  t.primary_color as primaryColor,
                  t.logo_url as logoUrl,
+                 t.status,
                  t.created_at as createdAt,
                  (
                    SELECT u.email
@@ -771,6 +1015,20 @@ app.get('/api/dev/tenants', requireDevHost, requireRole('DEV'), (req, res, next)
                    FROM users u
                    WHERE u.tenant_id = t.id
                  ) as userCount
+                 ,(
+                   SELECT s.status
+                   FROM appmax_subscriptions s
+                   WHERE s.tenant_id = t.id
+                   ORDER BY s.updated_at DESC, s.created_at DESC
+                   LIMIT 1
+                 ) as subscriptionStatus
+                 ,(
+                   SELECT s.current_period_end
+                   FROM appmax_subscriptions s
+                   WHERE s.tenant_id = t.id
+                   ORDER BY s.updated_at DESC, s.created_at DESC
+                   LIMIT 1
+                 ) as subscriptionPeriodEnd
           FROM tenants t
           ORDER BY t.created_at DESC
         `,
@@ -789,7 +1047,7 @@ app.get('/api/dev/tenants/:tenantId', requireDevHost, requireRole('DEV'), (req, 
     const tenant = db
       .prepare(
         `
-          SELECT id, slug, name, primary_color as primaryColor, logo_url as logoUrl, created_at as createdAt
+          SELECT id, slug, name, primary_color as primaryColor, logo_url as logoUrl, status, created_at as createdAt
           FROM tenants
           WHERE id = ?
         `,
@@ -841,6 +1099,7 @@ app.patch('/api/dev/tenants/:tenantId', requireDevHost, requireRole('DEV'), (req
           .optional(),
         primaryColor: z.string().min(4).optional(),
         logoUrl: z.string().url().nullable().optional(),
+        status: z.enum(['ACTIVE', 'SUSPENDED', 'DISABLED']).optional(),
       })
       .parse(req.body)
 
@@ -854,6 +1113,7 @@ app.patch('/api/dev/tenants/:tenantId', requireDevHost, requireRole('DEV'), (req
     if (typeof body.primaryColor === 'string')
       updates.push({ sql: 'primary_color = ?', params: [body.primaryColor] })
     if ('logoUrl' in body) updates.push({ sql: 'logo_url = ?', params: [body.logoUrl ?? null] })
+    if (typeof body.status === 'string') updates.push({ sql: 'status = ?', params: [body.status] })
 
     if (typeof body.slug === 'string') {
       const slug = body.slug.trim().toLowerCase()
@@ -871,7 +1131,7 @@ app.patch('/api/dev/tenants/:tenantId', requireDevHost, requireRole('DEV'), (req
     const tenant = db
       .prepare(
         `
-          SELECT id, slug, name, primary_color as primaryColor, logo_url as logoUrl, created_at as createdAt
+          SELECT id, slug, name, primary_color as primaryColor, logo_url as logoUrl, status, created_at as createdAt
           FROM tenants
           WHERE id = ?
         `,
@@ -892,7 +1152,213 @@ app.delete('/api/dev/tenants/:tenantId', requireDevHost, requireRole('DEV'), (re
       | undefined
     if (!row) return next(notFound('Tenant não encontrado', 'TENANT_NOT_FOUND'))
 
-    db.prepare('DELETE FROM tenants WHERE id = ?').run(tenantId)
+    const tx = db.transaction(() => {
+        // Explicitly delete appointments first because of ON DELETE RESTRICT constraints
+        db.prepare('DELETE FROM appointments WHERE tenant_id = ?').run(tenantId)
+        console.log(`[DeleteTenant] Deleted appointments for tenant ${tenantId}`)
+        
+        // Now delete the tenant - CASCADE will handle other tables
+        db.prepare('DELETE FROM tenants WHERE id = ?').run(tenantId)
+        console.log(`[DeleteTenant] Deleted tenant ${tenantId}`)
+    })
+    
+    tx()
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.get('/api/dev/integrations', requireDevHost, requireRole('DEV'), (req, res, next) => {
+  try {
+    const rows = db.prepare('SELECT key, value FROM platform_settings').all() as Array<{
+      key: string
+      value: string
+    }>
+    const settings: Record<string, string> = {}
+    for (const r of rows) settings[r.key] = r.value
+    res.json({ settings })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/dev/integrations', requireDevHost, requireRole('DEV'), (req, res, next) => {
+  try {
+    const body = z.record(z.string()).parse(req.body)
+    const now = new Date().toISOString()
+    
+    const stmt = db.prepare(`
+      INSERT INTO platform_settings (key, value, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `)
+
+    const tx = db.transaction(() => {
+      for (const [k, v] of Object.entries(body)) {
+        stmt.run(k, v, now)
+      }
+    })
+    tx()
+
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/dev/test-mode', requireDevHost, requireRole('DEV'), (req, res, next) => {
+  try {
+    const body = z.object({ enabled: z.boolean() }).parse(req.body)
+    const now = new Date().toISOString()
+    
+    db.prepare(`
+      INSERT INTO platform_settings (key, value, updated_at)
+      VALUES ('test_mode', ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(String(body.enabled), now)
+
+    res.json({ ok: true, enabled: body.enabled })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.get('/api/dev/notifications', requireDevHost, requireRole('DEV'), (req, res, next) => {
+  try {
+    const limit = 20
+    const events = db.prepare(`
+      SELECT id, event_type as eventType, payload_json as payload, received_at as receivedAt
+      FROM appmax_events
+      WHERE event_type IN ('payment_approved', 'order_created', 'OrderCreated', 'PaymentApproved')
+      ORDER BY received_at DESC
+      LIMIT ?
+    `).all(limit) as Array<{ id: string; eventType: string; payload: string; receivedAt: string }>
+
+    const notifications = events.map(e => {
+      let data: any = {}
+      try {
+        data = JSON.parse(e.payload)
+      } catch {
+        data = {}
+      }
+      
+      const customerName = data.customer?.firstname ? `${data.customer.firstname} ${data.customer.lastname || ''}` : 'Cliente'
+      const total = data.total ? (Number(data.total) / 100).toFixed(2) : '0.00'
+
+      return {
+        id: e.id,
+        title: e.eventType === 'payment_approved' || e.eventType === 'PaymentApproved' ? 'Pagamento Aprovado' : 'Novo Pedido',
+        desc: `${customerName} - R$ ${total}`,
+        time: e.receivedAt,
+        type: e.eventType
+      }
+    })
+
+    res.json({ notifications })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/webhooks/appmax', async (req, res, next) => {
+  try {
+    const body = req.body
+    const event = body.event || body.type || 'unknown'
+    const id = randomUUID()
+    const now = new Date().toISOString()
+
+    // Log event
+    db.prepare(`
+      INSERT INTO appmax_events (id, event_type, payload_json, received_at)
+      VALUES (?, ?, ?, ?)
+    `).run(id, event, JSON.stringify(body), now)
+
+    // Process subscription activation
+    if (event === 'payment_approved' || event === 'PaymentApproved' || event === 'order_created') {
+      const data = body.data || body
+      const customerEmail = data.customer?.email
+      
+      if (customerEmail) {
+        // Find tenant by admin email
+        const user = db.prepare(`SELECT tenant_id FROM users WHERE email = ? AND role = 'ADMIN'`).get(customerEmail) as { tenant_id: string } | undefined
+        
+        if (user && user.tenant_id) {
+            const subId = randomUUID()
+            // Upsert subscription status
+            // Check if exists first to decide insert or update
+            const existing = db.prepare(`SELECT id FROM appmax_subscriptions WHERE tenant_id = ?`).get(user.tenant_id)
+            
+            if (existing) {
+                db.prepare(`UPDATE appmax_subscriptions SET status = 'ACTIVE', updated_at = ? WHERE tenant_id = ?`).run(now, user.tenant_id)
+            } else {
+                db.prepare(`INSERT INTO appmax_subscriptions (id, tenant_id, status, created_at, updated_at) VALUES (?, ?, 'ACTIVE', ?, ?)`).run(subId, user.tenant_id, now, now)
+            }
+            console.log(`[Appmax] Subscription activated for tenant ${user.tenant_id} via email ${customerEmail}`)
+        }
+      }
+    }
+
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Test Mode: Simulate Payment
+app.post('/api/admin/subscription/test-pay', requireRole('ADMIN'), (req, res, next) => {
+    try {
+        if (!req.sessionUser?.tenantId) return next(badRequest('Tenant inválido'))
+        
+        const tenantId = req.sessionUser.tenantId
+        const now = new Date().toISOString()
+        const subId = randomUUID()
+        
+        const existing = db.prepare(`SELECT id FROM appmax_subscriptions WHERE tenant_id = ?`).get(tenantId)
+        
+        if (existing) {
+            db.prepare(`UPDATE appmax_subscriptions SET status = 'ACTIVE', updated_at = ? WHERE tenant_id = ?`).run(now, tenantId)
+        } else {
+            db.prepare(`INSERT INTO appmax_subscriptions (id, tenant_id, status, created_at, updated_at) VALUES (?, ?, 'ACTIVE', ?, ?)`).run(subId, tenantId, now, now)
+        }
+        
+        // Also log a fake event for notifications
+        const eventId = randomUUID()
+        const payload = JSON.stringify({
+            event: 'payment_approved',
+            total: 9700,
+            customer: {
+                firstname: 'Test',
+                lastname: 'User',
+                email: 'test@example.com'
+            }
+        })
+        db.prepare(`INSERT INTO appmax_events (id, event_type, payload_json, received_at) VALUES (?, ?, ?, ?)`).run(eventId, 'payment_approved', payload, now)
+
+        res.json({ ok: true, status: 'ACTIVE' })
+    } catch (err) {
+        next(err)
+    }
+})
+
+// Checkout URL
+app.get('/api/admin/subscription/checkout-url', requireRole('ADMIN'), (req, res, next) => {
+    try {
+        // Here you would generate a real checkout link with user data
+        // For now, return a placeholder or config value
+        res.json({ url: 'https://appmax.com.br/checkout/example' })
+    } catch (err) {
+        next(err)
+    }
+})
+
+// Middleware for admin routes - Check Subscription
+app.use('/api/admin', requireActiveSubscription)
+
+app.post('/api/webhooks/evolution', async (req, res, next) => {
+  try {
+    // Basic evolution webhook handler - just log for now
+    console.log('Evolution Webhook:', req.body)
     res.json({ ok: true })
   } catch (err) {
     next(err)
@@ -955,28 +1421,722 @@ app.post('/api/admin/services', requireRole('ADMIN'), (req, res, next) => {
   }
 })
 
+app.patch('/api/admin/services/:id', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+    const id = z.string().uuid().parse(req.params.id)
+
+    const body = z
+      .object({
+        name: z.string().min(2).optional(),
+        durationMinutes: z.number().int().positive().optional(),
+        priceCents: z.number().int().nonnegative().optional(),
+        coverUrl: z.string().max(350_000).nullable().optional(),
+      })
+      .parse(req.body)
+
+    const row = db
+      .prepare('SELECT id FROM services WHERE id = ? AND tenant_id = ?')
+      .get(id, tenantId) as { id: string } | undefined
+    if (!row) return next(notFound('Serviço não encontrado', 'SERVICE_NOT_FOUND'))
+
+    const updates: Array<{ sql: string; params: unknown[] }> = []
+    if (typeof body.name === 'string') updates.push({ sql: 'name = ?', params: [body.name] })
+    if (typeof body.durationMinutes === 'number')
+      updates.push({ sql: 'duration_minutes = ?', params: [body.durationMinutes] })
+    if (typeof body.priceCents === 'number') updates.push({ sql: 'price_cents = ?', params: [body.priceCents] })
+    if ('coverUrl' in body) {
+      const nextCover = body.coverUrl === null ? null : (body.coverUrl ?? '').trim()
+      updates.push({ sql: 'cover_url = ?', params: [nextCover ? nextCover : null] })
+    }
+
+    if (updates.length === 0) return next(badRequest('Nada para atualizar', 'NO_UPDATES'))
+
+    const setSql = updates.map((u) => u.sql).join(', ')
+    const params = updates.flatMap((u) => u.params)
+    db.prepare(`UPDATE services SET ${setSql} WHERE id = ? AND tenant_id = ?`).run(...params, id, tenantId)
+
+    const service = db
+      .prepare(
+        `
+          SELECT id, name, duration_minutes as durationMinutes, price_cents as priceCents, cover_url as coverUrl
+          FROM services
+          WHERE id = ?
+        `,
+      )
+      .get(id)
+
+    res.json({ service })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.delete('/api/admin/services/:id', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+    const id = z.string().uuid().parse(req.params.id)
+
+    const r = db.prepare('DELETE FROM services WHERE id = ? AND tenant_id = ?').run(id, tenantId)
+    if (r.changes === 0) return next(notFound('Serviço não encontrado', 'SERVICE_NOT_FOUND'))
+
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
 app.get('/api/admin/appointments', requireRole('ADMIN'), (req, res, next) => {
   try {
     const tenantId = req.sessionUser?.tenantId
     if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+    const q = z
+      .object({
+        start: z.string().datetime().optional(),
+        end: z.string().datetime().optional(),
+        limit: z
+          .string()
+          .regex(/^\d+$/)
+          .transform((v) => Number(v))
+          .pipe(z.number().int().min(1).max(2000))
+          .optional(),
+      })
+      .parse({
+        start: typeof req.query.start === 'string' ? req.query.start : undefined,
+        end: typeof req.query.end === 'string' ? req.query.end : undefined,
+        limit: typeof req.query.limit === 'string' ? req.query.limit : undefined,
+      })
+
+    const where: string[] = [`a.tenant_id = ?`]
+    const params: unknown[] = [tenantId]
+    if (q.start) {
+      where.push(`a.starts_at >= ?`)
+      params.push(q.start)
+    }
+    if (q.end) {
+      where.push(`a.starts_at < ?`)
+      params.push(q.end)
+    }
+
+    const limit = q.limit ?? 800
     const appointments = db
       .prepare(
         `
           SELECT a.id,
+                 a.service_id as serviceId,
                  a.starts_at as startsAt,
+                 a.ends_at as endsAt,
                  a.status,
                  u.email as clientEmail,
-                 s.name as serviceName
+                 c.name as clientName,
+                 c.phone as clientPhone,
+                 s.name as serviceName,
+                 s.price_cents as priceCents
           FROM appointments a
           JOIN users u ON u.id = a.client_user_id
+          LEFT JOIN clients c ON c.user_id = u.id AND c.tenant_id = a.tenant_id
           JOIN services s ON s.id = a.service_id
-          WHERE a.tenant_id = ?
+          WHERE ${where.join(' AND ')}
           ORDER BY a.starts_at ASC
-          LIMIT 200
+          LIMIT ${limit}
+        `,
+      )
+      .all(...params)
+    res.json({ appointments })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/admin/appointments', requireRole('ADMIN'), async (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const body = z
+      .object({
+        clientName: z.string().min(2),
+        clientPhone: z.string().min(8).optional(),
+        serviceId: z.string().uuid(),
+        startsAt: z.string().datetime(),
+        status: z.enum(['PENDING', 'CONFIRMED', 'CANCELLED']).optional(),
+      })
+      .parse(req.body)
+
+    const service = db
+      .prepare(
+        `
+          SELECT id, duration_minutes as durationMinutes
+          FROM services
+          WHERE id = ? AND tenant_id = ?
+        `,
+      )
+      .get(body.serviceId, tenantId) as { id: string; durationMinutes: number } | undefined
+    if (!service) return next(notFound('Serviço não encontrado', 'SERVICE_NOT_FOUND'))
+
+    const now = new Date().toISOString()
+    const startsAt = new Date(body.startsAt)
+    if (Number.isNaN(startsAt.getTime())) throw badRequest('Data inválida', 'INVALID_DATE')
+    const endsAt = new Date(startsAt.getTime() + service.durationMinutes * 60_000)
+
+    const existingClient = body.clientPhone
+      ? (db
+          .prepare(
+            `
+              SELECT c.user_id as userId
+              FROM clients c
+              WHERE c.tenant_id = ? AND c.phone = ?
+              LIMIT 1
+            `,
+          )
+          .get(tenantId, body.clientPhone.trim()) as { userId: string } | undefined)
+      : undefined
+
+    let clientUserId = existingClient?.userId ?? null
+    const newClient = clientUserId
+      ? null
+      : {
+          userId: randomUUID(),
+          clientId: randomUUID(),
+          email: `client+${randomUUID()}@lashspace.local`,
+          passwordHash: await hashPassword(randomUUID()),
+        }
+
+    const appointmentId = randomUUID()
+
+    const tx = db.transaction(() => {
+      if (!clientUserId) {
+        if (!newClient) throw new Error('Falha ao criar cliente')
+        clientUserId = newClient.userId
+        db.prepare(
+          `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at)
+           VALUES (?, ?, ?, ?, 'CLIENT', ?)`
+        ).run(newClient.userId, tenantId, newClient.email, newClient.passwordHash, now)
+
+        db.prepare(
+          `INSERT INTO clients (id, tenant_id, user_id, name, phone, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        ).run(
+          newClient.clientId,
+          tenantId,
+          newClient.userId,
+          body.clientName.trim(),
+          body.clientPhone?.trim() || null,
+          now,
+        )
+      }
+
+      db.prepare(
+        `
+          INSERT INTO appointments (id, tenant_id, service_id, client_user_id, starts_at, ends_at, status, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(
+        appointmentId,
+        tenantId,
+        body.serviceId,
+        clientUserId,
+        startsAt.toISOString(),
+        endsAt.toISOString(),
+        body.status ?? 'CONFIRMED',
+        now,
+      )
+    })
+
+    tx()
+
+    const appointment = db
+      .prepare(
+        `
+          SELECT a.id,
+                 a.service_id as serviceId,
+                 a.starts_at as startsAt,
+                 a.ends_at as endsAt,
+                 a.status,
+                 u.email as clientEmail,
+                 c.name as clientName,
+                 c.phone as clientPhone,
+                 s.name as serviceName,
+                 s.price_cents as priceCents
+          FROM appointments a
+          JOIN users u ON u.id = a.client_user_id
+          LEFT JOIN clients c ON c.user_id = u.id AND c.tenant_id = a.tenant_id
+          JOIN services s ON s.id = a.service_id
+          WHERE a.id = ? AND a.tenant_id = ?
+        `,
+      )
+      .get(appointmentId, tenantId)
+
+    res.json({ appointment })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.patch('/api/admin/appointments/:id', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+    const id = z.string().uuid().parse(req.params.id)
+
+    const body = z
+      .object({
+        status: z.enum(['PENDING', 'CONFIRMED', 'CANCELLED']),
+      })
+      .parse(req.body)
+
+    const row = db
+      .prepare('SELECT id FROM appointments WHERE id = ? AND tenant_id = ?')
+      .get(id, tenantId) as { id: string } | undefined
+    if (!row) return next(notFound('Agendamento não encontrado', 'APPOINTMENT_NOT_FOUND'))
+
+    db.prepare('UPDATE appointments SET status = ? WHERE id = ?').run(body.status, id)
+
+    const appointment = db
+      .prepare(
+        `
+          SELECT a.id,
+                 a.service_id as serviceId,
+                 a.starts_at as startsAt,
+                 a.ends_at as endsAt,
+                 a.status,
+                 u.email as clientEmail,
+                 c.name as clientName,
+                 c.phone as clientPhone,
+                 s.name as serviceName,
+                 s.price_cents as priceCents
+          FROM appointments a
+          JOIN users u ON u.id = a.client_user_id
+          LEFT JOIN clients c ON c.user_id = u.id AND c.tenant_id = a.tenant_id
+          JOIN services s ON s.id = a.service_id
+          WHERE a.id = ?
+        `,
+      )
+      .get(id)
+
+    res.json({ appointment })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.delete('/api/admin/appointments/:id', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+    const id = z.string().uuid().parse(req.params.id)
+
+    const r = db.prepare('DELETE FROM appointments WHERE id = ? AND tenant_id = ?').run(id, tenantId)
+    if (r.changes === 0) return next(notFound('Agendamento não encontrado', 'APPOINTMENT_NOT_FOUND'))
+
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.get('/api/admin/business-hours', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const businessHours = db
+      .prepare(
+        `
+          SELECT id, weekday, start_minute as startMinute, end_minute as endMinute
+          FROM business_hours
+          WHERE tenant_id = ?
+          ORDER BY weekday ASC, start_minute ASC
         `,
       )
       .all(tenantId)
-    res.json({ appointments })
+
+    res.json({ businessHours })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/admin/business-hours', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const body = z
+      .object({
+        weekday: z.number().int().min(0).max(6),
+        startMinute: z.number().int().min(0).max(1440),
+        endMinute: z.number().int().min(0).max(1440),
+      })
+      .parse(req.body)
+
+    if (body.endMinute <= body.startMinute) {
+      return next(badRequest('Intervalo inválido', 'INVALID_RANGE'))
+    }
+
+    const overlap = db
+      .prepare(
+        `
+          SELECT id
+          FROM business_hours
+          WHERE tenant_id = ?
+            AND weekday = ?
+            AND NOT (end_minute <= ? OR start_minute >= ?)
+          LIMIT 1
+        `,
+      )
+      .get(tenantId, body.weekday, body.startMinute, body.endMinute) as { id: string } | undefined
+
+    if (overlap) return next(badRequest('Horário sobreposto', 'OVERLAPPING_RANGE'))
+
+    const id = randomUUID()
+    const now = new Date().toISOString()
+    db.prepare(
+      `
+        INSERT INTO business_hours (id, tenant_id, weekday, start_minute, end_minute, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `,
+    ).run(id, tenantId, body.weekday, body.startMinute, body.endMinute, now)
+
+    const businessHour = db
+      .prepare(
+        `
+          SELECT id, weekday, start_minute as startMinute, end_minute as endMinute
+          FROM business_hours
+          WHERE id = ? AND tenant_id = ?
+        `,
+      )
+      .get(id, tenantId)
+
+    res.json({ businessHour })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.patch('/api/admin/business-hours/:id', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+    const id = z.string().uuid().parse(req.params.id)
+
+    const body = z
+      .object({
+        weekday: z.number().int().min(0).max(6).optional(),
+        startMinute: z.number().int().min(0).max(1440).optional(),
+        endMinute: z.number().int().min(0).max(1440).optional(),
+      })
+      .parse(req.body)
+
+    const row = db
+      .prepare(
+        `
+          SELECT weekday, start_minute as startMinute, end_minute as endMinute
+          FROM business_hours
+          WHERE id = ? AND tenant_id = ?
+        `,
+      )
+      .get(id, tenantId) as { weekday: number; startMinute: number; endMinute: number } | undefined
+
+    if (!row) return next(notFound('Horário não encontrado', 'BUSINESS_HOUR_NOT_FOUND'))
+
+    const nextWeekday = body.weekday ?? row.weekday
+    const nextStart = body.startMinute ?? row.startMinute
+    const nextEnd = body.endMinute ?? row.endMinute
+    if (nextEnd <= nextStart) return next(badRequest('Intervalo inválido', 'INVALID_RANGE'))
+
+    const overlap = db
+      .prepare(
+        `
+          SELECT id
+          FROM business_hours
+          WHERE tenant_id = ?
+            AND weekday = ?
+            AND id <> ?
+            AND NOT (end_minute <= ? OR start_minute >= ?)
+          LIMIT 1
+        `,
+      )
+      .get(tenantId, nextWeekday, id, nextStart, nextEnd) as { id: string } | undefined
+
+    if (overlap) return next(badRequest('Horário sobreposto', 'OVERLAPPING_RANGE'))
+
+    const updates: Array<{ sql: string; params: unknown[] }> = []
+    if (typeof body.weekday === 'number') updates.push({ sql: 'weekday = ?', params: [body.weekday] })
+    if (typeof body.startMinute === 'number') updates.push({ sql: 'start_minute = ?', params: [body.startMinute] })
+    if (typeof body.endMinute === 'number') updates.push({ sql: 'end_minute = ?', params: [body.endMinute] })
+
+    if (updates.length === 0) return next(badRequest('Nada para atualizar', 'NO_UPDATES'))
+
+    const setSql = updates.map((u) => u.sql).join(', ')
+    const params = updates.flatMap((u) => u.params)
+    db.prepare(`UPDATE business_hours SET ${setSql} WHERE id = ? AND tenant_id = ?`).run(...params, id, tenantId)
+
+    const businessHour = db
+      .prepare(
+        `
+          SELECT id, weekday, start_minute as startMinute, end_minute as endMinute
+          FROM business_hours
+          WHERE id = ? AND tenant_id = ?
+        `,
+      )
+      .get(id, tenantId)
+
+    res.json({ businessHour })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.delete('/api/admin/business-hours/:id', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+    const id = z.string().uuid().parse(req.params.id)
+
+    const r = db.prepare('DELETE FROM business_hours WHERE id = ? AND tenant_id = ?').run(id, tenantId)
+    if (r.changes === 0) return next(notFound('Horário não encontrado', 'BUSINESS_HOUR_NOT_FOUND'))
+
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.get('/api/admin/time-off', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const q = z
+      .object({
+        start: z.string().datetime().optional(),
+        end: z.string().datetime().optional(),
+        limit: z
+          .string()
+          .regex(/^\d+$/)
+          .transform((v) => Number(v))
+          .pipe(z.number().int().min(1).max(2000))
+          .optional(),
+      })
+      .parse({
+        start: typeof req.query.start === 'string' ? req.query.start : undefined,
+        end: typeof req.query.end === 'string' ? req.query.end : undefined,
+        limit: typeof req.query.limit === 'string' ? req.query.limit : undefined,
+      })
+
+    const where: string[] = ['tenant_id = ?']
+    const params: unknown[] = [tenantId]
+    if (q.start) {
+      where.push('ends_at > ?')
+      params.push(q.start)
+    }
+    if (q.end) {
+      where.push('starts_at < ?')
+      params.push(q.end)
+    }
+
+    const limit = q.limit ?? 500
+    const timeOff = db
+      .prepare(
+        `
+          SELECT id, starts_at as startsAt, ends_at as endsAt, reason, created_at as createdAt
+          FROM time_off
+          WHERE ${where.join(' AND ')}
+          ORDER BY starts_at ASC
+          LIMIT ${limit}
+        `,
+      )
+      .all(...params) as Array<{ id: string; startsAt: string; endsAt: string; reason: string | null; createdAt: string }>
+
+    res.json({ timeOff })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/admin/time-off', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const body = z
+      .object({
+        startsAt: z.string().datetime(),
+        endsAt: z.string().datetime(),
+        reason: z.string().max(200).optional().nullable(),
+      })
+      .parse(req.body)
+
+    const startsAt = new Date(body.startsAt)
+    const endsAt = new Date(body.endsAt)
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      return next(badRequest('Data inválida', 'INVALID_DATE'))
+    }
+    if (endsAt.getTime() <= startsAt.getTime()) {
+      return next(badRequest('Intervalo inválido', 'INVALID_RANGE'))
+    }
+
+    const overlapExisting = db
+      .prepare(
+        `
+          SELECT id
+          FROM time_off
+          WHERE tenant_id = ?
+            AND NOT (ends_at <= ? OR starts_at >= ?)
+          LIMIT 1
+        `,
+      )
+      .get(tenantId, startsAt.toISOString(), endsAt.toISOString()) as { id: string } | undefined
+
+    if (overlapExisting) return next(badRequest('Bloqueio sobreposto', 'OVERLAPPING_TIME_OFF'))
+
+    const overlapAppt = db
+      .prepare(
+        `
+          SELECT id
+          FROM appointments
+          WHERE tenant_id = ?
+            AND status IN ('CONFIRMED', 'PENDING')
+            AND NOT (ends_at <= ? OR starts_at >= ?)
+          LIMIT 1
+        `,
+      )
+      .get(tenantId, startsAt.toISOString(), endsAt.toISOString()) as { id: string } | undefined
+
+    if (overlapAppt) return next(badRequest('Existe agendamento nesse intervalo', 'TIME_OFF_CONFLICT_APPOINTMENT'))
+
+    const id = randomUUID()
+    const now = new Date().toISOString()
+    db.prepare(
+      `
+        INSERT INTO time_off (id, tenant_id, starts_at, ends_at, reason, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `,
+    ).run(id, tenantId, startsAt.toISOString(), endsAt.toISOString(), body.reason ? body.reason.trim() : null, now)
+
+    const timeOff = db
+      .prepare(
+        `
+          SELECT id, starts_at as startsAt, ends_at as endsAt, reason, created_at as createdAt
+          FROM time_off
+          WHERE id = ? AND tenant_id = ?
+        `,
+      )
+      .get(id, tenantId)
+
+    res.json({ timeOff })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.patch('/api/admin/time-off/:id', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+    const id = z.string().uuid().parse(req.params.id)
+
+    const body = z
+      .object({
+        startsAt: z.string().datetime().optional(),
+        endsAt: z.string().datetime().optional(),
+        reason: z.string().max(200).optional().nullable(),
+      })
+      .parse(req.body)
+
+    const row = db
+      .prepare(
+        `
+          SELECT starts_at as startsAt, ends_at as endsAt, reason
+          FROM time_off
+          WHERE id = ? AND tenant_id = ?
+        `,
+      )
+      .get(id, tenantId) as { startsAt: string; endsAt: string; reason: string | null } | undefined
+
+    if (!row) return next(notFound('Bloqueio não encontrado', 'TIME_OFF_NOT_FOUND'))
+
+    const nextStartsAt = body.startsAt ?? row.startsAt
+    const nextEndsAt = body.endsAt ?? row.endsAt
+    const startsAt = new Date(nextStartsAt)
+    const endsAt = new Date(nextEndsAt)
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      return next(badRequest('Data inválida', 'INVALID_DATE'))
+    }
+    if (endsAt.getTime() <= startsAt.getTime()) {
+      return next(badRequest('Intervalo inválido', 'INVALID_RANGE'))
+    }
+
+    const overlapExisting = db
+      .prepare(
+        `
+          SELECT id
+          FROM time_off
+          WHERE tenant_id = ?
+            AND id <> ?
+            AND NOT (ends_at <= ? OR starts_at >= ?)
+          LIMIT 1
+        `,
+      )
+      .get(tenantId, id, startsAt.toISOString(), endsAt.toISOString()) as { id: string } | undefined
+
+    if (overlapExisting) return next(badRequest('Bloqueio sobreposto', 'OVERLAPPING_TIME_OFF'))
+
+    const overlapAppt = db
+      .prepare(
+        `
+          SELECT id
+          FROM appointments
+          WHERE tenant_id = ?
+            AND status IN ('CONFIRMED', 'PENDING')
+            AND NOT (ends_at <= ? OR starts_at >= ?)
+          LIMIT 1
+        `,
+      )
+      .get(tenantId, startsAt.toISOString(), endsAt.toISOString()) as { id: string } | undefined
+
+    if (overlapAppt) return next(badRequest('Existe agendamento nesse intervalo', 'TIME_OFF_CONFLICT_APPOINTMENT'))
+
+    const updates: Array<{ sql: string; params: unknown[] }> = []
+    if (typeof body.startsAt === 'string') updates.push({ sql: 'starts_at = ?', params: [startsAt.toISOString()] })
+    if (typeof body.endsAt === 'string') updates.push({ sql: 'ends_at = ?', params: [endsAt.toISOString()] })
+    if ('reason' in body) updates.push({ sql: 'reason = ?', params: [body.reason ? body.reason.trim() : null] })
+
+    if (updates.length === 0) return next(badRequest('Nada para atualizar', 'NO_UPDATES'))
+
+    const setSql = updates.map((u) => u.sql).join(', ')
+    const params = updates.flatMap((u) => u.params)
+    db.prepare(`UPDATE time_off SET ${setSql} WHERE id = ? AND tenant_id = ?`).run(...params, id, tenantId)
+
+    const timeOff = db
+      .prepare(
+        `
+          SELECT id, starts_at as startsAt, ends_at as endsAt, reason, created_at as createdAt
+          FROM time_off
+          WHERE id = ? AND tenant_id = ?
+        `,
+      )
+      .get(id, tenantId)
+
+    res.json({ timeOff })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.delete('/api/admin/time-off/:id', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+    const id = z.string().uuid().parse(req.params.id)
+
+    const r = db.prepare('DELETE FROM time_off WHERE id = ? AND tenant_id = ?').run(id, tenantId)
+    if (r.changes === 0) return next(notFound('Bloqueio não encontrado', 'TIME_OFF_NOT_FOUND'))
+
+    res.json({ ok: true })
   } catch (err) {
     next(err)
   }
@@ -1041,13 +2201,159 @@ app.get('/api/admin/dashboard', requireRole('ADMIN'), (req, res, next) => {
       clientName: string | null
     }>
 
+    const thirtyDaysAgo = new Date(now)
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const newClients = db
+      .prepare(
+        `
+          SELECT COUNT(1) as newClientsCount
+          FROM clients
+          WHERE tenant_id = ?
+            AND created_at >= ?
+        `,
+      )
+      .get(tenantId, thirtyDaysAgo.toISOString()) as { newClientsCount: number } | undefined
+
+    const pending = db
+      .prepare(
+        `
+          SELECT COUNT(1) as pendingAppointmentsCount
+          FROM appointments
+          WHERE tenant_id = ?
+            AND status = 'PENDING'
+            AND starts_at >= ?
+        `,
+      )
+      .get(tenantId, now.toISOString()) as { pendingAppointmentsCount: number } | undefined
+
+    const recentActivity = db
+      .prepare(
+        `
+          SELECT kind,
+                 at,
+                 clientName,
+                 clientEmail,
+                 serviceName,
+                 priceCents,
+                 amountCents,
+                 note
+          FROM (
+            SELECT 'APPOINTMENT_CREATED' as kind,
+                   a.created_at as at,
+                   c.name as clientName,
+                   u.email as clientEmail,
+                   s.name as serviceName,
+                   s.price_cents as priceCents,
+                   NULL as amountCents,
+                   NULL as note
+            FROM appointments a
+            JOIN services s ON s.id = a.service_id
+            JOIN users u ON u.id = a.client_user_id
+            LEFT JOIN clients c ON c.user_id = u.id AND c.tenant_id = a.tenant_id
+            WHERE a.tenant_id = ?
+
+            UNION ALL
+
+            SELECT 'EXPENSE_CREATED' as kind,
+                   t.created_at as at,
+                   NULL as clientName,
+                   NULL as clientEmail,
+                   NULL as serviceName,
+                   NULL as priceCents,
+                   t.amount_cents as amountCents,
+                   t.note as note
+            FROM cash_transactions t
+            WHERE t.tenant_id = ?
+              AND t.type = 'EXPENSE'
+          )
+          ORDER BY at DESC
+          LIMIT 12
+        `,
+      )
+      .all(tenantId, tenantId) as Array<{
+      kind: string
+      at: string
+      clientName: string | null
+      clientEmail: string | null
+      serviceName: string | null
+      priceCents: number | null
+      amountCents: number | null
+      note: string | null
+    }>
+
     res.json({
       today: {
         appointmentsCount: today?.appointmentsCount ?? 0,
         expectedRevenueCents: today?.expectedRevenueCents ?? 0,
       },
+      newClients30d: newClients?.newClientsCount ?? 0,
+      pendingAppointments: pending?.pendingAppointmentsCount ?? 0,
       upcoming,
+      recentActivity,
     })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.patch('/api/admin/tenant', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const body = z
+      .object({
+        name: z.string().min(2).optional(),
+        primaryColor: z.string().min(4).optional(),
+        logoUrl: z
+          .string()
+          .max(450_000)
+          .nullable()
+          .optional()
+          .refine(
+            (v) => {
+              if (typeof v === 'undefined') return true
+              if (v === null) return true
+              if (typeof v !== 'string') return false
+              const s = v.trim()
+              if (!s) return true
+              return s.startsWith('data:image/') || /^https?:\/\//.test(s)
+            },
+            { message: 'Logo inválida' },
+          ),
+      })
+      .parse(req.body)
+
+    const row = db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId) as { id: string } | undefined
+    if (!row) return next(notFound('Tenant não encontrado', 'TENANT_NOT_FOUND'))
+
+    const updates: Array<{ sql: string; params: unknown[] }> = []
+    if (typeof body.name === 'string') updates.push({ sql: 'name = ?', params: [body.name] })
+    if (typeof body.primaryColor === 'string')
+      updates.push({ sql: 'primary_color = ?', params: [body.primaryColor] })
+    if ('logoUrl' in body) {
+      const nextLogo = body.logoUrl === null ? null : (body.logoUrl ?? '').trim()
+      updates.push({ sql: 'logo_url = ?', params: [nextLogo ? nextLogo : null] })
+    }
+
+    if (updates.length === 0) return next(badRequest('Nada para atualizar', 'NO_UPDATES'))
+
+    const setSql = updates.map((u) => u.sql).join(', ')
+    const params = updates.flatMap((u) => u.params)
+    db.prepare(`UPDATE tenants SET ${setSql} WHERE id = ?`).run(...params, tenantId)
+
+    const tenant = db
+      .prepare(
+        `
+          SELECT id, slug, name, primary_color as primaryColor, logo_url as logoUrl
+          FROM tenants
+          WHERE id = ?
+        `,
+      )
+      .get(tenantId)
+
+    res.json({ tenant })
   } catch (err) {
     next(err)
   }
@@ -1098,6 +2404,13 @@ app.get('/api/admin/finance', requireRole('ADMIN'), (req, res, next) => {
     const tenantId = req.sessionUser?.tenantId
     if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
 
+    const now = new Date()
+    const monthStart = new Date(now)
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+    const sixMonthsStart = new Date(monthStart)
+    sixMonthsStart.setMonth(sixMonthsStart.getMonth() - 5)
+
     const entries = db
       .prepare(
         `
@@ -1138,6 +2451,80 @@ app.get('/api/admin/finance', requireRole('ADMIN'), (req, res, next) => {
       )
       .all(tenantId) as Array<{ id: string; amountCents: number; method: string; note: string | null; createdAt: string }>
 
+    const lastEntries = db
+      .prepare(
+        `
+          SELECT a.id,
+                 a.starts_at as startsAt,
+                 a.status,
+                 s.name as serviceName,
+                 s.price_cents as priceCents,
+                 u.email as clientEmail,
+                 c.name as clientName
+          FROM appointments a
+          JOIN services s ON s.id = a.service_id
+          JOIN users u ON u.id = a.client_user_id
+          LEFT JOIN clients c ON c.user_id = u.id AND c.tenant_id = a.tenant_id
+          WHERE a.tenant_id = ?
+            AND a.status = 'CONFIRMED'
+          ORDER BY a.starts_at DESC
+          LIMIT 100
+        `,
+      )
+      .all(tenantId) as Array<{
+      id: string
+      startsAt: string
+      status: string
+      serviceName: string
+      priceCents: number
+      clientEmail: string
+      clientName: string | null
+    }>
+
+    const entriesByMonth = db
+      .prepare(
+        `
+          SELECT substr(a.starts_at, 1, 7) as ym,
+                 COALESCE(SUM(s.price_cents), 0) as entriesCents
+          FROM appointments a
+          JOIN services s ON s.id = a.service_id
+          WHERE a.tenant_id = ?
+            AND a.status = 'CONFIRMED'
+            AND a.starts_at >= ?
+          GROUP BY ym
+          ORDER BY ym ASC
+        `,
+      )
+      .all(tenantId, sixMonthsStart.toISOString()) as Array<{ ym: string; entriesCents: number }>
+
+    const expensesByMonth = db
+      .prepare(
+        `
+          SELECT substr(created_at, 1, 7) as ym,
+                 COALESCE(SUM(amount_cents), 0) as expensesCents
+          FROM cash_transactions
+          WHERE tenant_id = ?
+            AND type = 'EXPENSE'
+            AND created_at >= ?
+          GROUP BY ym
+          ORDER BY ym ASC
+        `,
+      )
+      .all(tenantId, sixMonthsStart.toISOString()) as Array<{ ym: string; expensesCents: number }>
+
+    const entriesByMonthMap = new Map(entriesByMonth.map((r) => [r.ym, r.entriesCents]))
+    const expensesByMonthMap = new Map(expensesByMonth.map((r) => [r.ym, r.expensesCents]))
+    const monthly = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(sixMonthsStart)
+      d.setMonth(sixMonthsStart.getMonth() + i)
+      const ym = d.toISOString().slice(0, 7)
+      return {
+        ym,
+        entriesCents: entriesByMonthMap.get(ym) ?? 0,
+        expensesCents: expensesByMonthMap.get(ym) ?? 0,
+      }
+    })
+
     const entriesCents = entries?.entriesCents ?? 0
     const expensesCents = expenses?.expensesCents ?? 0
 
@@ -1148,6 +2535,8 @@ app.get('/api/admin/finance', requireRole('ADMIN'), (req, res, next) => {
         profitCents: entriesCents - expensesCents,
       },
       lastExpenses,
+      lastEntries,
+      monthly,
     })
   } catch (err) {
     next(err)
@@ -1298,6 +2687,55 @@ const requireWhatsappConfig = (tenantId: string) => {
   return row
 }
 
+const defaultWhatsappSettings = {
+  remindersEnabled: true,
+  reminderOffsetHours: 24,
+  reminderMessage:
+    'Oi {{nome}}, tudo bem? Só passando para lembrar do seu horário amanhã às {{hora}} aqui no {{espaco}}. Até lá!',
+  promoEnabled: false,
+  promoMessage:
+    'Oi {{nome}}, temos uma novidade especial para você esta semana no {{espaco}}. Responda esta mensagem para saber mais.',
+}
+
+const requireWhatsappSettings = (tenantId: string) => {
+  const row = db
+    .prepare(
+      `
+        SELECT tenant_id as tenantId,
+               reminders_enabled as remindersEnabled,
+               reminder_offset_hours as reminderOffsetHours,
+               reminder_message as reminderMessage,
+               promo_enabled as promoEnabled,
+               promo_message as promoMessage,
+               updated_at as updatedAt
+        FROM whatsapp_settings
+        WHERE tenant_id = ?
+        LIMIT 1
+      `,
+    )
+    .get(tenantId) as
+    | {
+        tenantId: string
+        remindersEnabled: number
+        reminderOffsetHours: number
+        reminderMessage: string
+        promoEnabled: number
+        promoMessage: string
+        updatedAt: string
+      }
+    | undefined
+
+  if (!row) return null
+  return {
+    remindersEnabled: Boolean(row.remindersEnabled),
+    reminderOffsetHours: row.reminderOffsetHours,
+    reminderMessage: row.reminderMessage,
+    promoEnabled: Boolean(row.promoEnabled),
+    promoMessage: row.promoMessage,
+    updatedAt: row.updatedAt,
+  }
+}
+
 app.get('/api/admin/whatsapp', requireRole('ADMIN'), (req, res, next) => {
   try {
     const tenantId = req.sessionUser?.tenantId
@@ -1365,6 +2803,109 @@ app.put('/api/admin/whatsapp', requireRole('ADMIN'), (req, res, next) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     ).run(id, tenantId, provider, baseUrl, apiKey, instanceName, status, now, now)
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.get('/api/admin/whatsapp/settings', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+    const settings = requireWhatsappSettings(tenantId)
+    res.json({ settings: settings ?? defaultWhatsappSettings })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.put('/api/admin/whatsapp/settings', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const body = z
+      .object({
+        remindersEnabled: z.boolean().optional(),
+        reminderOffsetHours: z.number().int().min(1).max(168).optional(),
+        reminderMessage: z
+          .string()
+          .max(2000)
+          .transform((v) => v.trim())
+          .pipe(z.string().min(1))
+          .optional(),
+        promoEnabled: z.boolean().optional(),
+        promoMessage: z
+          .string()
+          .max(2000)
+          .transform((v) => v.trim())
+          .pipe(z.string().min(1))
+          .optional(),
+      })
+      .parse(req.body)
+
+    const existing = requireWhatsappSettings(tenantId) ?? defaultWhatsappSettings
+
+    const remindersEnabled = body.remindersEnabled ?? existing.remindersEnabled
+    const reminderOffsetHours = body.reminderOffsetHours ?? existing.reminderOffsetHours
+    const reminderMessage = body.reminderMessage ?? existing.reminderMessage
+    const promoEnabled = body.promoEnabled ?? existing.promoEnabled
+    const promoMessage = body.promoMessage ?? existing.promoMessage
+
+    const now = new Date().toISOString()
+    const row = db.prepare('SELECT tenant_id as tenantId FROM whatsapp_settings WHERE tenant_id = ?').get(tenantId) as
+      | { tenantId: string }
+      | undefined
+
+    if (row) {
+      db.prepare(
+        `
+          UPDATE whatsapp_settings
+          SET reminders_enabled = ?,
+              reminder_offset_hours = ?,
+              reminder_message = ?,
+              promo_enabled = ?,
+              promo_message = ?,
+              updated_at = ?
+          WHERE tenant_id = ?
+        `,
+      ).run(
+        remindersEnabled ? 1 : 0,
+        reminderOffsetHours,
+        reminderMessage,
+        promoEnabled ? 1 : 0,
+        promoMessage,
+        now,
+        tenantId,
+      )
+      res.json({ ok: true })
+      return
+    }
+
+    db.prepare(
+      `
+        INSERT INTO whatsapp_settings (
+          tenant_id,
+          reminders_enabled,
+          reminder_offset_hours,
+          reminder_message,
+          promo_enabled,
+          promo_message,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+    ).run(
+      tenantId,
+      remindersEnabled ? 1 : 0,
+      reminderOffsetHours,
+      reminderMessage,
+      promoEnabled ? 1 : 0,
+      promoMessage,
+      now,
+      now,
+    )
     res.json({ ok: true })
   } catch (err) {
     next(err)
@@ -1514,6 +3055,41 @@ app.post('/api/admin/whatsapp/broadcast', requireRole('ADMIN'), async (req, res,
     }
 
     res.json({ sent, failed, total: numbers.length })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/admin/whatsapp/send', requireRole('ADMIN'), async (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const body = z
+      .object({
+        toPhone: z.string().min(6).max(40),
+        text: z.string().min(1).max(2000),
+      })
+      .parse(req.body)
+
+    const row = requireWhatsappConfig(tenantId)
+    if (!row?.baseUrl || !row.apiKey || !row.instanceName) {
+      return next(badRequest('WhatsApp não configurado', 'WHATSAPP_NOT_CONFIGURED'))
+    }
+
+    const number = body.toPhone.trim()
+    const url = `${normalizeBaseUrl(row.baseUrl)}/message/sendText/${encodeURIComponent(row.instanceName)}`
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: row.apiKey },
+      body: JSON.stringify({ number, text: body.text, textMessage: body.text }),
+    })
+
+    if (!resp.ok) {
+      return next(badRequest('Falha ao enviar mensagem', 'WHATSAPP_SEND_FAILED'))
+    }
+
+    res.json({ ok: true })
   } catch (err) {
     next(err)
   }
@@ -1680,6 +3256,19 @@ app.post('/api/client/appointments', requireRole('CLIENT'), (req, res, next) => 
     if (!fitsAnyRange) {
       throw badRequest('Horário fora do atendimento', 'OUTSIDE_BUSINESS_HOURS')
     }
+
+    const timeOffOverlap = db
+      .prepare(
+        `
+          SELECT id FROM time_off
+          WHERE tenant_id = ?
+            AND NOT (ends_at <= ? OR starts_at >= ?)
+          LIMIT 1
+        `,
+      )
+      .get(tenantId, startsAt.toISOString(), endsAt.toISOString())
+
+    if (timeOffOverlap) throw badRequest('Horário indisponível', 'SLOT_UNAVAILABLE')
 
     const overlap = db
       .prepare(

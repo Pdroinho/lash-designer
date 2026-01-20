@@ -2,7 +2,8 @@ import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 're
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { api } from './api'
 import type { SessionUser, TenantDev, TenantPublic, CalendarEvent } from './types'
-import { applyTenantTheme, setAppMode } from './theme'
+import { applyTenantTheme, getDevTheme, initDevTheme, setAppMode, toggleDevTheme, type DevThemeMode, getDevPrimaryColor, setDevPrimaryColor } from './theme'
+import { ColorPicker } from './components/ColorPicker'
 import {
   Calendar,
   ClipboardList,
@@ -32,10 +33,20 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
-  MessageSquare,
   Megaphone,
   QrCode,
-  Smartphone
+  Smartphone,
+  Copy,
+  Moon,
+  Sun,
+  Palette,
+  Globe,
+  Key,
+  Webhook,
+  BellRing,
+  CreditCard,
+  MessageSquare,
+  Lock
 } from 'lucide-react'
 
 function withBasePath(basePath: string, path: string) {
@@ -47,10 +58,28 @@ function withBasePath(basePath: string, path: string) {
 type CssVarStyle = CSSProperties & { ['--auth-accent']?: string }
 
 type AdminStats = {
-  today?: {
-    appointmentsCount?: number
-    expectedRevenueCents?: number
-  }
+  today?: { appointmentsCount?: number; expectedRevenueCents?: number }
+  newClients30d?: number
+  pendingAppointments?: number
+  upcoming?: Array<{
+    id: string
+    startsAt: string
+    status: string
+    serviceName: string
+    priceCents: number
+    clientEmail: string
+    clientName: string | null
+  }>
+  recentActivity?: Array<{
+    kind: string
+    at: string
+    clientName: string | null
+    clientEmail: string | null
+    serviceName: string | null
+    priceCents: number | null
+    amountCents: number | null
+    note: string | null
+  }>
 }
 
 type AdminService = {
@@ -59,6 +88,39 @@ type AdminService = {
   durationMinutes: number
   priceCents: number
   coverUrl?: string | null
+}
+
+type AdminAppointment = {
+  id: string
+  serviceId: string
+  startsAt: string
+  endsAt: string
+  status: string
+  clientEmail: string
+  clientName: string | null
+  clientPhone: string | null
+  serviceName: string
+  priceCents: number
+}
+
+type AdminClientRow = {
+  id: string
+  name: string
+  phone: string | null
+  email: string
+  totalSpentCents: number
+  lastVisitAt: string | null
+}
+
+type AdminFinanceData = {
+  totals: {
+    entriesCents: number
+    expensesCents: number
+    profitCents: number
+  }
+  lastExpenses: Array<{ id: string; amountCents: number; method: string; note: string | null; createdAt: string }>
+  lastEntries: Array<{ id: string; startsAt: string; status: string; serviceName: string; priceCents: number; clientEmail: string; clientName: string | null }>
+  monthly: Array<{ ym: string; entriesCents: number; expensesCents: number }>
 }
 
 function formatBRL(n: number) {
@@ -105,6 +167,351 @@ function SidebarItem(props: { active?: boolean; icon: ReactNode; label: string; 
   )
 }
 
+function NotificationsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [notifications, setNotifications] = useState<Array<{id: string; title: string; desc: string; time: string; type: string}>>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) {
+        setLoading(true)
+        api<{notifications: Array<{id: string; title: string; desc: string; time: string; type: string}>}>('/api/dev/notifications')
+            .then(res => {
+                if(res.ok) setNotifications(res.data.notifications)
+            })
+            .finally(() => setLoading(false))
+    }
+  }, [isOpen])
+  
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        onClose()
+      }
+    }
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isOpen, onClose])
+
+  if (!isOpen) return null
+
+  const getIcon = (type: string) => {
+      const t = type.toLowerCase()
+      if (t.includes('payment') || t.includes('approved')) return <CreditCard size={16}/>
+      if (t.includes('message')) return <MessageSquare size={16}/>
+      if (t.includes('fail') || t.includes('refused')) return <XCircle size={16}/>
+      return <BellRing size={16}/>
+  }
+
+  const getColor = (type: string) => {
+      const t = type.toLowerCase()
+      if (t.includes('payment') || t.includes('approved')) return { bg: '#dcfce7', text: '#166534' }
+      if (t.includes('message')) return { bg: '#e0f2fe', text: '#0369a1' }
+      if (t.includes('fail') || t.includes('refused')) return { bg: '#fee2e2', text: '#991b1b' }
+      return { bg: 'var(--bg-subtle)', text: 'var(--text-muted)' }
+  }
+
+  const relativeTime = (iso: string) => {
+      try {
+          const date = new Date(iso)
+          if (isNaN(date.getTime())) return iso
+          const diff = Date.now() - date.getTime()
+          const mins = Math.floor(diff / 60000)
+          if (mins < 1) return 'Agora'
+          if (mins < 60) return `Há ${mins} min`
+          const hours = Math.floor(mins / 60)
+          if (hours < 24) return `Há ${hours} h`
+          return date.toLocaleDateString('pt-BR')
+      } catch {
+          return iso
+      }
+  }
+
+  return (
+    <div ref={ref} className="notifications-popover" style={{
+        position: 'absolute',
+        top: 60,
+        right: 80,
+        width: 360,
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        borderRadius: 12,
+        boxShadow: 'var(--shadow-lg)',
+        zIndex: 100,
+        overflow: 'hidden'
+    }}>
+        <div style={{padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <h3 style={{fontSize: '0.95rem', fontWeight: 600, margin: 0}}>Notificações</h3>
+            <button className="btn btn-ghost" style={{fontSize: '0.75rem', height: 24, padding: '0 8px'}}>Marcar todas como lidas</button>
+        </div>
+        <div style={{maxHeight: 400, overflowY: 'auto'}}>
+            {loading ? (
+                <div style={{padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem'}}>Carregando...</div>
+            ) : notifications.length === 0 ? (
+                <div style={{padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem'}}>Nenhuma notificação recente.</div>
+            ) : (
+                notifications.map(n => {
+                    const style = getColor(n.type)
+                    return (
+                        <div key={n.id} style={{padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, cursor: 'pointer', transition: 'background 0.2s'}} 
+                             onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'}
+                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                            <div style={{width: 32, height: 32, borderRadius: '50%', background: style.bg, color: style.text, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0}}>
+                                {getIcon(n.type)}
+                            </div>
+                            <div>
+                                <div style={{fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)'}}>{n.title}</div>
+                                <div style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2}}>{n.desc}</div>
+                                <div style={{fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4}}>{relativeTime(n.time)}</div>
+                            </div>
+                        </div>
+                    )
+                })
+            )}
+        </div>
+        <div style={{padding: 12, background: 'var(--bg-subtle)', textAlign: 'center', borderTop: '1px solid var(--border)'}}>
+            <button className="btn btn-ghost btn-sm" style={{width: '100%'}}>Ver todas</button>
+        </div>
+    </div>
+  )
+}
+
+function SubscriptionPopup({ isOpen, user, isTestMode }: { isOpen: boolean; user: SessionUser | null; isTestMode: boolean }) {
+    // Force live check of local storage to ensure test mode is detected
+    const [localTestMode, setLocalTestMode] = useState(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem('lash_test_mode') === 'true'
+        return false
+    })
+
+    // Poll for changes in test mode (every 1s) to react immediately
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const val = localStorage.getItem('lash_test_mode') === 'true'
+            setLocalTestMode(v => v !== val ? val : v)
+        }, 1000)
+        return () => clearInterval(interval)
+    }, [])
+
+    const effectiveTestMode = isTestMode || localTestMode
+
+    const [loading, setLoading] = useState(false)
+    const [testLoading, setTestLoading] = useState(false)
+    const [view, setView] = useState<'blocked' | 'checkout'>('blocked')
+    
+    // Form state for simulated checkout
+    const [cardNumber, setCardNumber] = useState('')
+    const [cardName, setCardName] = useState('')
+    const [cardExpiry, setCardExpiry] = useState('')
+    const [cardCvc, setCardCvc] = useState('')
+
+    // Reset view when closed or opened
+    useEffect(() => {
+        if (isOpen) {
+            setView('blocked')
+            setCardNumber('')
+            setCardName('')
+            setCardExpiry('')
+            setCardCvc('')
+        }
+    }, [isOpen])
+
+    // Auto-fill effect when entering checkout view
+    useEffect(() => {
+        if (view === 'checkout') {
+            const timer1 = setTimeout(() => setCardNumber('4242 4242 4242 4242'), 500)
+            const timer2 = setTimeout(() => setCardName(user?.email?.split('@')[0].toUpperCase() || 'USUARIO TESTE'), 800)
+            const timer3 = setTimeout(() => setCardExpiry('12/30'), 1100)
+            const timer4 = setTimeout(() => setCardCvc('123'), 1400)
+            return () => {
+                clearTimeout(timer1)
+                clearTimeout(timer2)
+                clearTimeout(timer3)
+                clearTimeout(timer4)
+            }
+        }
+    }, [view, user])
+
+    if (!isOpen) return null
+
+    const handleCheckout = async () => {
+        // Double check at click time
+        const currentTestMode = effectiveTestMode || (typeof window !== 'undefined' && localStorage.getItem('lash_test_mode') === 'true')
+        
+        if (currentTestMode) {
+            setView('checkout')
+            return
+        }
+
+        setLoading(true)
+        try {
+            const res = await api<{url: string}>('/api/admin/subscription/checkout-url')
+            if (res.ok && res.data?.url) {
+                window.open(res.data.url, '_blank')
+            } else {
+                alert('Erro ao gerar link de pagamento')
+            }
+        } catch (err) {
+            console.error(err)
+            alert('Erro ao conectar com servidor')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleTestPay = async (e?: React.FormEvent) => {
+        e?.preventDefault()
+        setTestLoading(true)
+        
+        // Simulate processing delay
+        await new Promise(r => setTimeout(r, 1500))
+
+        try {
+            const res = await api<{ok: boolean}>('/api/admin/subscription/test-pay', { method: 'POST' })
+            if (res.ok) {
+                alert('Pagamento aprovado! Liberando acesso...')
+                window.location.reload()
+            } else {
+                alert('Erro ao simular pagamento')
+            }
+        } catch (err) {
+            console.error(err)
+            alert('Erro ao conectar com servidor')
+        } finally {
+            setTestLoading(false)
+        }
+    }
+
+    if (view === 'checkout') {
+        return (
+             <div className="modal-overlay" style={{zIndex: 9999, backdropFilter: 'blur(5px)'}}>
+                <div className="modal-content" style={{maxWidth: 450, padding: 32}}>
+                    <div style={{display: 'flex', alignItems: 'center', marginBottom: 24, gap: 12}}>
+                        <button onClick={() => setView('blocked')} className="icon-btn" style={{border: 'none', background: 'transparent', marginLeft: -8}}>
+                            <ChevronLeft size={20} />
+                        </button>
+                        <h2 style={{fontSize: '1.25rem', fontWeight: 700, margin: 0}}>Checkout Seguro (Teste)</h2>
+                    </div>
+
+                    <form onSubmit={handleTestPay} style={{display: 'flex', flexDirection: 'column', gap: 16}}>
+                        <div className="input-group">
+                            <label className="label">Número do Cartão</label>
+                            <div style={{position: 'relative'}}>
+                                <CreditCard size={18} style={{position: 'absolute', left: 12, top: 11, color: 'var(--text-muted)'}} />
+                                <input 
+                                    className="input" 
+                                    style={{paddingLeft: 40}} 
+                                    value={cardNumber} 
+                                    onChange={e => setCardNumber(e.target.value)}
+                                    placeholder="0000 0000 0000 0000"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="input-group">
+                            <label className="label">Nome no Cartão</label>
+                            <input 
+                                className="input" 
+                                value={cardName} 
+                                onChange={e => setCardName(e.target.value)}
+                                placeholder="NOME COMO NO CARTAO"
+                                required
+                            />
+                        </div>
+
+                        <div style={{display: 'flex', gap: 16}}>
+                            <div className="input-group" style={{flex: 1}}>
+                                <label className="label">Validade</label>
+                                <input 
+                                    className="input" 
+                                    value={cardExpiry} 
+                                    onChange={e => setCardExpiry(e.target.value)}
+                                    placeholder="MM/AA"
+                                    required
+                                />
+                            </div>
+                            <div className="input-group" style={{flex: 1}}>
+                                <label className="label">CVC</label>
+                                <div style={{position: 'relative'}}>
+                                    <Lock size={16} style={{position: 'absolute', left: 12, top: 12, color: 'var(--text-muted)'}} />
+                                    <input 
+                                        className="input" 
+                                        style={{paddingLeft: 36}} 
+                                        value={cardCvc} 
+                                        onChange={e => setCardCvc(e.target.value)}
+                                        placeholder="123"
+                                        required
+                                        type="password"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{background: 'var(--bg-subtle)', padding: 16, borderRadius: 8, marginTop: 8}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8}}>
+                                <span>Plano Pro</span>
+                                <span>R$ 99,90</span>
+                            </div>
+                            <div style={{display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1rem', borderTop: '1px solid var(--border)', paddingTop: 8}}>
+                                <span>Total</span>
+                                <span>R$ 99,90</span>
+                            </div>
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            className="btn btnPrimary" 
+                            style={{height: 48, fontSize: '1rem', marginTop: 8}}
+                            disabled={testLoading}
+                        >
+                            {testLoading ? 'Processando...' : 'Pagar R$ 99,90'}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="modal-overlay" style={{zIndex: 9999, backdropFilter: 'blur(5px)'}}>
+            <div className="modal-content" style={{maxWidth: 450, textAlign: 'center', padding: 40}}>
+                <div style={{
+                    width: 64, height: 64, 
+                    background: '#fee2e2', color: '#dc2626', 
+                    borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 24px'
+                }}>
+                    <Lock size={32} />
+                </div>
+                
+                <h2 style={{fontSize: '1.5rem', fontWeight: 700, marginBottom: 12, color: 'var(--gray-900)'}}>
+                    Assinatura Necessária
+                </h2>
+                
+                <p style={{fontSize: '1rem', color: 'var(--text-muted)', marginBottom: 32, lineHeight: 1.6}}>
+                    Sua assinatura está inativa ou expirada. Para continuar gerenciando seu espaço e agendamentos, por favor, realize o pagamento.
+                </p>
+
+                <div style={{display: 'flex', flexDirection: 'column', gap: 12}}>
+                        <button 
+                            className="btn btnPrimary" 
+                            style={{height: 48, fontSize: '1rem'}}
+                            onClick={handleCheckout}
+                            disabled={loading || testLoading}
+                        >
+                            {loading ? 'Carregando...' : (effectiveTestMode ? 'Realizar Pagamento (Teste)' : 'Realizar Pagamento')}
+                        </button>
+                </div>
+                
+                <div style={{marginTop: 24, fontSize: '0.8rem', color: 'var(--text-muted)'}}>
+                    Precisa de ajuda? Entre em contato com o suporte.
+                </div>
+            </div>
+        </div>
+    )
+}
+
 function Shell(props: {
   title: string
   subtitle: string
@@ -113,8 +520,12 @@ function Shell(props: {
   children: ReactNode
   user?: SessionUser | null
   actions?: ReactNode
+  onSearch?: (query: string) => void
+  searchValue?: string
+  isTestMode?: boolean
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
 
   return (
     <div className="app-shell">
@@ -149,8 +560,8 @@ function Shell(props: {
 
       <main className="app-main">
         <header className="app-header">
-          <div style={{display: 'flex', alignItems: 'center', gap: 16}}>
-            <button className="icon-btn mobile-toggle" style={{display: 'none'}} onClick={() => setMobileOpen(true)}>
+          <div className="header-left" style={{display: 'flex', alignItems: 'center', gap: 16}}>
+            <button className="icon-btn mobile-toggle" onClick={() => setMobileOpen(true)}>
               <Menu size={20} />
             </button>
             <div style={{display: 'flex', flexDirection: 'column'}}>
@@ -167,14 +578,34 @@ function Shell(props: {
             
             <div className="search-trigger">
                 <Search size={14} />
-                <span style={{flex: 1}}>Buscar...</span>
-                <span style={{fontSize: '0.7rem', background: 'var(--gray-100)', padding: '2px 6px', borderRadius: 4, color: 'var(--gray-500)'}}>⌘K</span>
+                {props.onSearch ? (
+                    <input 
+                        className="search-input"
+                        placeholder="Buscar..."
+                        value={props.searchValue ?? ''}
+                        onChange={(e) => props.onSearch?.(e.target.value)}
+                        style={{
+                            border: 'none',
+                            background: 'transparent',
+                            outline: 'none',
+                            fontSize: '0.9rem',
+                            width: '100%',
+                            color: 'var(--text-main)',
+                            padding: 0
+                        }}
+                    />
+                ) : (
+                    <span style={{flex: 1}}>Buscar...</span>
+                )}
+                {!props.onSearch && <span style={{fontSize: '0.7rem', background: 'var(--gray-100)', padding: '2px 6px', borderRadius: 4, color: 'var(--gray-500)'}}>⌘K</span>}
             </div>
             
-            <div className="icon-btn" style={{position: 'relative', border: 'none', background: 'transparent'}}>
+            <div className="icon-btn" style={{position: 'relative', border: 'none', background: 'transparent'}} onClick={() => setShowNotifications(!showNotifications)}>
               <Bell size={20} />
               <div style={{position: 'absolute', top: 8, right: 8, width: 8, height: 8, background: '#ef4444', borderRadius: '50%', border: '2px solid white'}} />
             </div>
+            
+            <NotificationsModal isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
 
             <div style={{width: 1, height: 24, background: 'var(--gray-200)', margin: '0 8px'}} />
 
@@ -188,13 +619,45 @@ function Shell(props: {
           {props.children}
         </div>
       </main>
+
+      <SubscriptionPopup 
+        isOpen={props.user?.role === 'ADMIN' && props.user?.subscriptionStatus !== 'ACTIVE'} 
+        user={props.user ?? null} 
+        isTestMode={props.isTestMode ?? false}
+      />
     </div>
   )
 }
 
 // --- Admin Components ---
 
-function AdminDashboard({ me, stats, tenantSlug }: { me: SessionUser | null; stats: AdminStats | null; tenantSlug: string }) {
+function AdminDashboard({ me, stats, onRefresh }: { me: SessionUser | null; stats: AdminStats | null; onRefresh?: () => void }) {
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [updating, setUpdating] = useState(false)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpenId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  async function handleStatusChange(id: string, status: string) {
+    if (updating) return
+    setUpdating(true)
+    await api(`/api/admin/appointments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    })
+    setUpdating(false)
+    setMenuOpenId(null)
+    if (onRefresh) onRefresh()
+  }
+
   const greeting = useMemo(() => {
     const hour = new Date().getHours()
     if (hour < 12) return 'Bom dia'
@@ -202,7 +665,114 @@ function AdminDashboard({ me, stats, tenantSlug }: { me: SessionUser | null; sta
     return 'Boa noite'
   }, [])
 
-  const bookingLink = typeof window !== 'undefined' ? `${window.location.protocol}//${tenantSlug}.${window.location.host.replace('www.', '')}/agendar` : ''
+  const bookingLink = typeof window !== 'undefined' ? `${window.location.origin}/agendar` : ''
+  const [copied, setCopied] = useState(false)
+
+  const copyLink = () => {
+    if (typeof navigator !== 'undefined') {
+        navigator.clipboard.writeText(bookingLink)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const palette = [
+    { bg: undefined as string | undefined, fg: undefined as string | undefined },
+    { bg: '#e0f2fe', fg: '#0369a1' },
+    { bg: '#fef3c7', fg: '#b45309' },
+    { bg: '#f3e8ff', fg: '#6b21a8' },
+    { bg: '#ffe4e6', fg: '#9d174d' },
+  ]
+
+  const initials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean)
+    const a = parts[0]?.[0] ?? 'U'
+    const b = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? '' : (parts[0]?.[1] ?? '')
+    return (a + b).toUpperCase()
+  }
+
+  const colorFor = (name: string) => {
+    let h = 0
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+    return palette[h % palette.length]
+  }
+
+  const labelForStatus = (s: string) => {
+    const v = s.trim().toUpperCase()
+    if (v === 'CONFIRMED') return { label: 'Confirmado', className: 'status-success' }
+    if (v === 'PENDING') return { label: 'Pendente', className: 'status-pending' }
+    if (v === 'CANCELLED') return { label: 'Cancelado', className: 'status-warning' }
+    return { label: v || '—', className: 'status-warning' }
+  }
+
+  const fmtTime = (iso: string) =>
+    new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+  const relative = (iso: string) => {
+    const now = Date.now()
+    const t = new Date(iso).getTime()
+    if (!Number.isFinite(t)) return '—'
+    const diffMs = Math.max(0, now - t)
+    const mins = Math.floor(diffMs / 60_000)
+    if (mins <= 0) return 'Agora'
+    if (mins < 60) return `Há ${mins} min`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `Há ${hrs} h`
+    const days = Math.floor(hrs / 24)
+    return `Há ${days} d`
+  }
+
+  const upcoming = (stats?.upcoming ?? []).slice(0, 12).map((a) => {
+    const displayName = (a.clientName ?? a.clientEmail).trim() || 'Cliente'
+    const col = colorFor(displayName)
+    const st = labelForStatus(a.status)
+    return {
+      id: a.id,
+      name: displayName,
+      avatar: initials(displayName),
+      avatarBg: col.bg,
+      avatarColor: col.fg,
+      service: a.serviceName,
+      time: fmtTime(a.startsAt),
+      status: st.label,
+      statusClass: st.className,
+      rawStatus: a.status,
+    }
+  })
+
+  const activity = (stats?.recentActivity ?? []).slice(0, 10).map((a) => {
+    const kind = (a.kind || '').trim().toUpperCase()
+    if (kind === 'APPOINTMENT_CREATED') {
+      const who = (a.clientName ?? a.clientEmail ?? 'Cliente').trim() || 'Cliente'
+      const svc = a.serviceName ?? 'serviço'
+      return {
+        key: `${a.at}_${kind}_${who}`,
+        dot: 'var(--primary)',
+        title: 'Novo agendamento',
+        desc: `${who} agendou ${svc}`,
+        when: relative(a.at),
+      }
+    }
+    if (kind === 'EXPENSE_CREATED') {
+      const note = a.note?.trim() ? a.note.trim() : 'Despesa'
+      const amount = typeof a.amountCents === 'number' ? formatBRL(a.amountCents / 100) : ''
+      const desc = amount ? `${note} (${amount})` : note
+      return {
+        key: `${a.at}_${kind}_${note}`,
+        dot: 'var(--danger)',
+        title: 'Despesa lançada',
+        desc,
+        when: relative(a.at),
+      }
+    }
+    return {
+      key: `${a.at}_${kind}`,
+      dot: 'var(--gray-400)',
+      title: kind || 'Atividade',
+      desc: '—',
+      when: relative(a.at),
+    }
+  })
 
   return (
     <>
@@ -232,75 +802,177 @@ function AdminDashboard({ me, stats, tenantSlug }: { me: SessionUser | null; sta
           <div className="stat-icon"><Users size={24} /></div>
           <div className="stat-info">
             <h4>Novos Clientes</h4>
-            <div className="value">12</div>
+            <div className="value">{stats?.newClients30d ?? 0}</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"><Clock size={24} /></div>
           <div className="stat-info">
             <h4>Pendentes</h4>
-            <div className="value">3</div>
+            <div className="value">{stats?.pendingAppointments ?? 0}</div>
           </div>
         </div>
       </div>
 
-      <div className="grid" style={{gridTemplateColumns: '2fr 1fr', gap: '2rem', alignItems: 'start'}}>
+      <div className="grid grid-2-1">
         <div className="column" style={{gap: '2rem'}}>
         <div className="card">
           <div className="cardHeader">
             <h3 className="cardTitle">Próximos Agendamentos</h3>
             <button className="btn btn-ghost" style={{fontSize: '0.85rem'}}>Ver todos</button>
           </div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Serviço</th>
-                <th>Horário</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Mock Data for Surprise Factor */}
-              <tr>
-                <td>
-                  <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
-                    <div className="user-avatar-mini" style={{width: 32, height: 32, fontSize: '0.75rem'}}>MJ</div>
-                    <span style={{fontWeight: 600}}>Maria Julia</span>
-                  </div>
-                </td>
-                <td>Cílios Volume Russo</td>
-                <td>14:00</td>
-                <td><span className="status-badge status-success">Confirmado</span></td>
-                <td><button className="icon-btn" style={{width: 32, height: 32}}><MoreHorizontal size={16}/></button></td>
-              </tr>
-              <tr>
-                <td>
-                  <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
-                    <div className="user-avatar-mini" style={{width: 32, height: 32, fontSize: '0.75rem', background: '#e0f2fe', color: '#0369a1'}}>AS</div>
-                    <span style={{fontWeight: 600}}>Ana Silva</span>
-                  </div>
-                </td>
-                <td>Design de Sobrancelha</td>
-                <td>15:30</td>
-                <td><span className="status-badge status-pending">Pendente</span></td>
-                <td><button className="icon-btn" style={{width: 32, height: 32}}><MoreHorizontal size={16}/></button></td>
-              </tr>
-              <tr>
-                <td>
-                  <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
-                    <div className="user-avatar-mini" style={{width: 32, height: 32, fontSize: '0.75rem', background: '#fef3c7', color: '#b45309'}}>CP</div>
-                    <span style={{fontWeight: 600}}>Carla Perez</span>
-                  </div>
-                </td>
-                <td>Manutenção</td>
-                <td>16:45</td>
-                <td><span className="status-badge status-success">Confirmado</span></td>
-                <td><button className="icon-btn" style={{width: 32, height: 32}}><MoreHorizontal size={16}/></button></td>
-              </tr>
-            </tbody>
-          </table>
+          
+          {/* Desktop Table View */}
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Serviço</th>
+                  <th>Horário</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {upcoming.map(appt => (
+                    <tr key={appt.id}>
+                    <td>
+                        <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                        <div className="user-avatar-mini" style={{width: 32, height: 32, fontSize: '0.75rem', background: appt.avatarBg, color: appt.avatarColor}}>{appt.avatar}</div>
+                        <span style={{fontWeight: 600}}>{appt.name}</span>
+                        </div>
+                    </td>
+                    <td>{appt.service}</td>
+                    <td>{appt.time}</td>
+                    <td><span className={`status-badge ${appt.statusClass}`}>{appt.status}</span></td>
+                    <td>
+                        <div style={{position: 'relative'}}>
+                            <button 
+                                className="icon-btn" 
+                                style={{width: 32, height: 32}}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setMenuOpenId(menuOpenId === appt.id ? null : appt.id)
+                                }}
+                            >
+                                <MoreHorizontal size={16}/>
+                            </button>
+                            {menuOpenId === appt.id && (
+                                <div 
+                                    ref={menuRef}
+                                    style={{
+                                        position: 'absolute',
+                                        right: 0,
+                                        top: '100%',
+                                        marginTop: 4,
+                                        background: 'white',
+                                        border: '1px solid var(--gray-200)',
+                                        borderRadius: 8,
+                                        boxShadow: 'var(--shadow-lg)',
+                                        zIndex: 10,
+                                        minWidth: 160,
+                                        padding: 4
+                                    }}
+                                >
+                                    {appt.rawStatus !== 'CONFIRMED' && (
+                                        <button 
+                                            className="btn btn-ghost" 
+                                            onClick={() => handleStatusChange(appt.id, 'CONFIRMED')}
+                                            style={{width: '100%', justifyContent: 'flex-start', fontSize: '0.85rem', gap: 8}}
+                                        >
+                                            <Check size={14} color="var(--success)" /> Confirmar
+                                        </button>
+                                    )}
+                                    {appt.rawStatus !== 'CANCELLED' && (
+                                        <button 
+                                            className="btn btn-ghost" 
+                                            onClick={() => handleStatusChange(appt.id, 'CANCELLED')}
+                                            style={{width: '100%', justifyContent: 'flex-start', fontSize: '0.85rem', gap: 8, color: 'var(--danger)'}}
+                                        >
+                                            <XCircle size={14} /> Cancelar
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </td>
+                    </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile List View */}
+          <div className="mobile-appointment-list" style={{padding: '1rem'}}>
+            {upcoming.map(appt => (
+                <div className="mobile-appointment-card" key={appt.id}>
+                    <div className="mobile-appointment-header">
+                        <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                            <div className="user-avatar-mini" style={{width: 40, height: 40, fontSize: '0.9rem', background: appt.avatarBg, color: appt.avatarColor}}>{appt.avatar}</div>
+                            <div>
+                                <div style={{fontWeight: 700, color: 'var(--gray-900)'}}>{appt.name}</div>
+                                <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>{appt.service}</div>
+                            </div>
+                        </div>
+                        <button 
+                            className="icon-btn" 
+                            style={{width: 32, height: 32}}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setMenuOpenId(menuOpenId === appt.id ? null : appt.id)
+                            }}
+                        >
+                            <MoreHorizontal size={16}/>
+                        </button>
+                        {menuOpenId === appt.id && (
+                            <div 
+                                ref={menuRef}
+                                style={{
+                                    position: 'absolute',
+                                    right: 16,
+                                    top: 48,
+                                    marginTop: 0,
+                                    background: 'white',
+                                    border: '1px solid var(--gray-200)',
+                                    borderRadius: 8,
+                                    boxShadow: 'var(--shadow-lg)',
+                                    zIndex: 10,
+                                    minWidth: 160,
+                                    padding: 4
+                                }}
+                            >
+                                {appt.rawStatus !== 'CONFIRMED' && (
+                                    <button 
+                                        className="btn btn-ghost" 
+                                        onClick={() => handleStatusChange(appt.id, 'CONFIRMED')}
+                                        style={{width: '100%', justifyContent: 'flex-start', fontSize: '0.85rem', gap: 8}}
+                                    >
+                                        <Check size={14} color="var(--success)" /> Confirmar
+                                    </button>
+                                )}
+                                {appt.rawStatus !== 'CANCELLED' && (
+                                    <button 
+                                        className="btn btn-ghost" 
+                                        onClick={() => handleStatusChange(appt.id, 'CANCELLED')}
+                                        style={{width: '100%', justifyContent: 'flex-start', fontSize: '0.85rem', gap: 8, color: 'var(--danger)'}}
+                                    >
+                                        <XCircle size={14} /> Cancelar
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    <div className="mobile-appointment-row">
+                        <div style={{display: 'flex', alignItems: 'center', gap: 6, color: 'var(--gray-600)', fontWeight: 500}}>
+                            <Clock size={14} />
+                            {appt.time}
+                        </div>
+                        <span className={`status-badge ${appt.statusClass}`}>{appt.status}</span>
+                    </div>
+                </div>
+            ))}
+          </div>
         </div>
         
         <div className="card">
@@ -311,10 +983,33 @@ function AdminDashboard({ me, stats, tenantSlug }: { me: SessionUser | null; sta
                 <p style={{fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 12}}>
                     Envie este link para suas clientes agendarem:
                 </p>
-                <div style={{background: 'var(--bg-subtle)', padding: 12, borderRadius: 'var(--radius-md)', fontSize: '0.85rem', wordBreak: 'break-all', marginBottom: 16, border: '1px solid var(--gray-200)', color: 'var(--primary-600)', fontWeight: 500}}>
-                    {bookingLink}
+                <div style={{
+                    background: 'var(--bg-subtle)', 
+                    padding: 12, 
+                    borderRadius: 'var(--radius-md)', 
+                    fontSize: '0.85rem', 
+                    marginBottom: 16, 
+                    border: '1px solid var(--gray-200)', 
+                    color: 'var(--primary-600)', 
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8
+                }}>
+                    <span style={{wordBreak: 'break-all'}}>{bookingLink}</span>
+                    <button onClick={copyLink} style={{background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-500)', padding: 4, display: 'flex'}}>
+                        {copied ? <Check size={16} color="var(--success)" /> : <Copy size={16} />}
+                    </button>
                 </div>
-                <button className="btn btnPrimary w-full" onClick={() => window.open(bookingLink, '_blank')}>Abrir Link</button>
+                <div style={{display: 'flex', gap: 10, flexWrap: 'wrap'}}>
+                    <button className="btn w-full" style={{flex: 1}} onClick={copyLink}>
+                        {copied ? 'Copiado!' : 'Copiar'}
+                    </button>
+                    <button className="btn btnPrimary w-full" style={{flex: 1}} onClick={() => window.open(bookingLink, '_blank')}>
+                        Abrir Link
+                    </button>
+                </div>
             </div>
         </div>
         </div>
@@ -325,23 +1020,22 @@ function AdminDashboard({ me, stats, tenantSlug }: { me: SessionUser | null; sta
                 <h3 className="cardTitle" style={{fontSize: '1rem'}}>Atividade Recente</h3>
             </div>
             <div className="cardBody">
-                <div style={{display: 'flex', gap: 16, marginBottom: 20, position: 'relative'}}>
-                    <div style={{position: 'absolute', left: 5, top: 10, bottom: -20, width: 2, background: 'var(--gray-100)'}}></div>
-                    <div style={{width: 12, height: 12, borderRadius: '50%', background: 'var(--success)', marginTop: 4, zIndex: 1, border: '2px solid white', boxShadow: '0 0 0 2px var(--success-100, #dcfce7)'}} />
-                    <div>
-                        <div style={{fontSize: '0.9rem', fontWeight: 600, color: 'var(--gray-800)'}}>Pagamento recebido</div>
-                        <div style={{fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: 2}}>Maria Julia pagou <span style={{color: 'var(--gray-800)', fontWeight: 600}}>R$ 120,00</span></div>
-                        <div style={{fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 4}}>Há 10 min</div>
+                {activity.map((a, idx) => (
+                    <div key={a.key} style={{display: 'flex', gap: 16, marginBottom: idx === activity.length - 1 ? 0 : 20, position: 'relative'}}>
+                        {idx === 0 ? (
+                            <div style={{position: 'absolute', left: 5, top: 10, bottom: -20, width: 2, background: 'var(--gray-100)'}}></div>
+                        ) : null}
+                        <div style={{width: 12, height: 12, borderRadius: '50%', background: a.dot, marginTop: 4, zIndex: 1, border: '2px solid white', boxShadow: `0 0 0 2px color-mix(in srgb, ${a.dot} 18%, transparent)`}} />
+                        <div>
+                            <div style={{fontSize: '0.9rem', fontWeight: 600, color: 'var(--gray-800)'}}>{a.title}</div>
+                            <div style={{fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: 2}}>{a.desc}</div>
+                            <div style={{fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 4}}>{a.when}</div>
+                        </div>
                     </div>
-                </div>
-                <div style={{display: 'flex', gap: 16, marginBottom: 0}}>
-                    <div style={{width: 12, height: 12, borderRadius: '50%', background: 'var(--primary)', marginTop: 4, zIndex: 1, border: '2px solid white', boxShadow: '0 0 0 2px var(--primary-100)'}} />
-                    <div>
-                        <div style={{fontSize: '0.9rem', fontWeight: 600, color: 'var(--gray-800)'}}>Novo Agendamento</div>
-                        <div style={{fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: 2}}>Ana Silva agendou <span style={{color: 'var(--gray-800)', fontWeight: 600}}>Design</span></div>
-                        <div style={{fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 4}}>Há 32 min</div>
-                    </div>
-                </div>
+                ))}
+                {activity.length === 0 ? (
+                    <div style={{color: 'var(--text-muted)', fontSize: '0.9rem'}}>Sem atividade recente.</div>
+                ) : null}
             </div>
             </div>
         </div>
@@ -356,6 +1050,7 @@ function AdminServices() {
     const [modalOpen, setModalOpen] = useState(false)
     const [newService, setNewService] = useState({ name: '', duration: 60, price: 0, coverUrl: '' })
     const [saving, setSaving] = useState(false)
+    const [editingId, setEditingId] = useState<string | null>(null)
 
     const coverFileInputRef = useRef<HTMLInputElement | null>(null)
     const [coverBusy, setCoverBusy] = useState(false)
@@ -378,9 +1073,34 @@ function AdminServices() {
         setCoverBusy(false)
         setCoverFileName(null)
         setCoverError(null)
+        setEditingId(null)
         setNewService({ name: '', duration: 60, price: 0, coverUrl: '' })
         if (coverFileInputRef.current) coverFileInputRef.current.value = ''
         setModalOpen(true)
+    }
+
+    function openEditModal(s: AdminService) {
+        setCoverBusy(false)
+        setCoverFileName(null)
+        setCoverError(null)
+        setEditingId(s.id)
+        setNewService({ 
+            name: s.name, 
+            duration: s.durationMinutes, 
+            price: s.priceCents / 100, 
+            coverUrl: s.coverUrl || '' 
+        })
+        if (coverFileInputRef.current) coverFileInputRef.current.value = ''
+        setModalOpen(true)
+    }
+
+    async function handleDelete() {
+        if (!editingId || !confirm('Tem certeza que deseja excluir este serviço?')) return
+        setSaving(true)
+        await api(`/api/admin/services/${editingId}`, { method: 'DELETE' })
+        setSaving(false)
+        setModalOpen(false)
+        load()
     }
 
     function loadImageFromObjectUrl(src: string) {
@@ -469,19 +1189,28 @@ function AdminServices() {
         }
     }
 
-    async function handleCreate() {
+    async function handleSave() {
         setSaving(true)
-        const payload: { name: string; durationMinutes: number; priceCents: number; coverUrl?: string } = {
+        const payload: { name: string; durationMinutes: number; priceCents: number; coverUrl?: string | null } = {
             name: newService.name,
             durationMinutes: Number(newService.duration),
             priceCents: Math.round(Number(newService.price) * 100)
         }
         if (newService.coverUrl) payload.coverUrl = newService.coverUrl
+        else if (editingId && !newService.coverUrl) payload.coverUrl = null
 
-        await api('/api/admin/services', {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        })
+        if (editingId) {
+            await api(`/api/admin/services/${editingId}`, {
+                method: 'PATCH',
+                body: JSON.stringify(payload)
+            })
+        } else {
+            await api('/api/admin/services', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            })
+        }
+        
         setSaving(false)
         setModalOpen(false)
         load()
@@ -501,7 +1230,7 @@ function AdminServices() {
                 </div>
 
                 {loading ? <div style={{padding: 20}}>Carregando...</div> : (
-                    <div style={{overflowX: 'auto'}}>
+                    <div className="table-scroll">
                         <table className="data-table">
                             <thead>
                                 <tr>
@@ -518,7 +1247,7 @@ function AdminServices() {
                                         <td><span className="pill" style={{fontSize: '0.8rem'}}>{s.durationMinutes} min</span></td>
                                         <td style={{fontWeight: 500}}>R$ {(s.priceCents/100).toFixed(2)}</td>
                                         <td>
-                                            <button className="icon-btn" style={{width: 32, height: 32}}><Edit2 size={16}/></button>
+                                            <button className="icon-btn" style={{width: 32, height: 32}} onClick={() => openEditModal(s)}><Edit2 size={16}/></button>
                                         </td>
                                     </tr>
                                 ))}
@@ -535,7 +1264,7 @@ function AdminServices() {
                 <div className="modal-overlay" onClick={() => setModalOpen(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div className="cardHeader" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-                            <h3 className="cardTitle">Novo Serviço</h3>
+                            <h3 className="cardTitle">{editingId ? 'Editar Serviço' : 'Novo Serviço'}</h3>
                             <button className="icon-btn" onClick={() => setModalOpen(false)} style={{width: 32, height: 32, border: 'none'}}>
                                 <XCircle size={20} />
                             </button>
@@ -554,62 +1283,112 @@ function AdminServices() {
                                             const f = e.dataTransfer.files?.[0]
                                             if (f) handleCoverFile(f)
                                         }}
+                                        style={{
+                                            border: `2px dashed ${coverDragOver ? 'var(--primary-500)' : 'var(--gray-300)'}`,
+                                            borderRadius: 'var(--radius-md)',
+                                            background: coverDragOver ? 'var(--primary-50)' : 'var(--bg-subtle)',
+                                            transition: 'all 0.2s ease',
+                                            cursor: coverBusy ? 'wait' : 'pointer',
+                                            position: 'relative',
+                                            overflow: 'hidden',
+                                            height: 200,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            textAlign: 'center'
+                                        }}
+                                        onClick={() => !coverBusy && coverFileInputRef.current?.click()}
                                     >
-                                        <div 
-                                            className="cover-preview"
-                                            onClick={() => !coverBusy && coverFileInputRef.current?.click()}
-                                            style={{cursor: coverBusy ? 'default' : 'pointer'}}
-                                        >
-                                            {newService.coverUrl ? (
+                                        {coverBusy && (
+                                            <div style={{
+                                                position: 'absolute', 
+                                                inset: 0, 
+                                                background: 'rgba(255,255,255,0.8)', 
+                                                zIndex: 10, 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center'
+                                            }}>
+                                                <div className="spinner" />
+                                            </div>
+                                        )}
+
+                                        {newService.coverUrl ? (
+                                            <>
                                                 <img
                                                     src={newService.coverUrl}
                                                     alt="Capa do serviço"
+                                                    style={{width: '100%', height: '100%', objectFit: 'cover'}}
                                                     onError={() => setCoverError('Imagem inválida')}
                                                 />
-                                            ) : (
-                                                <ImageIcon size={18} style={{color: 'var(--gray-400)'}} />
-                                            )}
-                                            {newService.coverUrl && !coverBusy && (
-                                                <div className="cover-preview-overlay">
-                                                    <button type="button" className="btn" onClick={() => coverFileInputRef.current?.click()}>
+                                                <div 
+                                                    className="cover-actions-overlay"
+                                                    style={{
+                                                        position: 'absolute',
+                                                        inset: 0,
+                                                        background: 'rgba(0,0,0,0.4)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: 12,
+                                                        opacity: 0,
+                                                        transition: 'opacity 0.2s',
+                                                    }}
+                                                    onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                                                    onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+                                                >
+                                                    <button 
+                                                        type="button" 
+                                                        className="btn" 
+                                                        style={{background: 'white', border: 'none', color: 'var(--gray-900)', boxShadow: '0 2px 4px rgba(0,0,0,0.1)'}}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            coverFileInputRef.current?.click()
+                                                        }}
+                                                    >
                                                         <Upload size={16} style={{marginRight: 8}} /> Trocar
                                                     </button>
-                                                </div>
-                                            )}
-                                            {coverBusy && (
-                                                <div className="cover-preview-overlay">
-                                                    <div className="spinner" />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="cover-meta">
-                                            <div style={{fontWeight: 700, color: 'var(--gray-900)', lineHeight: 1.1}}>
-                                                {newService.coverUrl ? 'Capa selecionada' : 'Adicionar uma capa'}
-                                            </div>
-                                            <div style={{fontSize: '0.85rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                                                {coverFileName ? coverFileName : 'PNG/JPG/WebP'}
-                                            </div>
-                                            <div className="cover-actions">
-                                                <button type="button" className="btn" disabled={coverBusy} onClick={() => coverFileInputRef.current?.click()}>
-                                                    <Upload size={16} style={{marginRight: 8}} />
-                                                    {coverBusy ? 'Processando...' : 'Enviar'}
-                                                </button>
-                                                {newService.coverUrl && (
-                                                    <button
-                                                        type="button"
+                                                    <button 
+                                                        type="button" 
                                                         className="btn"
-                                                        onClick={() => {
+                                                        style={{background: '#fee2e2', color: '#ef4444', border: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.1)'}}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
                                                             setCoverError(null)
                                                             setCoverFileName(null)
                                                             setNewService((s) => ({ ...s, coverUrl: '' }))
                                                             if (coverFileInputRef.current) coverFileInputRef.current.value = ''
                                                         }}
                                                     >
-                                                        <Trash2 size={16} style={{marginRight: 8}} /> Remover
+                                                        <Trash2 size={16} />
                                                     </button>
-                                                )}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div style={{padding: 24, pointerEvents: 'none'}}>
+                                                <div style={{
+                                                    width: 48, 
+                                                    height: 48, 
+                                                    background: 'var(--gray-100)', 
+                                                    borderRadius: '50%', 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    justifyContent: 'center', 
+                                                    margin: '0 auto 12px',
+                                                    color: 'var(--primary-600)'
+                                                }}>
+                                                    <ImageIcon size={24} />
+                                                </div>
+                                                <div style={{fontWeight: 600, color: 'var(--gray-700)', marginBottom: 4}}>
+                                                    Adicionar capa
+                                                </div>
+                                                <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>
+                                                    Arraste ou clique para enviar
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
+                                        
                                         <input
                                             ref={coverFileInputRef}
                                             type="file"
@@ -677,9 +1456,14 @@ function AdminServices() {
                                 </div>
 
                                 <div className="row" style={{marginTop: 10}}>
-                                    <button className="btn w-full" onClick={() => setModalOpen(false)}>Cancelar</button>
-                                    <button className="btn btnPrimary w-full" onClick={handleCreate} disabled={saving}>
-                                        {saving ? 'Salvando...' : 'Criar'}
+                                    {editingId && (
+                                        <button className="btn" style={{color: 'var(--danger)', borderColor: 'var(--danger-border)', marginRight: 'auto'}} onClick={handleDelete} disabled={saving}>
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
+                                    <button className="btn" onClick={() => setModalOpen(false)}>Cancelar</button>
+                                    <button className="btn btnPrimary" onClick={handleSave} disabled={saving}>
+                                        {saving ? 'Salvando...' : (editingId ? 'Salvar Alterações' : 'Criar')}
                                     </button>
                                 </div>
                             </div>
@@ -690,8 +1474,6 @@ function AdminServices() {
         </>
     )
 }
-
-const MOCK_EVENTS_STORE: CalendarEvent[] = []
 
 function CustomSelect({ 
     value, 
@@ -823,26 +1605,42 @@ function NewAppointmentModal({
             return
         }
 
-        // Calculate start and end times
         const startDateTime = new Date(`${date}T${time}`)
-        const endDateTime = new Date(startDateTime.getTime() + service.durationMinutes * 60000)
+        const res = await api<{ appointment: AdminAppointment }>('/api/admin/appointments', {
+            method: 'POST',
+            body: JSON.stringify({
+                clientName,
+                serviceId,
+                startsAt: startDateTime.toISOString(),
+                status: 'CONFIRMED'
+            })
+        })
 
-        // Create new event object
-        const newEvent: CalendarEvent = {
-            id: Math.random().toString(36).substr(2, 9),
-            clientName: clientName,
-            title: service.name,
-            start: startDateTime.toISOString(),
-            end: endDateTime.toISOString(),
-            color: '#e0f2fe', // Default blue-ish
-            textColor: '#0369a1',
-            status: 'confirmed'
+        if (!res.ok) {
+            setError(res.error.message)
+            setLoading(false)
+            return
         }
 
-        // Simulate API call
-        await new Promise(r => setTimeout(r, 500))
+        const a = res.data.appointment
+        const status = a.status === 'CONFIRMED' ? 'confirmed' : a.status === 'PENDING' ? 'pending' : 'cancelled'
+        const colors =
+            status === 'confirmed'
+                ? { color: '#dcfce7', textColor: '#166534' }
+                : status === 'pending'
+                  ? { color: '#fef9c3', textColor: '#854d0e' }
+                  : { color: '#e5e7eb', textColor: '#374151' }
 
-        onSuccess(newEvent)
+        onSuccess({
+            id: a.id,
+            clientName: a.clientName ?? clientName,
+            title: a.serviceName,
+            start: a.startsAt,
+            end: a.endsAt,
+            status,
+            ...colors,
+        })
+
         onClose()
         setLoading(false)
         
@@ -936,12 +1734,123 @@ function NewAppointmentModal({
     )
 }
 
+function AppointmentDetailsModal({
+    isOpen,
+    onClose,
+    event,
+    onDelete
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    event: CalendarEvent | null;
+    onDelete: (id: string) => Promise<void>;
+}) {
+    if (!isOpen || !event) return null
+
+    return (
+        <div className="modal-overlay" onClick={onClose} style={{zIndex: 100}}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <div className="cardHeader">
+                    <h3 className="cardTitle">Detalhes do Agendamento</h3>
+                    <button className="icon-btn" onClick={onClose} style={{width: 32, height: 32, border: 'none'}}>
+                        <XCircle size={20} />
+                    </button>
+                </div>
+                <div className="cardBody">
+                    <div style={{display: 'flex', flexDirection: 'column', gap: 16}}>
+                        <div>
+                            <label className="label">Cliente</label>
+                            <div style={{fontSize: '1.1rem', fontWeight: 600}}>{event.clientName}</div>
+                        </div>
+                        <div>
+                            <label className="label">Serviço</label>
+                            <div>{event.title}</div>
+                        </div>
+                        <div className="row">
+                            <div>
+                                <label className="label">Data</label>
+                                <div>{new Date(event.start).toLocaleDateString()}</div>
+                            </div>
+                            <div>
+                                <label className="label">Horário</label>
+                                <div>
+                                    {new Date(event.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - 
+                                    {new Date(event.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="label">Status</label>
+                            <span 
+                                className="pill" 
+                                style={{
+                                    backgroundColor: event.color, 
+                                    color: event.textColor,
+                                    alignSelf: 'flex-start',
+                                    display: 'inline-flex'
+                                }}
+                            >
+                                {event.status === 'confirmed' ? 'Confirmado' : event.status === 'pending' ? 'Pendente' : 'Cancelado'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style={{marginTop: 32, display: 'flex', justifyContent: 'flex-end'}}>
+                        <button 
+                            className="btn" 
+                            style={{
+                                backgroundColor: '#fee2e2', 
+                                color: '#991b1b',
+                                border: '1px solid #fecaca'
+                            }}
+                            onClick={async () => {
+                                if(confirm('Tem certeza que deseja excluir este agendamento?')) {
+                                    await onDelete(event.id)
+                                    onClose()
+                                }
+                            }}
+                        >
+                            <Trash2 size={16} style={{marginRight: 8}} />
+                            Excluir Agendamento
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 function AdminCalendar() {
     const [view, setView] = useState<'week' | 'month'>('week')
     const [currentDate, setCurrentDate] = useState(new Date())
     const [events, setEvents] = useState<CalendarEvent[]>([])
     const [loading, setLoading] = useState(false)
     const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false)
+    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+
+    type AdminBusinessHour = { id: string; weekday: number; startMinute: number; endMinute: number }
+    type AdminTimeOff = { id: string; startsAt: string; endsAt: string; reason: string | null; createdAt: string }
+
+    const [agendaTab, setAgendaTab] = useState<'appointments' | 'hours' | 'blocks'>('appointments')
+
+    const [tenantTimeZone, setTenantTimeZone] = useState('America/Sao_Paulo')
+
+    const [businessHours, setBusinessHours] = useState<AdminBusinessHour[]>([])
+    const [businessHoursLoading, setBusinessHoursLoading] = useState(false)
+    const [businessHoursError, setBusinessHoursError] = useState<string | null>(null)
+    const [businessHoursEdits, setBusinessHoursEdits] = useState<Record<number, { startTime: string; endTime: string; lunchEnabled: boolean; lunchStart: string; lunchEnd: string }>>({})
+
+    const [timeOff, setTimeOff] = useState<AdminTimeOff[]>([])
+    const [timeOffLoading, setTimeOffLoading] = useState(false)
+    const [timeOffError, setTimeOffError] = useState<string | null>(null)
+    const [timeOffAdd, setTimeOffAdd] = useState<{ startsLocal: string; endsLocal: string; reason: string }>(() => {
+        const now = new Date()
+        const pad = (v: number) => String(v).padStart(2, '0')
+        const y = String(now.getFullYear())
+        const m = pad(now.getMonth() + 1)
+        const d = pad(now.getDate())
+        return { startsLocal: `${y}-${m}-${d}T09:00`, endsLocal: `${y}-${m}-${d}T18:00`, reason: '' }
+    })
     
     // Helpers for Date Manipulation
     const getWeekDays = (date: Date) => {
@@ -980,6 +1889,285 @@ function AdminCalendar() {
 
     const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate])
     const monthDays = useMemo(() => getMonthDays(currentDate), [currentDate])
+
+    useEffect(() => {
+        let mounted = true
+        api<{ timezone: string }>('/api/public/booking').then((res) => {
+            if (!mounted) return
+            if (res.ok && res.data?.timezone) setTenantTimeZone(res.data.timezone)
+        })
+        return () => {
+            mounted = false
+        }
+    }, [])
+
+    const weekdayNamesFull = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+    const weekdayNamesShort = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
+    const minuteToTime = (minute: number) => {
+        const m = Math.max(0, Math.min(1440, Math.floor(minute)))
+        const hh = String(Math.floor(m / 60)).padStart(2, '0')
+        const mm = String(m % 60).padStart(2, '0')
+        return `${hh}:${mm}`
+    }
+
+    const timeToMinute = (t: string) => {
+        const m = /^([0-9]{2}):([0-9]{2})$/.exec(t)
+        if (!m) return null
+        const hh = Number(m[1])
+        const mm = Number(m[2])
+        if (![hh, mm].every(Number.isFinite)) return null
+        if (hh < 0 || hh > 23) return null
+        if (mm < 0 || mm > 59) return null
+        return hh * 60 + mm
+    }
+
+    const timeOptions = useMemo(() => {
+        const opts: string[] = []
+        for (let i = 0; i < 24 * 60; i += 15) {
+            const h = Math.floor(i / 60).toString().padStart(2, '0')
+            const m = (i % 60).toString().padStart(2, '0')
+            opts.push(`${h}:${m}`)
+        }
+        // Add end of day if needed, usually business hours go up to a certain point.
+        // But 23:45 is the last 15m slot start.
+        return opts
+    }, [])
+
+    const TimeSelect = ({ value, onChange, disabled }: { value: string, onChange: (val: string) => void, disabled?: boolean }) => {
+        const [isOpen, setIsOpen] = useState(false)
+        const wrapperRef = useRef<HTMLDivElement>(null)
+
+        useEffect(() => {
+            function handleClickOutside(event: MouseEvent) {
+                if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                    setIsOpen(false)
+                }
+            }
+            if (isOpen) {
+                document.addEventListener('mousedown', handleClickOutside)
+            }
+            return () => document.removeEventListener('mousedown', handleClickOutside)
+        }, [isOpen])
+
+        // Scroll to selected option when opened
+        useEffect(() => {
+            if (isOpen && wrapperRef.current) {
+                const selected = wrapperRef.current.querySelector('.time-option.selected')
+                if (selected) {
+                    selected.scrollIntoView({ block: 'center' })
+                }
+            }
+        }, [isOpen])
+
+        return (
+            <div className="time-select-custom" ref={wrapperRef}>
+                <div 
+                    className={`time-select-trigger ${disabled ? 'disabled' : ''}`}
+                    onClick={() => !disabled && setIsOpen(!isOpen)}
+                >
+                    <span style={{flex: 1, textAlign: 'center'}}>{value}</span>
+                    <Clock size={14} className="time-select-icon" />
+                </div>
+                {isOpen && (
+                    <div className="time-select-dropdown">
+                        {timeOptions.map(t => (
+                            <div 
+                                key={t} 
+                                className={`time-option ${t === value ? 'selected' : ''}`}
+                                onClick={() => {
+                                    onChange(t)
+                                    setIsOpen(false)
+                                }}
+                            >
+                                {t}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    const sortBusinessHours = (list: AdminBusinessHour[]) => {
+        return [...list].sort((a, b) => a.weekday - b.weekday || a.startMinute - b.startMinute)
+    }
+
+    const suggestLunch = (startMinute: number, endMinute: number) => {
+        const span = endMinute - startMinute
+        const base = Math.max(startMinute + 60, startMinute + Math.floor(span / 2) - 30)
+        const lunchStart = Math.min(endMinute - 90, base)
+        const lunchEnd = Math.min(endMinute - 30, lunchStart + 60)
+        return { lunchStart, lunchEnd }
+    }
+
+    const buildDayEditState = (ranges: AdminBusinessHour[]) => {
+        if (ranges.length === 0) {
+            return { startTime: '09:00', endTime: '18:00', lunchEnabled: false, lunchStart: '12:00', lunchEnd: '13:00' }
+        }
+        if (ranges.length === 1) {
+            const r = ranges[0]
+            const lunch = suggestLunch(r.startMinute, r.endMinute)
+            return {
+                startTime: minuteToTime(r.startMinute),
+                endTime: minuteToTime(r.endMinute),
+                lunchEnabled: false,
+                lunchStart: '12:00',
+                lunchEnd: '13:00',
+            }
+        }
+        const r1 = ranges[0]
+        const r2 = ranges[1]
+        return {
+            startTime: minuteToTime(r1.startMinute),
+            endTime: minuteToTime(r2.endMinute),
+            lunchEnabled: true,
+            lunchStart: minuteToTime(r1.endMinute),
+            lunchEnd: minuteToTime(r2.startMinute),
+        }
+    }
+
+    const syncDayRanges = async (weekday: number, nextState: { startTime: string; endTime: string; lunchEnabled: boolean; lunchStart: string; lunchEnd: string }) => {
+        const dayRanges = sortBusinessHours(businessHours.filter((b) => b.weekday === weekday))
+        const startMinute = timeToMinute(nextState.startTime)
+        const endMinute = timeToMinute(nextState.endTime)
+        if (startMinute === null || endMinute === null) return
+        if (endMinute <= startMinute) {
+            setBusinessHoursError('Intervalo inválido')
+            return
+        }
+
+        const upsert = (bh: AdminBusinessHour) => {
+            setBusinessHours((prev) => {
+                const exists = prev.some((p) => p.id === bh.id)
+                const next = exists ? prev.map((p) => (p.id === bh.id ? bh : p)) : [...prev, bh]
+                return sortBusinessHours(next)
+            })
+        }
+
+        const createRange = async (start: number, end: number) => {
+            const res = await api<{ businessHour: AdminBusinessHour }>('/api/admin/business-hours', {
+                method: 'POST',
+                body: JSON.stringify({ weekday, startMinute: start, endMinute: end }),
+            })
+            if (res.ok) upsert(res.data.businessHour)
+        }
+
+        const patchRange = async (id: string, start: number, end: number) => {
+            const res = await api<{ businessHour: AdminBusinessHour }>(`/api/admin/business-hours/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ weekday, startMinute: start, endMinute: end }),
+            })
+            if (res.ok) upsert(res.data.businessHour)
+        }
+
+        const deleteRange = async (id: string) => {
+            const res = await api<{ ok: true }>(`/api/admin/business-hours/${id}`, { method: 'DELETE' })
+            if (res.ok) setBusinessHours((prev) => prev.filter((p) => p.id !== id))
+        }
+
+        if (!nextState.lunchEnabled) {
+            if (dayRanges.length === 0) {
+                await createRange(startMinute, endMinute)
+            } else {
+                await patchRange(dayRanges[0].id, startMinute, endMinute)
+                for (const r of dayRanges.slice(1)) await deleteRange(r.id)
+            }
+            return
+        }
+
+        const lunchStart = timeToMinute(nextState.lunchStart)
+        const lunchEnd = timeToMinute(nextState.lunchEnd)
+        if (lunchStart === null || lunchEnd === null) return
+        if (!(startMinute < lunchStart && lunchStart < lunchEnd && lunchEnd < endMinute)) {
+            setBusinessHoursError('Intervalo de almoço inválido')
+            return
+        }
+
+        const morningStart = startMinute
+        const morningEnd = lunchStart
+        const afternoonStart = lunchEnd
+        const afternoonEnd = endMinute
+
+        if (morningEnd <= morningStart || afternoonEnd <= afternoonStart) {
+            setBusinessHoursError('Intervalo inválido')
+            return
+        }
+
+        if (dayRanges.length === 0) {
+            await createRange(morningStart, morningEnd)
+            await createRange(afternoonStart, afternoonEnd)
+            return
+        }
+
+        if (dayRanges.length === 1) {
+            await patchRange(dayRanges[0].id, morningStart, morningEnd)
+            await createRange(afternoonStart, afternoonEnd)
+            return
+        }
+
+        await patchRange(dayRanges[0].id, morningStart, morningEnd)
+        await patchRange(dayRanges[1].id, afternoonStart, afternoonEnd)
+        for (const r of dayRanges.slice(2)) await deleteRange(r.id)
+    }
+
+    const utcForLocalTime = (input: {
+        timeZone: string
+        year: number
+        month: number
+        day: number
+        hour: number
+        minute: number
+        second?: number
+    }) => {
+        const fmt = new Intl.DateTimeFormat('en-US', {
+            timeZone: input.timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+        })
+
+        const targetUtc = Date.UTC(input.year, input.month - 1, input.day, input.hour, input.minute, input.second ?? 0)
+        let utc = new Date(targetUtc)
+
+        for (let i = 0; i < 4; i++) {
+            const parts = fmt.formatToParts(utc)
+            const y = Number(parts.find(p => p.type === 'year')?.value)
+            const m = Number(parts.find(p => p.type === 'month')?.value)
+            const d = Number(parts.find(p => p.type === 'day')?.value)
+            const hh = Number(parts.find(p => p.type === 'hour')?.value)
+            const mm = Number(parts.find(p => p.type === 'minute')?.value)
+            const ss = Number(parts.find(p => p.type === 'second')?.value)
+            if (![y, m, d, hh, mm, ss].every(Number.isFinite)) break
+
+            const desired = Date.UTC(input.year, input.month - 1, input.day, input.hour, input.minute, input.second ?? 0)
+            const got = Date.UTC(y, m - 1, d, hh, mm, ss)
+            const diff = desired - got
+            if (diff === 0) break
+            utc = new Date(utc.getTime() + diff)
+        }
+        return utc
+    }
+
+    const parseLocalDateTimeInputToUtc = (value: string, timeZone: string) => {
+        const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2})$/.exec(value)
+        if (!m) return null
+        const year = Number(m[1])
+        const month = Number(m[2])
+        const day = Number(m[3])
+        const hour = Number(m[4])
+        const minute = Number(m[5])
+        if (![year, month, day, hour, minute].every(Number.isFinite)) return null
+        try {
+            return utcForLocalTime({ timeZone, year, month, day, hour, minute, second: 0 })
+        } catch {
+            return null
+        }
+    }
     
     const nextPeriod = () => {
         const d = new Date(currentDate)
@@ -996,165 +2184,196 @@ function AdminCalendar() {
     }
 
     const handleNewEvent = (newEvent: CalendarEvent) => {
-        MOCK_EVENTS_STORE.push(newEvent)
-        setEvents([...MOCK_EVENTS_STORE])
+        setEvents(prev => [...prev, newEvent].sort((a, b) => a.start.localeCompare(b.start)))
     }
 
-    // Backend Integration Simulation
     useEffect(() => {
-        // Initialize store if empty
-        if (MOCK_EVENTS_STORE.length === 0) {
-            const baseEvents = [
-                { 
-                    id: '1', 
-                    clientName: 'Maria Julia', 
-                    title: 'Cílios Volume Russo', 
-                    start: setTime(weekDays[1], 10, 0).toISOString(), 
-                    end: setTime(weekDays[1], 12, 0).toISOString(), 
-                    color: '#dcfce7', 
-                    textColor: '#166534',
-                    status: 'confirmed'
-                },
-                { 
-                    id: '2', 
-                    clientName: 'Ana Silva', 
-                    title: 'Design Sobrancelha', 
-                    start: setTime(weekDays[1], 14, 0).toISOString(), 
-                    end: setTime(weekDays[1], 15, 0).toISOString(), 
-                    color: '#fef9c3', 
-                    textColor: '#854d0e',
-                    status: 'pending'
-                },
-                { 
-                    id: '3', 
-                    clientName: 'Carla Perez', 
-                    title: 'Manutenção', 
-                    start: setTime(weekDays[2], 11, 0).toISOString(), 
-                    end: setTime(weekDays[2], 12, 30).toISOString(), 
-                    color: '#e0f2fe', 
-                    textColor: '#0369a1',
-                    status: 'confirmed'
-                },
-                { 
-                    id: '4', 
-                    clientName: 'Beatriz Lima', 
-                    title: 'Lifting', 
-                    start: setTime(weekDays[3], 16, 0).toISOString(), 
-                    end: setTime(weekDays[3], 17, 30).toISOString(), 
-                    color: '#f3e8ff', 
-                    textColor: '#6b21a8',
-                    status: 'confirmed'
-                },
-                { 
-                    id: '5', 
-                    clientName: 'Fernanda Costa', 
-                    title: 'Cílios Clássico', 
-                    start: setTime(weekDays[4], 9, 0).toISOString(), 
-                    end: setTime(weekDays[4], 11, 0).toISOString(), 
-                    color: '#ffe4e6', 
-                    textColor: '#9d174d',
-                    status: 'confirmed'
-                },
-                // Extra events for Month View demo
-                { 
-                    id: '6', 
-                    clientName: 'Patricia Santos', 
-                    title: 'Microblading', 
-                    start: setTime(weekDays[0], 13, 0).toISOString(), 
-                    end: setTime(weekDays[0], 15, 0).toISOString(), 
-                    color: '#ffedd5', 
-                    textColor: '#c2410c',
-                    status: 'confirmed'
-                },
-                { 
-                    id: '7', 
-                    clientName: 'Juliana Costa', 
-                    title: 'Brow Lamination', 
-                    start: setTime(weekDays[5], 10, 0).toISOString(), 
-                    end: setTime(weekDays[5], 11, 0).toISOString(), 
-                    color: '#d1fae5', 
-                    textColor: '#047857',
-                    status: 'confirmed'
-                },
-            ] as CalendarEvent[]
-            MOCK_EVENTS_STORE.push(...baseEvents)
-        }
-        
+        if (agendaTab !== 'appointments') return
         fetchEvents()
-    }, [currentDate, view])
+    }, [currentDate, view, agendaTab])
+
+    useEffect(() => {
+        if (agendaTab !== 'hours') return
+        fetchBusinessHours()
+    }, [agendaTab])
+
+    useEffect(() => {
+        if (agendaTab !== 'blocks') return
+        fetchTimeOff()
+    }, [agendaTab, tenantTimeZone])
+
+    async function fetchBusinessHours() {
+        setBusinessHoursLoading(true)
+        setBusinessHoursError(null)
+        const res = await api<{ businessHours: AdminBusinessHour[] }>('/api/admin/business-hours')
+        if (!res.ok) {
+            setBusinessHoursError(res.error.message)
+            setBusinessHoursLoading(false)
+            return
+        }
+        const list = res.data.businessHours ?? []
+        setBusinessHours(list)
+        setBusinessHoursEdits(() => {
+            const next: Record<number, { startTime: string; endTime: string; lunchEnabled: boolean; lunchStart: string; lunchEnd: string }> = {}
+            for (let weekday = 0; weekday <= 6; weekday += 1) {
+                const ranges = sortBusinessHours(list.filter((h) => h.weekday === weekday))
+                next[weekday] = buildDayEditState(ranges)
+            }
+            return next
+        })
+        setBusinessHoursLoading(false)
+    }
+
+    async function fetchTimeOff() {
+        setTimeOffLoading(true)
+        setTimeOffError(null)
+
+        const now = new Date()
+        const start = new Date(now)
+        start.setDate(start.getDate() - 7)
+        const end = new Date(now)
+        end.setDate(end.getDate() + 120)
+
+        const qs = new URLSearchParams({ start: start.toISOString(), end: end.toISOString(), limit: '800' })
+        const res = await api<{ timeOff: AdminTimeOff[] }>(`/api/admin/time-off?${qs.toString()}`)
+        if (!res.ok) {
+            setTimeOffError(res.error.message)
+            setTimeOffLoading(false)
+            return
+        }
+        const list = res.data.timeOff ?? []
+        setTimeOff(list)
+        setTimeOffLoading(false)
+    }
 
     async function fetchEvents() {
         setLoading(true)
-        // In a real app, you would fetch based on the start/end of the view
-        // const start = weekDays[0].toISOString()
-        // const end = weekDays[6].toISOString()
-        // const { data } = await api.get('/appointments', { params: { start, end } })
+        const rangeStart = view === 'week' ? weekDays[0] : monthDays[0]
+        const rangeEnd = view === 'week' ? weekDays[6] : monthDays[monthDays.length - 1]
 
-        // Mock Data Generation that aligns with the current view
-        await new Promise(r => setTimeout(r, 300)) // Network simulation
+        const start = new Date(rangeStart)
+        start.setHours(0, 0, 0, 0)
+        const end = new Date(rangeEnd)
+        end.setHours(0, 0, 0, 0)
+        end.setDate(end.getDate() + 1)
 
-        setEvents([...MOCK_EVENTS_STORE])
+        const qs = new URLSearchParams({ start: start.toISOString(), end: end.toISOString(), limit: '800' })
+        const res = await api<{ appointments: AdminAppointment[] }>(`/api/admin/appointments?${qs.toString()}`)
+
+        if (res.ok) {
+            const mapped: CalendarEvent[] = res.data.appointments.map(a => {
+                const status = a.status === 'CONFIRMED' ? 'confirmed' : a.status === 'PENDING' ? 'pending' : 'cancelled'
+                const colors =
+                    status === 'confirmed'
+                        ? { color: '#dcfce7', textColor: '#166534' }
+                        : status === 'pending'
+                          ? { color: '#fef9c3', textColor: '#854d0e' }
+                          : { color: '#e5e7eb', textColor: '#374151' }
+
+                return {
+                    id: a.id,
+                    title: a.serviceName,
+                    clientName: a.clientName ?? a.clientEmail,
+                    start: a.startsAt,
+                    end: a.endsAt,
+                    status,
+                    ...colors,
+                }
+            })
+            setEvents(mapped)
+        }
         setLoading(false)
     }
 
-    const setTime = (d: Date, h: number, m: number) => {
-        const date = new Date(d)
-        date.setHours(h, m, 0, 0)
-        return date
+    async function handleDeleteEvent(id: string) {
+        const res = await api<{ ok: true }>(`/api/admin/appointments/${id}`, { method: 'DELETE' })
+        if (res.ok) {
+            setEvents(prev => prev.filter(e => e.id !== id))
+        } else {
+            alert('Erro ao excluir agendamento: ' + res.error.message)
+        }
     }
 
+    const [currentTimeMinutes, setCurrentTimeMinutes] = useState(() => {
+        const now = new Date()
+        return now.getHours() * 60 + now.getMinutes()
+    })
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = new Date()
+            setCurrentTimeMinutes(now.getHours() * 60 + now.getMinutes())
+        }, 60000)
+        return () => clearInterval(interval)
+    }, [])
+
     const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-    const weekDayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    const weekDayNames = weekdayNamesShort
     const hours = Array.from({ length: 11 }, (_, i) => i + 8) // 8:00 to 18:00
 
     return (
-        <>
-            <div className="card" style={{height: '100%', display: 'flex', flexDirection: 'column'}}>
-                <div className="cardHeader">
-                    <div style={{display: 'flex', alignItems: 'center', gap: 16}}>
-                        <button className="icon-btn" onClick={prevPeriod}><ChevronLeft size={20}/></button>
-                        <h2 className="cardTitle" style={{fontSize: '1.25rem', minWidth: 180, textAlign: 'center'}}>
-                            {monthNames[currentDate.getMonth()]}, {currentDate.getFullYear()}
-                        </h2>
-                        <button className="icon-btn" onClick={nextPeriod}><ChevronRight size={20}/></button>
-                    </div>
-                    <div style={{display: 'flex', gap: 12}}>
-                        <div style={{display: 'flex', background: 'var(--gray-50)', padding: 4, borderRadius: 8}}>
-                            <button 
-                                className={`btn btn-ghost ${view === 'week' ? 'bg-white shadow-sm' : ''}`} 
-                                style={{padding: '6px 16px', height: 32, borderRadius: 6, color: view === 'week' ? 'var(--gray-900)' : 'var(--gray-500)'}}
-                                onClick={() => setView('week')}
-                            >
-                                Semana
-                            </button>
-                            <button 
-                                className={`btn btn-ghost ${view === 'month' ? 'bg-white shadow-sm' : ''}`} 
-                                style={{padding: '6px 16px', height: 32, borderRadius: 6, color: view === 'month' ? 'var(--gray-900)' : 'var(--gray-500)'}}
-                                onClick={() => setView('month')}
-                            >
-                                Mês
+        <div className="agenda-layout animate-entry">
+            <div className="agenda-tabs-container">
+                <button 
+                    className={`agenda-tab ${agendaTab === 'appointments' ? 'active' : ''}`} 
+                    onClick={() => setAgendaTab('appointments')}
+                >
+                    Calendário
+                </button>
+                <button 
+                    className={`agenda-tab ${agendaTab === 'hours' ? 'active' : ''}`} 
+                    onClick={() => setAgendaTab('hours')}
+                >
+                    Horários
+                </button>
+                <button 
+                    className={`agenda-tab ${agendaTab === 'blocks' ? 'active' : ''}`} 
+                    onClick={() => setAgendaTab('blocks')}
+                >
+                    Bloqueios
+                </button>
+            </div>
+            
+            {agendaTab === 'appointments' && (
+                <div className="calendar-layout">
+                    <div className="calendar-toolbar">
+                        <div style={{display: 'flex', alignItems: 'center', gap: 16}}>
+                            <div style={{display: 'flex', gap: 8}}>
+                                <button className="calendar-nav-btn" onClick={prevPeriod}><ChevronLeft size={20}/></button>
+                                <button className="calendar-nav-btn" onClick={nextPeriod}><ChevronRight size={20}/></button>
+                            </div>
+                            <h2 style={{fontSize: '1.25rem', fontWeight: 800, color: 'var(--gray-900)', margin: 0}}>
+                                {monthNames[currentDate.getMonth()]}, {currentDate.getFullYear()}
+                            </h2>
+                        </div>
+                        
+                        <div style={{display: 'flex', gap: 16}}>
+                            <div className="calendar-view-toggle">
+                                <button 
+                                    className={`view-btn ${view === 'week' ? 'active' : ''}`} 
+                                    onClick={() => setView('week')}
+                                >
+                                    Semana
+                                </button>
+                                <button 
+                                    className={`view-btn ${view === 'month' ? 'active' : ''}`} 
+                                    onClick={() => setView('month')}
+                                >
+                                    Mês
+                                </button>
+                            </div>
+                            <button className="btn btnPrimary" onClick={() => setIsNewAppointmentOpen(true)}>
+                                <Plus size={16} /> <span style={{marginLeft: 8}} className="desktop-only">Novo Agendamento</span>
                             </button>
                         </div>
-                        <button className="btn btnPrimary" onClick={() => setIsNewAppointmentOpen(true)}>
-                            <Plus size={16} style={{marginRight: 8}}/> Novo Agendamento
-                        </button>
                     </div>
-                </div>
-                
-                <div className="calendar-grid-wrapper" style={{opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s', flexDirection: view === 'month' ? 'column' : 'row'}}>
-                    {view === 'week' ? (
-                        <>
-                            <div className="calendar-time-column">
-                                <div className="calendar-header-cell empty"></div>
-                                {hours.map(h => (
-                                    <div key={h} className="calendar-time-slot">
-                                        {h}:00
-                                    </div>
-                                ))}
-                            </div>
-                            
-                            <div className="calendar-days-container">
-                                <div className="calendar-days-header">
+
+                    <div className="calendar-grid-wrapper" style={{opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s', flexDirection: view === 'month' ? 'column' : 'row', overflow: view === 'week' ? 'auto' : 'hidden'}}>
+                        {view === 'week' ? (
+                            <div style={{ flex: 1, minWidth: 'fit-content' }}>
+                                {/* Sticky Header Row */}
+                                <div className="calendar-days-header" style={{ position: 'sticky', top: 0, zIndex: 30, width: '100%', minWidth: 'fit-content' }}>
+                                    <div className="calendar-header-cell empty" style={{ flex: '0 0 70px', width: 70, minWidth: 70, position: 'sticky', left: 0, zIndex: 40, background: 'white', borderRight: '1px solid var(--gray-100)' }}></div>
                                     {weekDays.map((date) => {
                                         const isToday = new Date().toDateString() === date.toDateString()
                                         return (
@@ -1166,92 +2385,376 @@ function AdminCalendar() {
                                     })}
                                 </div>
                                 
-                                <div className="calendar-body">
-                                    {weekDays.map((date) => (
-                                        <div key={date.toISOString()} className="calendar-day-column">
-                                            {hours.map(h => (
-                                                <div key={h} className="calendar-grid-cell"></div>
-                                            ))}
-                                            
-                                            {events.filter(ev => {
-                                                const evDate = new Date(ev.start)
-                                                return evDate.getDate() === date.getDate() && 
-                                                    evDate.getMonth() === date.getMonth() && 
-                                                    evDate.getFullYear() === date.getFullYear()
-                                            }).map(ev => {
-                                                const start = new Date(ev.start)
-                                                const end = new Date(ev.end)
-                                                const startHour = start.getHours() + (start.getMinutes() / 60)
-                                                const endHour = end.getHours() + (end.getMinutes() / 60)
-                                                const durationHours = endHour - startHour
+                                {/* Body Row */}
+                                <div style={{ display: 'flex', minWidth: 'fit-content' }}>
+                                    {/* Sticky Time Column */}
+                                    <div className="calendar-time-column" style={{ position: 'sticky', left: 0, zIndex: 20, background: 'white', borderRight: '1px solid var(--gray-100)', width: 70, minWidth: 70 }}>
+                                        {hours.map(h => (
+                                            <div key={h} className="calendar-time-slot">
+                                                {h}:00
+                                            </div>
+                                        ))}
+                                    </div>
+                                    
+                                    {/* Days Columns */}
+                                    {weekDays.map((date) => {
+                                        const isToday = new Date().toDateString() === date.toDateString()
+                                        
+                                        return (
+                                            <div key={date.toISOString()} className="calendar-day-column">
+                                                {hours.map(h => (
+                                                    <div key={h} className="calendar-grid-cell"></div>
+                                                ))}
                                                 
-                                                const top = (startHour - 8) * 60 + 10 // 60px per hour + offset
-                                                const height = durationHours * 60
-                                                
-                                                return (
+                                                {/* Current Time Indicator */}
+                                                {isToday && (
                                                     <div 
-                                                        key={ev.id}
-                                                        className="calendar-event"
+                                                        className="current-time-line"
                                                         style={{
-                                                            top: `${top}px`,
-                                                            height: `${height}px`,
-                                                            backgroundColor: ev.color,
-                                                            borderLeft: `3px solid ${ev.textColor}`
+                                                            top: `${(currentTimeMinutes / 60 - 8) * 60 + 10}px`
                                                         }}
                                                     >
-                                                        <div className="event-title" style={{color: ev.textColor}}>{ev.title}</div>
-                                                        <div className="event-time" style={{color: ev.textColor, opacity: 0.8}}>
-                                                            {start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {ev.clientName}
-                                                        </div>
+                                                        <div className="current-time-dot" />
                                                     </div>
-                                                )
-                                            })}
+                                                )}
+                                                
+                                                {events.filter(ev => {
+                                                    const evDate = new Date(ev.start)
+                                                    return evDate.getDate() === date.getDate() && 
+                                                        evDate.getMonth() === date.getMonth() && 
+                                                        evDate.getFullYear() === date.getFullYear()
+                                                }).map(ev => {
+                                                    const start = new Date(ev.start)
+                                                        const end = new Date(ev.end)
+                                                        const startHour = start.getHours() + (start.getMinutes() / 60)
+                                                        const endHour = end.getHours() + (end.getMinutes() / 60)
+                                                        const durationHours = endHour - startHour
+                                                        
+                                                        const top = (startHour - 8) * 60 + 10 // 60px per hour + offset
+                                                        const height = Math.max(durationHours * 60, 24) // Minimum height
+                                                        
+                                                        return (
+                                                            <div 
+                                                                key={ev.id}
+                                                                className="calendar-event"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    setSelectedEvent(ev)
+                                                                }}
+                                                                style={{
+                                                                    top: `${top}px`,
+                                                                    height: `${height}px`,
+                                                                    backgroundColor: ev.color,
+                                                                    borderLeft: `3px solid ${ev.textColor}`
+                                                                }}
+                                                            >
+                                                                <div className="event-title" style={{color: ev.textColor}}>{ev.title}</div>
+                                                                <div className="event-time" style={{color: ev.textColor, opacity: 0.8}}>
+                                                                    {start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {ev.clientName}
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                        ) : (
+                            <>
+                                <div className="calendar-days-header" style={{paddingLeft: 0, borderBottom: 'none', height: 'auto', minHeight: 40}}>
+                                    {weekDayNames.map((name) => (
+                                        <div key={name} className="calendar-header-cell" style={{height: 40, minWidth: 0, borderBottom: '1px solid var(--gray-100)'}}>
+                                            <div className="calendar-day-name" style={{margin: 0}}>{name}</div>
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <div className="calendar-days-header" style={{paddingLeft: 0, borderBottom: 'none', height: 'auto', minHeight: 40}}>
-                                {weekDayNames.map((name) => (
-                                    <div key={name} className="calendar-header-cell" style={{height: 40, minWidth: 0, borderBottom: '1px solid var(--gray-100)'}}>
-                                        <div className="calendar-day-name" style={{margin: 0}}>{name}</div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="calendar-month-grid">
-                                {monthDays.map((date) => {
-                                    const isToday = new Date().toDateString() === date.toDateString()
-                                    const isCurrentMonth = date.getMonth() === currentDate.getMonth()
-                                    
-                                    return (
-                                        <div key={date.toISOString()} className={`calendar-month-cell ${!isCurrentMonth ? 'different-month' : ''}`}>
-                                            <div className={`calendar-month-day-number ${isToday ? 'today' : ''}`}>
-                                                {date.getDate()}
-                                            </div>
-                                            {events.filter(ev => {
-                                                const evDate = new Date(ev.start)
-                                                return evDate.getDate() === date.getDate() && 
-                                                    evDate.getMonth() === date.getMonth() && 
-                                                    evDate.getFullYear() === date.getFullYear()
-                                            }).map(ev => (
-                                                <div 
-                                                    key={ev.id} 
-                                                    className="calendar-month-event"
-                                                    style={{backgroundColor: ev.color, color: ev.textColor}}
-                                                >
-                                                    {new Date(ev.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} {ev.clientName}
+                                <div className="calendar-month-grid">
+                                    {monthDays.map((date) => {
+                                        const isToday = new Date().toDateString() === date.toDateString()
+                                        const isCurrentMonth = date.getMonth() === currentDate.getMonth()
+                                        
+                                        return (
+                                            <div key={date.toISOString()} className={`calendar-month-cell ${!isCurrentMonth ? 'different-month' : ''}`}>
+                                                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%'}}>
+                                                    <div className={`calendar-month-day-number ${isToday ? 'today' : ''}`}>
+                                                        {date.getDate()}
+                                                    </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </>
-                    )}
+                                                {events.filter(ev => {
+                                                    const evDate = new Date(ev.start)
+                                                    return evDate.getDate() === date.getDate() && 
+                                                        evDate.getMonth() === date.getMonth() && 
+                                                        evDate.getFullYear() === date.getFullYear()
+                                                }).map(ev => (
+                                                    <div 
+                                                        key={ev.id} 
+                                                        className="calendar-month-event"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setSelectedEvent(ev)
+                                                        }}
+                                                        style={{backgroundColor: ev.color, color: ev.textColor}}
+                                                    >
+                                                        {new Date(ev.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} {ev.clientName}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {agendaTab === 'hours' && (
+                <div className="animate-entry">
+                    {businessHoursLoading && (
+                        <div className="pill" style={{color: 'var(--gray-700)', background: 'var(--gray-100)', justifyContent: 'center', margin: '0 24px 16px'}}>
+                            Carregando horários...
+                        </div>
+                    )}
+                    {businessHoursError && (
+                        <div className="pill" style={{color: 'var(--danger)', background: '#fee2e2', justifyContent: 'center', margin: '0 24px 16px'}}>
+                            {businessHoursError}
+                        </div>
+                    )}
+                    <div className="schedule-grid">
+                        {weekdayNamesFull.map((dayName, idx) => {
+                        const dayRanges = sortBusinessHours(businessHours.filter(b => b.weekday === idx))
+                        const isOpen = dayRanges.length > 0
+                        const editState = businessHoursEdits[idx] ?? buildDayEditState(dayRanges)
+                        const startTime = editState.startTime
+                        const endTime = editState.endTime
+                        const lunchEnabled = editState.lunchEnabled
+                        const lunchStart = editState.lunchStart
+                        const lunchEnd = editState.lunchEnd
+
+                        return (
+                            <div key={dayName} className={`schedule-day-card ${!isOpen ? 'closed' : ''}`}>
+                                <div className="schedule-day-header">
+                                    <div className="schedule-day-title">
+                                        {dayName}
+                                    </div>
+                                    <div 
+                                        className={`toggle-switch ${isOpen ? 'checked' : ''}`}
+                                        onClick={async () => {
+                                            setBusinessHoursError(null)
+                                            if (isOpen) {
+                                                if (!confirm(`Fechar ${dayName}?`)) return
+                                                for (const r of dayRanges) {
+                                                    const res = await api<{ ok: true }>(`/api/admin/business-hours/${r.id}`, { method: 'DELETE' })
+                                                    if (res.ok) setBusinessHours(prev => prev.filter(x => x.id !== r.id))
+                                                }
+                                                return
+                                            }
+                                            await syncDayRanges(idx, editState)
+                                        }}
+                                    >
+                                        <div className="toggle-thumb" />
+                                    </div>
+                                </div>
+                                
+                                <div style={{display: 'flex', alignItems: 'center', gap: 12, opacity: isOpen ? 1 : 0.4, pointerEvents: isOpen ? 'auto' : 'none', transition: 'opacity 0.2s'}}>
+                                    <div className="time-input-wrapper" style={{flex: 1}}>
+                                        <TimeSelect 
+                                            value={startTime}
+                                            onChange={async (newTime) => {
+                                                setBusinessHoursEdits(prev => ({
+                                                    ...prev,
+                                                    [idx]: { ...editState, startTime: newTime }
+                                                }))
+                                                if (!isOpen) return
+                                                await syncDayRanges(idx, { ...editState, startTime: newTime })
+                                            }}
+                                        />
+                                    </div>
+                                    <span style={{color: 'var(--gray-400)', fontWeight: 600}}>-</span>
+                                    <div className="time-input-wrapper" style={{flex: 1}}>
+                                        <TimeSelect 
+                                            value={endTime}
+                                            onChange={async (newTime) => {
+                                                setBusinessHoursEdits(prev => ({
+                                                    ...prev,
+                                                    [idx]: { ...editState, endTime: newTime }
+                                                }))
+                                                if (!isOpen) return
+                                                await syncDayRanges(idx, { ...editState, endTime: newTime })
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="schedule-lunch-row" style={{opacity: isOpen ? 1 : 0.4, pointerEvents: isOpen ? 'auto' : 'none', display: 'block'}}>
+                                    <div style={{display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8}}>
+                                        <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                                            <div 
+                                                className={`checkbox-circle ${lunchEnabled ? 'checked' : ''}`}
+                                                onClick={async () => {
+                                                    const next = { ...editState, lunchEnabled: !lunchEnabled }
+                                                    setBusinessHoursEdits(prev => ({ ...prev, [idx]: next }))
+                                                    if (!isOpen) return
+                                                    await syncDayRanges(idx, next)
+                                                }}
+                                            >
+                                                {lunchEnabled && <Check size={12} strokeWidth={4} />}
+                                            </div>
+                                            <div className="schedule-lunch-label" style={{margin: 0}}>Almoço</div>
+                                        </div>
+                                    </div>
+                                    
+                                    {lunchEnabled && (
+                                        <div className="schedule-lunch-times" style={{display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 0, width: '100%', animation: 'fadeIn 0.2s'}}>
+                                            <div className="time-input-wrapper compact" style={{flex: 1}}>
+                                                <TimeSelect
+                                                    value={lunchStart}
+                                                    onChange={async (newTime) => {
+                                                        const next = { ...editState, lunchStart: newTime }
+                                                        setBusinessHoursEdits(prev => ({ ...prev, [idx]: next }))
+                                                        if (!isOpen || !next.lunchEnabled) return
+                                                        await syncDayRanges(idx, next)
+                                                    }}
+                                                />
+                                            </div>
+                                            <span style={{color: 'var(--gray-400)', fontWeight: 600}}>-</span>
+                                            <div className="time-input-wrapper compact" style={{flex: 1}}>
+                                                <TimeSelect
+                                                    value={lunchEnd}
+                                                    onChange={async (newTime) => {
+                                                        const next = { ...editState, lunchEnd: newTime }
+                                                        setBusinessHoursEdits(prev => ({ ...prev, [idx]: next }))
+                                                        if (!isOpen || !next.lunchEnabled) return
+                                                        await syncDayRanges(idx, next)
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <div className={`schedule-day-status ${isOpen ? 'status-open' : 'status-closed'}`} style={{alignSelf: 'flex-start'}}>
+                                    {isOpen ? 'Aberto' : 'Fechado'}
+                                </div>
+                            </div>
+                        )
+                    })}
+                    </div>
+                </div>
+            )}
+
+            {agendaTab === 'blocks' && (
+                <div className="animate-entry">
+                     <div className="blocks-list">
+                        <div className="card" style={{padding: 20, marginBottom: 12, border: '1px dashed var(--gray-300)', boxShadow: 'none'}}>
+                            <h4 style={{margin: '0 0 16px', fontSize: '1rem'}}>Novo Bloqueio</h4>
+                            <div className="grid grid-3" style={{gap: 12}}>
+                                <div className="agenda-input-group">
+                                    <label className="agenda-label">Início</label>
+                                    <div className="time-input-wrapper">
+                                        <input
+                                            type="datetime-local"
+                                            className="time-input"
+                                            value={timeOffAdd.startsLocal}
+                                            onChange={(e) => setTimeOffAdd(prev => ({ ...prev, startsLocal: e.target.value }))}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="agenda-input-group">
+                                    <label className="agenda-label">Fim</label>
+                                    <div className="time-input-wrapper">
+                                        <input
+                                            type="datetime-local"
+                                            className="time-input"
+                                            value={timeOffAdd.endsLocal}
+                                            onChange={(e) => setTimeOffAdd(prev => ({ ...prev, endsLocal: e.target.value }))}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="agenda-input-group">
+                                    <label className="agenda-label">Motivo</label>
+                                    <div className="time-input-wrapper">
+                                        <input
+                                            className="time-input"
+                                            value={timeOffAdd.reason}
+                                            onChange={(e) => setTimeOffAdd(prev => ({ ...prev, reason: e.target.value }))}
+                                            placeholder="Ex: Feriado"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{marginTop: 16, display: 'flex', justifyContent: 'flex-end'}}>
+                                <button
+                                    className="btn btnPrimary"
+                                    onClick={async () => {
+                                        setTimeOffError(null)
+                                        const s = parseLocalDateTimeInputToUtc(timeOffAdd.startsLocal, tenantTimeZone)
+                                        const e = parseLocalDateTimeInputToUtc(timeOffAdd.endsLocal, tenantTimeZone)
+                                        if (!s || !e) {
+                                            setTimeOffError('Data inválida')
+                                            return
+                                        }
+                                        const res = await api<{ timeOff: AdminTimeOff }>('/api/admin/time-off', {
+                                            method: 'POST',
+                                            body: JSON.stringify({ startsAt: s.toISOString(), endsAt: e.toISOString(), reason: timeOffAdd.reason.trim() || null }),
+                                        })
+                                        if (!res.ok) {
+                                            setTimeOffError(res.error.message)
+                                            return
+                                        }
+                                        const created = res.data.timeOff
+                                        setTimeOff(prev => [...prev, created].sort((a, b) => a.startsAt.localeCompare(b.startsAt)))
+                                    }}
+                                    disabled={timeOffLoading}
+                                >
+                                    <Plus size={18} /> Adicionar Bloqueio
+                                </button>
+                            </div>
+                            {timeOffError && <div style={{color: 'var(--danger)', fontSize: '0.85rem', marginTop: 8}}>{timeOffError}</div>}
+                        </div>
+
+                        {timeOff.map((b) => {
+                             const dateObj = new Date(b.startsAt)
+                             const monthShort = dateObj.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase().replace('.', '')
+                             const dayNum = dateObj.getDate()
+                             
+                             return (
+                                <div key={b.id} className="block-card">
+                                    <div className="block-date-badge">
+                                        <span style={{fontSize: '0.75rem', opacity: 0.7}}>{monthShort}</span>
+                                        <span style={{fontSize: '1.5rem', lineHeight: 1}}>{dayNum}</span>
+                                    </div>
+                                    <div className="block-info">
+                                        <div className="block-title">{b.reason || 'Bloqueio de Agenda'}</div>
+                                        <div className="block-meta">
+                                            <Clock size={14} />
+                                            {new Date(b.startsAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - 
+                                            {new Date(b.endsAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            <span style={{margin: '0 6px'}}>•</span>
+                                            {new Date(b.endsAt).toLocaleDateString('pt-BR') !== new Date(b.startsAt).toLocaleDateString('pt-BR') ? 
+                                                `Até ${new Date(b.endsAt).toLocaleDateString('pt-BR')}` : 'Mesmo dia'}
+                                        </div>
+                                    </div>
+                                    <button 
+                                        className="icon-btn" 
+                                        style={{color: 'var(--danger)', borderColor: 'transparent'}}
+                                        onClick={async () => {
+                                            if(!confirm('Remover bloqueio?')) return
+                                            const res = await api<{ ok: true }>(`/api/admin/time-off/${b.id}`, { method: 'DELETE' })
+                                            if(res.ok) {
+                                                setTimeOff(prev => prev.filter(x => x.id !== b.id))
+                                            }
+                                        }}
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                             )
+                        })}
+                     </div>
+                </div>
+            )}
 
             <NewAppointmentModal 
                 isOpen={isNewAppointmentOpen} 
@@ -1259,11 +2762,55 @@ function AdminCalendar() {
                 onSuccess={handleNewEvent}
                 initialDate={currentDate}
             />
-        </>
+
+            <AppointmentDetailsModal 
+                isOpen={!!selectedEvent}
+                event={selectedEvent}
+                onClose={() => setSelectedEvent(null)}
+                onDelete={handleDeleteEvent}
+            />
+        </div>
     )
 }
 
 function AdminClients() {
+    const [clients, setClients] = useState<AdminClientRow[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        let mounted = true
+        setLoading(true)
+        api<{ clients: AdminClientRow[] }>('/api/admin/clients').then(res => {
+            if (!mounted) return
+            if (res.ok) setClients(res.data.clients)
+            setLoading(false)
+        })
+        return () => {
+            mounted = false
+        }
+    }, [])
+
+    const palette = [
+        { bg: undefined as string | undefined, fg: undefined as string | undefined },
+        { bg: '#e0f2fe', fg: '#0369a1' },
+        { bg: '#fef3c7', fg: '#b45309' },
+        { bg: '#f3e8ff', fg: '#6b21a8' },
+        { bg: '#ffe4e6', fg: '#9d174d' },
+    ]
+
+    const initials = (name: string) => {
+        const parts = name.trim().split(/\s+/).filter(Boolean)
+        const a = parts[0]?.[0] ?? 'U'
+        const b = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? '' : (parts[0]?.[1] ?? '')
+        return (a + b).toUpperCase()
+    }
+
+    const colorFor = (name: string) => {
+        let h = 0
+        for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+        return palette[h % palette.length]
+    }
+
     return (
         <div className="card">
             <div className="cardHeader">
@@ -1272,51 +2819,116 @@ function AdminClients() {
                     <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4}}>Base de clientes do seu espaço.</p>
                 </div>
             </div>
-            <div style={{overflowX: 'auto'}}>
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Telefone</th>
-                            <th>Última Visita</th>
-                            <th>Total Gasto</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>
-                                 <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
-                                    <div className="user-avatar-mini" style={{width: 36, height: 36, fontSize: '0.8rem'}}>MJ</div>
-                                    <span style={{fontWeight: 600, color: 'var(--gray-800)'}}>Maria Julia</span>
-                                </div>
-                            </td>
-                            <td style={{color: 'var(--gray-600)'}}>(11) 99999-9999</td>
-                            <td><span className="pill">10/01/2026</span></td>
-                            <td style={{fontWeight: 600}}>R$ 450,00</td>
-                            <td><button className="icon-btn" style={{width: 32, height: 32}}><MoreHorizontal size={16}/></button></td>
-                        </tr>
-                        <tr>
-                            <td>
-                                 <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
-                                    <div className="user-avatar-mini" style={{width: 36, height: 36, fontSize: '0.8rem', background: '#e0f2fe', color: '#0369a1'}}>AS</div>
-                                    <span style={{fontWeight: 600, color: 'var(--gray-800)'}}>Ana Silva</span>
-                                </div>
-                            </td>
-                            <td style={{color: 'var(--gray-600)'}}>(11) 98888-8888</td>
-                            <td><span className="pill">15/01/2026</span></td>
-                            <td style={{fontWeight: 600}}>R$ 120,00</td>
-                            <td><button className="icon-btn" style={{width: 32, height: 32}}><MoreHorizontal size={16}/></button></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            {loading ? (
+                <div style={{display: 'flex', justifyContent: 'center', padding: 40}}>
+                    <div className="spinner" />
+                </div>
+            ) : (
+                <div className="table-scroll">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Telefone</th>
+                                <th>Última Visita</th>
+                                <th>Total Gasto</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {clients.map(c => {
+                                const col = colorFor(c.name)
+                                return (
+                                    <tr key={c.id}>
+                                        <td>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                                                <div
+                                                    className="user-avatar-mini"
+                                                    style={{
+                                                        width: 36,
+                                                        height: 36,
+                                                        fontSize: '0.8rem',
+                                                        background: col.bg,
+                                                        color: col.fg,
+                                                    }}
+                                                >
+                                                    {initials(c.name)}
+                                                </div>
+                                                <span style={{fontWeight: 600, color: 'var(--gray-800)'}}>{c.name}</span>
+                                            </div>
+                                        </td>
+                                        <td style={{color: 'var(--gray-600)'}}>{c.phone || '-'}</td>
+                                        <td>
+                                            {c.lastVisitAt ? (
+                                                <span className="pill">{new Date(c.lastVisitAt).toLocaleDateString('pt-BR')}</span>
+                                            ) : (
+                                                <span style={{color: 'var(--text-muted)'}}>—</span>
+                                            )}
+                                        </td>
+                                        <td style={{fontWeight: 600}}>{formatBRL(c.totalSpentCents / 100)}</td>
+                                        <td>
+                                            <button className="icon-btn" style={{width: 32, height: 32}}>
+                                                <MoreHorizontal size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                            {clients.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} style={{textAlign: 'center', padding: 20, color: 'var(--text-muted)'}}>
+                                        Nenhum cliente ainda
+                                    </td>
+                                </tr>
+                            ) : null}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     )
 }
 
 function AdminEvolutionAPI() {
+    type WhatsAppInstance = {
+        id: string
+        provider: string
+        baseUrl: string | null
+        instanceName: string | null
+        status: string
+        updatedAt: string
+        hasApiKey: boolean
+    }
+
+    type WhatsAppSettings = {
+        remindersEnabled: boolean
+        reminderOffsetHours: number
+        reminderMessage: string
+        promoEnabled: boolean
+        promoMessage: string
+        updatedAt?: string
+    }
+
     const [status, setStatus] = useState<'disconnected' | 'qr_scan' | 'connected'>('disconnected')
+    const [connectionState, setConnectionState] = useState<string | null>(null)
+    const [qrCode, setQrCode] = useState<string | null>(null)
+    const [busy, setBusy] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [instance, setInstance] = useState<WhatsAppInstance | null>(null)
+
+    const [provider, setProvider] = useState('EVOLUTION')
+    const [baseUrl, setBaseUrl] = useState('')
+    const [instanceName, setInstanceName] = useState('')
+    const [apiKey, setApiKey] = useState('')
+    const [showApiKey, setShowApiKey] = useState(false)
+
+    const [settingsBusy, setSettingsBusy] = useState(false)
+    const [settingsUpdatedAt, setSettingsUpdatedAt] = useState<string | null>(null)
+
+    const [testPhone, setTestPhone] = useState('')
+    const [testBusy, setTestBusy] = useState(false)
+    const [testResult, setTestResult] = useState<null | { kind: 'reminder' | 'promo'; ok: boolean }>(null)
+
     const [remindersEnabled, setRemindersEnabled] = useState(true)
     const [reminderOffset, setReminderOffset] = useState('24')
     const [reminderMessage, setReminderMessage] = useState(
@@ -1326,8 +2938,10 @@ function AdminEvolutionAPI() {
     const [promoMessage, setPromoMessage] = useState(
         'Oi {{nome}}, temos uma novidade especial para você esta semana no {{espaco}}. Responda esta mensagem para saber mais.'
     )
+    const [broadcastLimit, setBroadcastLimit] = useState('300')
+    const [broadcastBusy, setBroadcastBusy] = useState(false)
+    const [broadcastResult, setBroadcastResult] = useState<null | { sent: number; failed: number; total: number }>(null)
 
-    // Helper to format preview message
     const formatPreview = (msg: string) => {
         return msg
             .replace(/{{nome}}/g, 'Maria')
@@ -1336,8 +2950,216 @@ function AdminEvolutionAPI() {
             .replace(/{{espaco}}/g, 'Studio Bella')
     }
 
+    const mapStateToUi = (raw: string | null) => {
+        if (!raw) return 'disconnected' as const
+        const s = raw.trim().toLowerCase()
+        if (!s) return 'disconnected' as const
+        if (s.includes('open') || s.includes('connected')) return 'connected' as const
+        if (s.includes('qr') || s.includes('pair') || s.includes('scan') || s.includes('connecting')) return 'qr_scan' as const
+        if (s.includes('not_configured')) return 'disconnected' as const
+        return 'disconnected' as const
+    }
+
+    async function loadConfig() {
+        const res = await api<{ instance: WhatsAppInstance | null }>('/api/admin/whatsapp')
+        if (!res.ok) {
+            setError(res.error.message)
+            return
+        }
+        setInstance(res.data.instance)
+        const nextProvider = res.data.instance?.provider || 'EVOLUTION'
+        setProvider(nextProvider)
+        setBaseUrl(res.data.instance?.baseUrl || '')
+        setInstanceName(res.data.instance?.instanceName || '')
+    }
+
+    async function refreshStatus() {
+        const res = await api<{ state: string; raw?: unknown }>('/api/admin/whatsapp/status')
+        if (!res.ok) {
+            setError(res.error.message)
+            return
+        }
+        setConnectionState(res.data.state)
+        setStatus(mapStateToUi(res.data.state))
+        if (mapStateToUi(res.data.state) !== 'qr_scan') setQrCode(null)
+    }
+
+    async function loadSettings() {
+        const res = await api<{ settings: WhatsAppSettings }>('/api/admin/whatsapp/settings')
+        if (!res.ok) {
+            setError(res.error.message)
+            return
+        }
+        const s = res.data.settings
+        setRemindersEnabled(Boolean(s.remindersEnabled))
+        setReminderOffset(String(s.reminderOffsetHours ?? 24))
+        setReminderMessage(s.reminderMessage)
+        setPromoEnabled(Boolean(s.promoEnabled))
+        setPromoMessage(s.promoMessage)
+        setSettingsUpdatedAt(typeof s.updatedAt === 'string' ? s.updatedAt : null)
+    }
+
+    async function handleSaveSettings() {
+        setSettingsBusy(true)
+        setError(null)
+        setTestResult(null)
+        try {
+            const offsetNum = Number(reminderOffset)
+            const reminderOffsetHours = Number.isFinite(offsetNum) ? Math.max(1, Math.min(168, Math.floor(offsetNum))) : 24
+            const res = await api<{ ok: true }>('/api/admin/whatsapp/settings', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    remindersEnabled,
+                    reminderOffsetHours,
+                    reminderMessage: reminderMessage.trim(),
+                    promoEnabled,
+                    promoMessage: promoMessage.trim(),
+                }),
+            })
+            if (!res.ok) {
+                setError(res.error.message)
+                return
+            }
+            await loadSettings()
+        } finally {
+            setSettingsBusy(false)
+        }
+    }
+
+    async function handleTestSend(kind: 'reminder' | 'promo') {
+        setTestBusy(true)
+        setError(null)
+        setTestResult(null)
+        try {
+            const toPhone = testPhone.trim()
+            if (toPhone.length < 6) {
+                setError('Informe um telefone válido para teste.')
+                return
+            }
+            const msg = kind === 'reminder' ? reminderMessage : promoMessage
+            const text = formatPreview(msg)
+            const res = await api<{ ok: true }>('/api/admin/whatsapp/send', {
+                method: 'POST',
+                body: JSON.stringify({ toPhone, text }),
+            })
+            if (!res.ok) {
+                setError(res.error.message)
+                setTestResult({ kind, ok: false })
+                return
+            }
+            setTestResult({ kind, ok: true })
+        } finally {
+            setTestBusy(false)
+        }
+    }
+
+    async function handleSaveConfig() {
+        setBusy(true)
+        setError(null)
+        setBroadcastResult(null)
+        try {
+            const payload: Record<string, string> = {}
+            if (provider.trim()) payload.provider = provider.trim()
+            if (baseUrl.trim()) payload.baseUrl = baseUrl.trim()
+            if (instanceName.trim()) payload.instanceName = instanceName.trim()
+            if (apiKey.trim()) payload.apiKey = apiKey.trim()
+
+            const res = await api<{ ok: true }>('/api/admin/whatsapp', {
+                method: 'PUT',
+                body: JSON.stringify(payload),
+            })
+            if (!res.ok) {
+                setError(res.error.message)
+                return
+            }
+            setApiKey('')
+            await loadConfig()
+            await refreshStatus()
+        } finally {
+            setBusy(false)
+        }
+    }
+
+    async function handleConnect() {
+        setBusy(true)
+        setError(null)
+        setBroadcastResult(null)
+        try {
+            const qr = await api<{ qrCode: string | null; raw?: unknown; state?: string }>('/api/admin/whatsapp/qrcode')
+            if (!qr.ok) {
+                setError(qr.error.message)
+                return
+            }
+            setQrCode(qr.data.qrCode)
+            setStatus('qr_scan')
+            await refreshStatus()
+        } finally {
+            setBusy(false)
+        }
+    }
+
+    async function handleBroadcast() {
+        setBroadcastBusy(true)
+        setError(null)
+        setBroadcastResult(null)
+        try {
+            const hasVars = /{{\s*(nome|data|hora|espaco)\s*}}/.test(promoMessage)
+            if (hasVars) {
+                setError('Remova variáveis {{...}} para enviar em massa (mensagem única).')
+                return
+            }
+            const limitNum = Number(broadcastLimit)
+            const limit = Number.isFinite(limitNum) && limitNum > 0 ? Math.min(2000, Math.floor(limitNum)) : 300
+
+            const res = await api<{ sent: number; failed: number; total: number }>('/api/admin/whatsapp/broadcast', {
+                method: 'POST',
+                body: JSON.stringify({ text: promoMessage.trim(), limit }),
+            })
+            if (!res.ok) {
+                setError(res.error.message)
+                return
+            }
+            setBroadcastResult(res.data)
+        } finally {
+            setBroadcastBusy(false)
+        }
+    }
+
+    useEffect(() => {
+        let mounted = true
+        setError(null)
+        Promise.resolve()
+            .then(async () => {
+                await loadConfig()
+                if (!mounted) return
+                await loadSettings()
+                if (!mounted) return
+                await refreshStatus()
+            })
+            .catch(() => {
+                if (!mounted) return
+                setError('Falha ao carregar WhatsApp')
+            })
+        return () => {
+            mounted = false
+        }
+    }, [])
+
+    useEffect(() => {
+        if (status !== 'qr_scan') return
+        let alive = true
+        const t = window.setInterval(() => {
+            if (!alive) return
+            refreshStatus()
+        }, 3000)
+        return () => {
+            alive = false
+            window.clearInterval(t)
+        }
+    }, [status])
+
     return (
-        <div className="grid" style={{gridTemplateColumns: '1fr 400px', gap: '2rem', alignItems: 'start'}}>
+        <div className="grid grid-1-400">
             {/* Left Column: Configuration */}
             <div className="column" style={{gap: '1.5rem'}}>
                 {/* Connection Status Card */}
@@ -1356,26 +3178,95 @@ function AdminEvolutionAPI() {
                                      {status === 'connected' ? 'WhatsApp Conectado' : 'WhatsApp Desconectado'}
                                  </h3>
                                  <div style={{fontSize: '0.8rem', color: status === 'connected' ? '#166534' : '#991b1b'}}>
-                                     {status === 'connected' ? 'Pronto para enviar mensagens.' : 'Escaneie o QR Code para conectar.'}
+                                     {status === 'connected'
+                                         ? `Pronto para enviar mensagens.${connectionState ? ` (${connectionState})` : ''}`
+                                         : instance?.baseUrl && instance?.instanceName && instance?.hasApiKey
+                                           ? 'Escaneie o QR Code para conectar.'
+                                           : 'Configure o provedor para conectar.'}
                                  </div>
                              </div>
                         </div>
-                        {status === 'connected' ? (
-                            <button className="btn btn-ghost" style={{background: 'white'}} onClick={() => setStatus('disconnected')}>Desconectar</button>
-                        ) : (
-                            <button className="btn btnPrimary" onClick={() => setStatus(status === 'qr_scan' ? 'connected' : 'qr_scan')}>
-                                {status === 'qr_scan' ? 'Simular Conexão' : 'Conectar'}
+                        <div style={{display: 'flex', gap: 10}}>
+                            <button className="btn btn-ghost" style={{background: 'white'}} onClick={refreshStatus} disabled={busy}>
+                                Atualizar
                             </button>
-                        )}
+                            <button
+                                className="btn btnPrimary"
+                                onClick={handleConnect}
+                                disabled={busy || !(instance?.baseUrl && instance?.instanceName && instance?.hasApiKey)}
+                            >
+                                {status === 'qr_scan' ? 'Recarregar QR' : 'Conectar'}
+                            </button>
+                        </div>
                     </div>
+                    {error ? (
+                        <div className="cardBody" style={{display: 'flex', alignItems: 'center', gap: 10, color: '#991b1b'}}>
+                            <XCircle size={18} />
+                            <div style={{fontSize: '0.9rem'}}>{error}</div>
+                        </div>
+                    ) : null}
                     {status === 'qr_scan' && (
                         <div className="cardBody" style={{textAlign: 'center'}}>
                             <div style={{background: '#1f2937', padding: 16, borderRadius: 12, display: 'inline-block', marginBottom: 16}}>
-                                <QrCode size={120} color="white" />
+                                {qrCode ? (
+                                    <img src={qrCode} alt="QR Code" style={{width: 180, height: 180, objectFit: 'contain'}} />
+                                ) : (
+                                    <QrCode size={120} color="white" />
+                                )}
                             </div>
                             <p style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>Abra o WhatsApp &gt; Aparelhos Conectados &gt; Conectar Aparelho</p>
                         </div>
                     )}
+                </div>
+
+                <div className="card">
+                    <div className="cardHeader">
+                        <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
+                            <div style={{width: 32, height: 32, borderRadius: 8, background: 'var(--primary-50)', color: 'var(--primary-600)', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                <Link2 size={18} />
+                            </div>
+                            <div>
+                                <h3 className="cardTitle">Provedor (Evolution)</h3>
+                                <div style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>
+                                    {instance?.updatedAt ? `Última atualização: ${new Date(instance.updatedAt).toLocaleString('pt-BR')}` : 'Configure a instância para habilitar QR.'}
+                                </div>
+                            </div>
+                        </div>
+                        <button className="btn btnPrimary" onClick={handleSaveConfig} disabled={busy}>
+                            {busy ? 'Salvando...' : 'Salvar'}
+                        </button>
+                    </div>
+                    <div className="cardBody">
+                        <div className="form-stack">
+                            <div className="input-group">
+                                <label className="label">Provider</label>
+                                <input className="input" value={provider} onChange={e => setProvider(e.target.value)} placeholder="EVOLUTION" />
+                            </div>
+                            <div className="input-group">
+                                <label className="label">Base URL</label>
+                                <input className="input" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="https://sua-evolution.example" />
+                            </div>
+                            <div className="input-group">
+                                <label className="label">Instance Name</label>
+                                <input className="input" value={instanceName} onChange={e => setInstanceName(e.target.value)} placeholder="lashsaas" />
+                            </div>
+                            <div className="input-group">
+                                <label className="label">API Key</label>
+                                <div className="authRefInputWrapper">
+                                    <input
+                                        className="input authRefInput"
+                                        type={showApiKey ? 'text' : 'password'}
+                                        value={apiKey}
+                                        onChange={e => setApiKey(e.target.value)}
+                                        placeholder={instance?.hasApiKey ? '•••••••• (já configurada)' : 'Cole sua API Key'}
+                                    />
+                                    <button type="button" className="authRefPasswordToggle" onClick={() => setShowApiKey(v => !v)} tabIndex={-1}>
+                                        {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Reminders Config */}
@@ -1387,7 +3278,12 @@ function AdminEvolutionAPI() {
                             </div>
                             <h3 className="cardTitle">Lembretes Automáticos</h3>
                         </div>
-                        <Switch checked={remindersEnabled} onChange={setRemindersEnabled} />
+                        <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+                            <button className="btn btn-ghost" onClick={handleSaveSettings} disabled={settingsBusy}>
+                                {settingsBusy ? 'Salvando...' : 'Salvar'}
+                            </button>
+                            <Switch checked={remindersEnabled} onChange={setRemindersEnabled} />
+                        </div>
                     </div>
                     {remindersEnabled && (
                         <div className="cardBody" style={{animation: 'fadeIn 0.3s ease'}}>
@@ -1421,6 +3317,32 @@ function AdminEvolutionAPI() {
                                     ))}
                                 </div>
                             </div>
+
+                            <div style={{display: 'flex', gap: 10, alignItems: 'center', marginTop: 14, flexWrap: 'wrap'}}>
+                                <div style={{display: 'flex', gap: 8, alignItems: 'center'}}>
+                                    <span className="pill" style={{fontSize: '0.75rem'}}>Teste</span>
+                                    <input
+                                        className="input"
+                                        style={{width: 220}}
+                                        value={testPhone}
+                                        onChange={e => setTestPhone(e.target.value)}
+                                        placeholder="Telefone (ex: 5511999999999)"
+                                    />
+                                </div>
+                                <button className="btn btnPrimary" onClick={() => handleTestSend('reminder')} disabled={testBusy || status !== 'connected'}>
+                                    {testBusy ? 'Enviando...' : 'Enviar teste'}
+                                </button>
+                                {settingsUpdatedAt ? (
+                                    <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>
+                                        Atualizado: {new Date(settingsUpdatedAt).toLocaleString('pt-BR')}
+                                    </div>
+                                ) : null}
+                                {testResult?.kind === 'reminder' ? (
+                                    <div style={{fontSize: '0.85rem', color: testResult.ok ? '#166534' : '#991b1b'}}>
+                                        {testResult.ok ? 'Teste enviado' : 'Falha no envio'}
+                                    </div>
+                                ) : null}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1434,7 +3356,12 @@ function AdminEvolutionAPI() {
                             </div>
                             <h3 className="cardTitle">Campanhas de Marketing</h3>
                         </div>
-                        <Switch checked={promoEnabled} onChange={setPromoEnabled} />
+                        <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+                            <button className="btn btn-ghost" onClick={handleSaveSettings} disabled={settingsBusy}>
+                                {settingsBusy ? 'Salvando...' : 'Salvar'}
+                            </button>
+                            <Switch checked={promoEnabled} onChange={setPromoEnabled} />
+                        </div>
                     </div>
                     {promoEnabled && (
                         <div className="cardBody" style={{animation: 'fadeIn 0.3s ease'}}>
@@ -1447,6 +3374,37 @@ function AdminEvolutionAPI() {
                                     onChange={e => setPromoMessage(e.target.value)}
                                 />
                             </div>
+                            <div style={{display: 'flex', gap: 10, alignItems: 'center', marginTop: 12}}>
+                                <div style={{display: 'flex', gap: 8, alignItems: 'center'}}>
+                                    <span className="pill" style={{fontSize: '0.75rem'}}>Limite</span>
+                                    <input
+                                        className="input"
+                                        style={{width: 110}}
+                                        value={broadcastLimit}
+                                        onChange={e => setBroadcastLimit(e.target.value)}
+                                        inputMode="numeric"
+                                    />
+                                </div>
+                                <button className="btn btnPrimary" onClick={handleBroadcast} disabled={broadcastBusy || status !== 'connected'}>
+                                    {broadcastBusy ? 'Enviando...' : 'Enviar campanha'}
+                                </button>
+                                {broadcastResult ? (
+                                    <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>
+                                        Enviado: {broadcastResult.sent} | Falhas: {broadcastResult.failed} | Total: {broadcastResult.total}
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            <div style={{display: 'flex', gap: 10, alignItems: 'center', marginTop: 14, flexWrap: 'wrap'}}>
+                                <button className="btn" onClick={() => handleTestSend('promo')} disabled={testBusy || status !== 'connected'}>
+                                    {testBusy ? 'Enviando...' : 'Testar no WhatsApp'}
+                                </button>
+                                {testResult?.kind === 'promo' ? (
+                                    <div style={{fontSize: '0.85rem', color: testResult.ok ? '#166534' : '#991b1b'}}>
+                                        {testResult.ok ? 'Teste enviado' : 'Falha no envio'}
+                                    </div>
+                                ) : null}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1454,7 +3412,7 @@ function AdminEvolutionAPI() {
 
             {/* Right Column: Phone Preview */}
             <div className="column">
-                <div style={{position: 'sticky', top: 20}}>
+                <div className="sticky-panel">
                     <h3 style={{fontSize: '1rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700}}>
                         Visualização em Tempo Real
                     </h3>
@@ -1591,6 +3549,19 @@ function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUp
     const [logoError, setLogoError] = useState<string | null>(null)
     const logoInputRef = useRef<HTMLInputElement>(null)
 
+    const [billingLoading, setBillingLoading] = useState(true)
+    const [subscription, setSubscription] = useState<
+        | null
+        | {
+              id: string
+              externalId: string | null
+              status: string
+              currentPeriodEnd: string | null
+              createdAt: string
+              updatedAt: string
+          }
+    >(null)
+
     // Update state when tenant changes
     useEffect(() => {
         if(tenant) {
@@ -1599,6 +3570,19 @@ function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUp
             setLogoUrl(tenant.logoUrl || '')
         }
     }, [tenant])
+
+    useEffect(() => {
+        let mounted = true
+        setBillingLoading(true)
+        api<{ subscription: typeof subscription }>('/api/admin/billing/overview').then((res) => {
+            if (!mounted) return
+            if (res.ok) setSubscription(res.data.subscription)
+            setBillingLoading(false)
+        })
+        return () => {
+            mounted = false
+        }
+    }, [])
 
     async function handleLogoFile(file: File) {
         setLogoBusy(true)
@@ -1619,24 +3603,40 @@ function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUp
 
     async function handleSave() {
         setSaving(true)
-        // Mock API call to update tenant
-        // In real app: await api.put('/api/admin/tenant', { name, primaryColor, logoUrl })
-        
-        // Simulate network delay
-        await new Promise(r => setTimeout(r, 800))
-        
-        // Update local theme immediately for better UX
-        const root = document.documentElement
-        root.style.setProperty('--primary-500', primaryColor)
-        // Note: In a real app we would need to generate the full palette or rely on the backend/theme helper
-        
-        setSaving(false)
-        if (onUpdate) onUpdate()
-        alert('Configurações salvas com sucesso!')
+        setLogoError(null)
+        try {
+            const nextName = name.trim()
+            const nextPrimaryColor = primaryColor.trim()
+            const nextLogo = logoUrl.trim()
+            const payload: Record<string, unknown> = {}
+
+            if (!tenant || nextName !== tenant.name) payload.name = nextName
+            if (!tenant || nextPrimaryColor !== tenant.primaryColor) payload.primaryColor = nextPrimaryColor
+            const currentLogo = (tenant?.logoUrl ?? '') || ''
+            if (!tenant || nextLogo !== currentLogo) payload.logoUrl = nextLogo ? nextLogo : null
+
+            if (Object.keys(payload).length === 0) return
+
+            const res = await api<{ tenant: TenantPublic }>('/api/admin/tenant', {
+                method: 'PATCH',
+                body: JSON.stringify(payload),
+            })
+
+            if (!res.ok) {
+                setLogoError(res.error.message)
+                return
+            }
+
+            applyTenantTheme(res.data.tenant)
+            if (onUpdate) onUpdate()
+            alert('Configurações salvas com sucesso!')
+        } finally {
+            setSaving(false)
+        }
     }
 
     return (
-        <div className="grid" style={{gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start'}}>
+        <div className="grid grid-1-1">
             <div className="column" style={{gap: '1.5rem'}}>
                 <div className="card">
                     <div className="cardHeader">
@@ -1694,31 +3694,10 @@ function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUp
 
                             <div className="input-group">
                                 <label className="label">Cor Principal</label>
-                                <div style={{display: 'flex', gap: 12, flexWrap: 'wrap'}}>
-                                    {['#ec4899', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#111827'].map(c => (
-                                        <div 
-                                            key={c}
-                                            onClick={() => setPrimaryColor(c)}
-                                            style={{
-                                                width: 32, height: 32, borderRadius: '50%', background: c, cursor: 'pointer',
-                                                border: primaryColor === c ? '2px solid var(--gray-900)' : '2px solid transparent',
-                                                boxShadow: primaryColor === c ? '0 0 0 2px white' : 'none',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                            }}
-                                        >
-                                            {primaryColor === c && <Check size={14} color="white" />}
-                                        </div>
-                                    ))}
-                                    <div style={{width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', position: 'relative', border: '1px solid var(--gray-200)'}}>
-                                        <input 
-                                            type="color" 
-                                            value={primaryColor} 
-                                            onChange={e => setPrimaryColor(e.target.value)}
-                                            style={{opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer'}} 
-                                        />
-                                        <div style={{width: '100%', height: '100%', background: primaryColor}} />
-                                    </div>
-                                </div>
+                                <ColorPicker 
+                                    value={primaryColor} 
+                                    onChange={setPrimaryColor} 
+                                />
                             </div>
                             
                             <div style={{marginTop: 16}}>
@@ -1735,38 +3714,35 @@ function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUp
                 <div className="card">
                     <div className="cardHeader">
                         <h2 className="cardTitle">Assinatura</h2>
-                        <span className="status-badge status-success">Ativa</span>
+                        {billingLoading ? (
+                            <span className="status-badge status-pending">Carregando</span>
+                        ) : subscription?.status?.toUpperCase?.() === 'ACTIVE' ? (
+                            <span className="status-badge status-success">Ativa</span>
+                        ) : subscription ? (
+                            <span className="status-badge status-warning">{subscription.status}</span>
+                        ) : (
+                            <span className="status-badge status-warning">Sem assinatura</span>
+                        )}
                     </div>
                     <div className="cardBody">
                         <div style={{background: 'linear-gradient(135deg, var(--gray-900), var(--gray-800))', borderRadius: 12, padding: 20, color: 'white', marginBottom: 20}}>
                             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
                                 <div>
                                     <div style={{fontSize: '0.85rem', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em'}}>Plano Atual</div>
-                                    <div style={{fontSize: '1.5rem', fontWeight: 700, margin: '4px 0'}}>Lash Space Pro</div>
-                                    <div style={{fontSize: '0.9rem', opacity: 0.9}}>R$ 97,00 / mês</div>
+                                    <div style={{fontSize: '1.5rem', fontWeight: 700, margin: '4px 0'}}>{subscription ? 'Assinatura' : '—'}</div>
+                                    <div style={{fontSize: '0.9rem', opacity: 0.9}}>{subscription ? `Status: ${subscription.status}` : 'Nenhuma assinatura encontrada para este espaço.'}</div>
                                 </div>
                                 <div style={{background: 'rgba(255,255,255,0.1)', padding: 8, borderRadius: 8}}>
                                     <Sparkles size={24} color="#f472b6" />
                                 </div>
                             </div>
                             <div style={{marginTop: 24, display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', opacity: 0.8}}>
-                                <Check size={14} /> Próxima cobrança em 15/02/2026
+                                <Check size={14} /> Próxima cobrança: {subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('pt-BR') : '—'}
                             </div>
                         </div>
-
-                        <div style={{marginBottom: 20}}>
-                            <div style={{fontWeight: 600, fontSize: '0.9rem', marginBottom: 12}}>Forma de Pagamento</div>
-                            <div style={{display: 'flex', alignItems: 'center', gap: 12, padding: 12, border: '1px solid var(--gray-200)', borderRadius: 12}}>
-                                <div style={{width: 36, height: 24, background: '#1f2937', borderRadius: 4}} />
-                                <div style={{flex: 1}}>
-                                    <div style={{fontSize: '0.9rem', fontWeight: 500}}>Mastercard final 4242</div>
-                                    <div style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>Expira em 12/28</div>
-                                </div>
-                                <button className="btn btn-ghost" style={{fontSize: '0.8rem'}}>Trocar</button>
-                            </div>
-                        </div>
-
-                        <button className="btn w-full" style={{border: '1px solid var(--danger)', color: 'var(--danger)'}}>Cancelar Assinatura</button>
+                        <button className="btn w-full" style={{border: '1px solid var(--danger)', color: 'var(--danger)'}} disabled>
+                            Cancelar Assinatura
+                        </button>
                     </div>
                 </div>
 
@@ -1774,7 +3750,8 @@ function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUp
                     <div className="cardHeader">
                         <h2 className="cardTitle">Histórico de Faturas</h2>
                     </div>
-                    <table className="data-table">
+                    <div className="table-scroll">
+                        <table className="data-table">
                         <thead>
                             <tr>
                                 <th>Data</th>
@@ -1785,19 +3762,13 @@ function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUp
                         </thead>
                         <tbody>
                             <tr>
-                                <td>15/01/2026</td>
-                                <td>R$ 97,00</td>
-                                <td><span className="status-badge status-success" style={{fontSize: '0.7rem'}}>Pago</span></td>
-                                <td><button className="icon-btn" style={{width: 28, height: 28}}><Upload size={14} style={{transform: 'rotate(180deg)'}} /></button></td>
-                            </tr>
-                            <tr>
-                                <td>15/12/2025</td>
-                                <td>R$ 97,00</td>
-                                <td><span className="status-badge status-success" style={{fontSize: '0.7rem'}}>Pago</span></td>
-                                <td><button className="icon-btn" style={{width: 28, height: 28}}><Upload size={14} style={{transform: 'rotate(180deg)'}} /></button></td>
+                                <td colSpan={4} style={{textAlign: 'center', padding: 20, color: 'var(--text-muted)'}}>
+                                    Nenhuma fatura disponível.
+                                </td>
                             </tr>
                         </tbody>
-                    </table>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1807,36 +3778,20 @@ function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUp
 function AdminFinance() {
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all')
-
-    // Mock Data
-    const stats = {
-        revenue: 1258050, // R$ 12.580,50
-        expenses: 345000, // R$ 3.450,00
-        profit: 913050,   // R$ 9.130,50
-        growth: 12.5      // +12.5%
-    }
-
-    const monthlyRevenue = [
-        { month: 'Ago', value: 8500 },
-        { month: 'Set', value: 9200 },
-        { month: 'Out', value: 10500 },
-        { month: 'Nov', value: 9800 },
-        { month: 'Dez', value: 14500 },
-        { month: 'Jan', value: 12580 }
-    ]
-
-    const maxRevenue = Math.max(...monthlyRevenue.map(m => m.value))
-
-    const transactions = [
-        { id: 1, title: 'Pagamento - Maria Julia', type: 'income', amount: 12000, date: 'Hoje, 14:30', category: 'Serviço' },
-        { id: 2, title: 'Compra de Materiais', type: 'expense', amount: 45000, date: 'Hoje, 10:00', category: 'Insumos' },
-        { id: 3, title: 'Pagamento - Ana Silva', type: 'income', amount: 8500, date: 'Ontem', category: 'Serviço' },
-        { id: 4, title: 'Aluguel do Espaço', type: 'expense', amount: 250000, date: '15/01', category: 'Fixo' },
-        { id: 5, title: 'Pagamento - Carla Perez', type: 'income', amount: 15000, date: '15/01', category: 'Serviço' },
-    ]
+    const [finance, setFinance] = useState<AdminFinanceData | null>(null)
+    const filters = ['all', 'income', 'expense'] as const
 
     useEffect(() => {
-        setTimeout(() => setLoading(false), 600)
+        let mounted = true
+        setLoading(true)
+        api<AdminFinanceData>('/api/admin/finance').then(res => {
+            if (!mounted) return
+            if (res.ok) setFinance(res.data)
+            setLoading(false)
+        })
+        return () => {
+            mounted = false
+        }
     }, [])
 
     if (loading) {
@@ -1846,6 +3801,50 @@ function AdminFinance() {
             </div>
         )
     }
+
+    const stats = {
+        revenue: finance?.totals.entriesCents ?? 0,
+        expenses: finance?.totals.expensesCents ?? 0,
+        profit: finance?.totals.profitCents ?? 0,
+        growth: (() => {
+            const m = finance?.monthly ?? []
+            const n = m.length
+            if (n < 2) return 0
+            const prev = m[n - 2]?.entriesCents ?? 0
+            const cur = m[n - 1]?.entriesCents ?? 0
+            if (prev <= 0) return cur > 0 ? 100 : 0
+            return Number((((cur - prev) / prev) * 100).toFixed(1))
+        })(),
+    }
+
+    const monthlyRevenue = (finance?.monthly ?? []).map(m => {
+        const d = new Date(`${m.ym}-01T00:00:00.000Z`)
+        const month = d.toLocaleString('pt-BR', { month: 'short' }).replace('.', '')
+        return { month: month.charAt(0).toUpperCase() + month.slice(1), value: m.entriesCents / 100 }
+    })
+
+    const maxRevenue = Math.max(1, ...monthlyRevenue.map(m => m.value))
+
+    const transactions = [
+        ...(finance?.lastEntries ?? []).map(a => ({
+            id: `in_${a.id}`,
+            title: `Pagamento - ${a.clientName ?? a.clientEmail}`,
+            type: 'income' as const,
+            amount: a.priceCents,
+            at: a.startsAt,
+            dateText: new Date(a.startsAt).toLocaleString('pt-BR'),
+            category: 'Serviço'
+        })),
+        ...(finance?.lastExpenses ?? []).map(e => ({
+            id: `ex_${e.id}`,
+            title: e.note?.trim() ? e.note.trim() : 'Despesa',
+            type: 'expense' as const,
+            amount: e.amountCents,
+            at: e.createdAt,
+            dateText: new Date(e.createdAt).toLocaleString('pt-BR'),
+            category: e.method
+        })),
+    ].sort((a, b) => b.at.localeCompare(a.at))
 
     const filteredTransactions = transactions.filter(t => {
         if (filter === 'all') return true
@@ -1922,11 +3921,11 @@ function AdminFinance() {
                 <div className="card">
                     <div className="cardHeader" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
                         <h3 className="cardTitle">Transações Recentes</h3>
-                        <div style={{display: 'flex', gap: 8}}>
-                            {['all', 'income', 'expense'].map(f => (
+                        <div className="finance-filter-group" style={{display: 'flex', gap: 8}}>
+                            {filters.map(f => (
                                 <button
                                     key={f}
-                                    onClick={() => setFilter(f as any)}
+                                    onClick={() => setFilter(f)}
                                     className={`finance-filter-btn ${filter === f ? 'active' : ''}`}
                                 >
                                     {f === 'all' ? 'Todas' : f === 'income' ? 'Entradas' : 'Saídas'}
@@ -1934,7 +3933,7 @@ function AdminFinance() {
                             ))}
                         </div>
                     </div>
-                    <div style={{overflowX: 'auto'}}>
+                    <div className="table-scroll">
                         <table className="data-table finance-transaction-table">
                             <thead>
                                 <tr>
@@ -1959,7 +3958,7 @@ function AdminFinance() {
                                             </div>
                                         </td>
                                         <td><span className="pill">{t.category}</span></td>
-                                        <td style={{color: 'var(--gray-500)'}}>{t.date}</td>
+                                        <td style={{color: 'var(--gray-500)'}}>{t.dateText}</td>
                                         <td style={{
                                             textAlign: 'right', 
                                             fontWeight: 700, 
@@ -1985,7 +3984,7 @@ function AdminFinance() {
                     <div style={{fontSize: '2.5rem', fontWeight: 800, marginBottom: 24, position: 'relative', zIndex: 1}}>
                         {formatBRL(stats.profit / 100)}
                     </div>
-                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, position: 'relative', zIndex: 1}}>
+                    <div className="grid grid-2" style={{position: 'relative', zIndex: 1}}>
                         <button className="btn" style={{background: 'white', color: 'var(--primary-600)', border: 'none', fontWeight: 600, height: 48}}>
                             Sacar
                         </button>
@@ -2032,6 +4031,10 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
   const [me, setMe] = useState<SessionUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [tenant, setTenant] = useState<TenantPublic | null>(null)
+  const [isTestMode, setIsTestMode] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('lash_test_mode') === 'true'
+    return false
+  })
   const [tab, setTab] = useState<'dashboard' | 'calendar' | 'services' | 'clients' | 'finance' | 'settings' | 'evolution'>('dashboard')
 
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -2042,8 +4045,19 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
         setTenant(props.tenant)
         applyTenantTheme(props.tenant)
     }
-    api<{ user: SessionUser | null }>('/api/auth/me').then(res => {
-        if(res.ok) setMe(res.data.user)
+    api<{ user: SessionUser | null; isTestMode?: boolean }>('/api/auth/me').then(res => {
+        if(res.ok) {
+            setMe(res.data.user)
+            // Fix: Sync with server but prefer 'true' if either source is active
+            if (typeof res.data.isTestMode === 'boolean') {
+                const serverMode = res.data.isTestMode
+                const localMode = localStorage.getItem('lash_test_mode') === 'true'
+                const effectiveMode = serverMode || localMode
+                
+                setIsTestMode(effectiveMode)
+                localStorage.setItem('lash_test_mode', String(effectiveMode))
+            }
+        }
         else {
              // Redirect immediately if not logged in to avoid hanging state
              nav('/login')
@@ -2084,6 +4098,7 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
         title={tab === 'dashboard' ? 'Visão Geral' : tab.charAt(0).toUpperCase() + tab.slice(1)}
         subtitle="Gestão do Espaço"
         user={me}
+        isTestMode={isTestMode}
         sidebar={
             <div className="nav-group">
                 <div className="nav-label">Principal</div>
@@ -2106,7 +4121,7 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
             </div>
         }
     >
-        {tab === 'dashboard' ? <AdminDashboard me={me} stats={stats} tenantSlug={slug} /> : null}
+        {tab === 'dashboard' ? <AdminDashboard me={me} stats={stats} /> : null}
         
         {tab === 'services' ? <AdminServices /> : null}
 
@@ -2152,8 +4167,6 @@ function NewTenantModal({
     const [logoMode, setLogoMode] = useState<'upload' | 'url'>('upload')
     const [logoFileName, setLogoFileName] = useState<string | null>(null)
     const logoFileInputRef = useRef<HTMLInputElement | null>(null)
-    const [colorText, setColorText] = useState('#ec4899')
-    const [colorError, setColorError] = useState<string | null>(null)
     const [data, setData] = useState({
         name: '',
         slug: '',
@@ -2163,34 +4176,7 @@ function NewTenantModal({
         logoUrl: ''
     })
 
-    useEffect(() => {
-        setColorText(data.primaryColor)
-    }, [data.primaryColor])
-
     if (!isOpen) return null
-
-    function isValidHexColor(s: string) {
-        const v = s.trim().toLowerCase()
-        if (/^#[0-9a-f]{6}$/.test(v)) return true
-        if (/^#[0-9a-f]{3}$/.test(v)) return true
-        return false
-    }
-
-    function normalizeHexColor(s: string) {
-        const raw = s.trim().toLowerCase()
-        const v = raw.startsWith('#') ? raw : `#${raw}`
-        return v
-    }
-
-    function applyHexColor(next: string) {
-        const normalized = normalizeHexColor(next)
-        if (!isValidHexColor(normalized)) {
-            setColorError('Cor inválida (use #RGB ou #RRGGBB)')
-            return
-        }
-        setColorError(null)
-        setData((d) => ({ ...d, primaryColor: normalized }))
-    }
 
     async function loadImageFromObjectUrl(objectUrl: string) {
         const img = new Image()
@@ -2373,89 +4359,10 @@ function NewTenantModal({
                         <div className="form-stack">
                             <div className="input-group">
                                 <label className="label">Cor Principal</label>
-                                <div style={{display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center'}}>
-                                    {['#ec4899', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#111827'].map(c => (
-                                        <div 
-                                            key={c}
-                                            onClick={() => setData({...data, primaryColor: c})}
-                                            style={{
-                                                width: 32, 
-                                                height: 32, 
-                                                borderRadius: '50%', 
-                                                background: c, 
-                                                cursor: 'pointer',
-                                                border: data.primaryColor === c ? '2px solid var(--text-main)' : '2px solid transparent',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                transition: 'transform 0.2s'
-                                            }}
-                                        >
-                                            {data.primaryColor === c && <Check size={16} color="white" style={{filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}/>}
-                                        </div>
-                                    ))}
-                                    <div style={{display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 220px', minWidth: 220}}>
-                                        <div
-                                            style={{
-                                                width: 44,
-                                                height: 44,
-                                                borderRadius: 12,
-                                                border: '1px solid var(--border)',
-                                                background: data.primaryColor,
-                                                position: 'relative',
-                                                overflow: 'hidden',
-                                                boxShadow: '0 10px 20px -12px rgba(0,0,0,0.5)'
-                                            }}
-                                        >
-                                            <input
-                                                aria-label="Escolher cor"
-                                                type="color"
-                                                value={data.primaryColor}
-                                                onChange={(e) => {
-                                                    setColorError(null)
-                                                    setData({ ...data, primaryColor: e.target.value })
-                                                }}
-                                                style={{
-                                                    position: 'absolute',
-                                                    inset: 0,
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    opacity: 0,
-                                                    cursor: 'pointer'
-                                                }}
-                                            />
-                                        </div>
-                                        <div style={{flex: 1, minWidth: 0}}>
-                                            <div style={{display: 'flex', gap: 10, alignItems: 'center'}}>
-                                                <input
-                                                    className="input"
-                                                    value={colorText}
-                                                    onChange={(e) => {
-                                                        setColorText(e.target.value)
-                                                        setColorError(null)
-                                                    }}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') applyHexColor(colorText)
-                                                    }}
-                                                    onBlur={() => applyHexColor(colorText)}
-                                                    inputMode="text"
-                                                    placeholder="#ec4899"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    className="btn"
-                                                    onClick={() => applyHexColor(colorText)}
-                                                    style={{whiteSpace: 'nowrap'}}
-                                                >
-                                                    Aplicar
-                                                </button>
-                                            </div>
-                                            {colorError && (
-                                                <div style={{marginTop: 8, color: 'var(--danger)', fontSize: '0.85rem'}}>{colorError}</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                                <ColorPicker 
+                                    value={data.primaryColor} 
+                                    onChange={(c) => setData({...data, primaryColor: c})} 
+                                />
                             </div>
 
                             <div className="input-group">
@@ -2622,18 +4529,111 @@ function NewTenantModal({
     )
 }
 
+function DevIntegrations() {
+    const [settings, setSettings] = useState<Record<string, string>>({})
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        api<{settings: Record<string, string>}>('/api/dev/integrations').then(res => {
+            if(res.ok) setSettings(res.data.settings)
+            setLoading(false)
+        })
+    }, [])
+
+    async function save() {
+        setSaving(true)
+        await api('/api/dev/integrations', {
+            method: 'POST',
+            body: JSON.stringify(settings)
+        })
+        setSaving(false)
+        if (typeof window !== 'undefined') window.alert('Configurações salvas!')
+    }
+
+    const handleChange = (key: string, val: string) => {
+        setSettings(s => ({...s, [key]: val}))
+    }
+
+    if(loading) return <div style={{padding: 40, textAlign: 'center', color: 'var(--text-muted)'}}>Carregando integrações...</div>
+
+    return (
+        <div style={{maxWidth: 800, margin: '0 auto', width: '100%'}}>
+            <div className="card">
+                <div className="cardHeader">
+                    <div>
+                        <h2 className="cardTitle">Integrações Globais</h2>
+                        <p className="cardDesc">Configure as chaves de API para os serviços externos.</p>
+                    </div>
+                    <button className="btn btnPrimary" onClick={save} disabled={saving}>
+                        {saving ? 'Salvando...' : 'Salvar Alterações'}
+                    </button>
+                </div>
+                <div className="cardBody">
+                    <h4 style={{fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 20, marginTop: 0}}>Appmax</h4>
+                    <div className="form-stack">
+                        <div className="input-group">
+                            <label className="label">API Key</label>
+                            <input className="input" type="password" value={settings['appmax_api_key'] || ''} onChange={e => handleChange('appmax_api_key', e.target.value)} placeholder="sk_..." />
+                        </div>
+                        <div className="input-group">
+                            <label className="label">Webhook Secret</label>
+                            <input className="input" type="password" value={settings['appmax_webhook_secret'] || ''} onChange={e => handleChange('appmax_webhook_secret', e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div style={{height: 1, background: 'var(--border)', margin: '24px 0'}} />
+
+                    <h4 style={{fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 20}}>Evolution API</h4>
+                    <div className="form-stack">
+                        <div className="input-group">
+                            <label className="label">Base URL</label>
+                            <input className="input" value={settings['evolution_api_url'] || ''} onChange={e => handleChange('evolution_api_url', e.target.value)} placeholder="https://api.evolution..." />
+                        </div>
+                        <div className="input-group">
+                            <label className="label">Global API Key</label>
+                            <input className="input" type="password" value={settings['evolution_api_key'] || ''} onChange={e => handleChange('evolution_api_key', e.target.value)} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 function Dev() {
     const nav = useNavigate()
     const [me, setMe] = useState<SessionUser | null>(null)
     const [tenants, setTenants] = useState<TenantDev[]>([])
     const [loading, setLoading] = useState(true)
-    const [testMode, setTestMode] = useState(false)
+    const [testMode, setTestMode] = useState(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem('lash_test_mode') === 'true'
+        return false
+    })
     const [showNew, setShowNew] = useState(false)
+    const [tab, setTab] = useState<'tenants' | 'settings' | 'integrations'>('tenants')
+    const [editingTenantId, setEditingTenantId] = useState<string | null>(null)
+    const [devTheme, setDevTheme] = useState<DevThemeMode>(() => getDevTheme())
+    const [devColor, setDevColor] = useState<string>(() => getDevPrimaryColor() ?? '#6366f1')
+    const [searchTerm, setSearchTerm] = useState('')
 
     useEffect(() => {
-        setAppMode('admin') 
-        api<{user: SessionUser}>('/api/auth/me').then(res => {
-            if(res.ok) setMe(res.data.user)
+        setAppMode('dev')
+        initDevTheme('dark')
+        setDevTheme(getDevTheme())
+        api<{user: SessionUser | null; isTestMode?: boolean}>('/api/auth/me').then(res => {
+            if(res.ok && res.data.user?.role === 'DEV') {
+                setMe(res.data.user)
+                // Fix: Sync with server but prefer 'true' if either source is active
+                if (typeof res.data.isTestMode === 'boolean') {
+                    const serverMode = res.data.isTestMode
+                    const localMode = localStorage.getItem('lash_test_mode') === 'true'
+                    const effectiveMode = serverMode || localMode
+
+                    setTestMode(effectiveMode)
+                    localStorage.setItem('lash_test_mode', String(effectiveMode))
+                }
+            }
             else nav('/login')
         })
         loadTenants()
@@ -2646,6 +4646,69 @@ function Dev() {
         setLoading(false)
     }
 
+    const filteredTenants = useMemo(() => {
+        if (!searchTerm) return tenants
+        const lower = searchTerm.toLowerCase()
+        return tenants.filter(t => 
+            t.name.toLowerCase().includes(lower) || 
+            t.slug.toLowerCase().includes(lower)
+        )
+    }, [tenants, searchTerm])
+
+    const statusMeta = (raw?: string) => {
+        const v = (raw ?? 'ACTIVE').trim().toUpperCase()
+        if (v === 'ACTIVE') return { label: 'Ativo', className: 'status-success' }
+        if (v === 'SUSPENDED') return { label: 'Suspenso', className: 'status-pending' }
+        if (v === 'DISABLED') return { label: 'Desativado', className: 'status-warning' }
+        return { label: v || '—', className: 'status-warning' }
+    }
+
+    const subscriptionMeta = (t: TenantDev) => {
+        const raw = (t.subscriptionStatus ?? '').trim()
+        if (!raw) {
+            return {
+                label: 'Sem assinatura',
+                style: {
+                    color: 'var(--text-muted)',
+                    background: 'var(--bg-subtle)',
+                    border: '1px dashed var(--border)'
+                } as CSSProperties
+            }
+        }
+
+        const v = raw.toUpperCase()
+        const isActive = ['ACTIVE', 'PAID', 'TRIAL', 'TRIALING', 'APPROVED'].some((k) => v.includes(k))
+        const isPastDue = ['PAST_DUE', 'OVERDUE', 'LATE'].some((k) => v.includes(k))
+        const isInactive = ['CANCELLED', 'CANCELED', 'EXPIRED', 'INACTIVE'].some((k) => v.includes(k))
+
+        const endIso = (t.subscriptionPeriodEnd ?? '').trim()
+        const endDate = endIso ? new Date(endIso) : null
+        const endText = endDate && Number.isFinite(endDate.getTime()) ? ` até ${endDate.toLocaleDateString('pt-BR')}` : ''
+
+        if (isActive) {
+            return {
+                label: `Ativa${endText}`,
+                style: { background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' } as CSSProperties
+            }
+        }
+        if (isPastDue) {
+            return {
+                label: `Em atraso${endText}`,
+                style: { background: '#fef9c3', color: '#854d0e', border: '1px solid #fde68a' } as CSSProperties
+            }
+        }
+        if (isInactive) {
+            return {
+                label: `Inativa${endText}`,
+                style: { background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' } as CSSProperties
+            }
+        }
+        return {
+            label: `${raw}${endText}`,
+            style: { background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border)' } as CSSProperties
+        }
+    }
+
     if (!me) return <div className="authContainer"><div className="text-center">Carregando Console...</div></div>
 
     return (
@@ -2653,48 +4716,74 @@ function Dev() {
             title="Developer Console"
             subtitle="Gestão da Plataforma"
             user={me}
+            isTestMode={testMode}
+            onSearch={setSearchTerm}
+            searchValue={searchTerm}
             actions={
-                <div 
-                    className="pill" 
-                    style={{
-                        background: testMode ? '#fef3c7' : 'var(--bg-subtle)', 
-                        color: testMode ? '#b45309' : 'var(--text-muted)',
-                        cursor: 'pointer', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 8,
-                        padding: '6px 12px',
-                        border: testMode ? '1px solid #fcd34d' : '1px solid var(--border)'
-                    }} 
-                    onClick={() => setTestMode(!testMode)}
-                >
-                    <TestTube size={16} />
-                    <span style={{fontWeight: 600}}>Test Mode</span>
-                    <div style={{
-                        width: 32, 
-                        height: 18, 
-                        background: testMode ? '#f59e0b' : 'var(--gray-300)', 
-                        borderRadius: 99, 
-                        position: 'relative',
-                        transition: 'all 0.2s'
-                    }}>
+                <div style={{display: 'flex', gap: 20, alignItems: 'center', marginRight: 8}}>
+                    <label 
+                        style={{
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 10, 
+                            cursor: 'pointer',
+                            opacity: testMode ? 1 : 0.7,
+                            transition: 'opacity 0.2s'
+                        }}
+                    >
                         <div style={{
-                            width: 14, 
-                            height: 14, 
-                            background: 'white', 
-                            borderRadius: '50%', 
-                            position: 'absolute', 
-                            top: 2, 
-                            left: testMode ? 16 : 2,
-                            transition: 'all 0.2s'
-                        }} />
-                    </div>
+                            fontSize: '0.85rem', 
+                            fontWeight: 600, 
+                            color: testMode ? 'var(--text-main)' : 'var(--text-muted)'
+                        }}>
+                            Test Mode
+                        </div>
+                        <Switch 
+                            checked={testMode} 
+                            onChange={(val) => {
+                                setTestMode(val)
+                                localStorage.setItem('lash_test_mode', String(val))
+                                api('/api/dev/test-mode', {
+                                    method: 'POST',
+                                    body: JSON.stringify({ enabled: val })
+                                }).then(res => {
+                                    if (!res.ok) {
+                                        // Revert on failure
+                                        setTestMode(!val)
+                                        localStorage.setItem('lash_test_mode', String(!val))
+                                        alert('Erro ao atualizar modo de teste no servidor')
+                                    }
+                                })
+                            }} 
+                        />
+                    </label>
+
+                    <div style={{width: 1, height: 24, background: 'var(--border)'}} />
+
+                    <button 
+                        className="icon-btn" 
+                        style={{
+                            width: 36, 
+                            height: 36,
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)'
+                        }}
+                        onClick={() => {
+                            const next = toggleDevTheme()
+                            setDevTheme(next)
+                        }}
+                        title={devTheme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+                    >
+                        {devTheme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
+                    </button>
                 </div>
             }
             sidebar={
                 <div className="nav-group">
-                    <SidebarItem active icon={<LayoutDashboard size={18}/>} label="Tenants" onClick={() => {}} />
-                    <SidebarItem icon={<Settings size={18}/>} label="Configurações" onClick={() => {}} />
+                    <SidebarItem active={tab === 'tenants'} icon={<LayoutDashboard size={18}/>} label="Tenants" onClick={() => setTab('tenants')} />
+                    <SidebarItem active={tab === 'integrations'} icon={<Webhook size={18}/>} label="Integrações" onClick={() => setTab('integrations')} />
+                    <SidebarItem active={tab === 'settings'} icon={<Settings size={18}/>} label="Configurações" onClick={() => setTab('settings')} />
                     <div className="navDivider" />
                     <SidebarItem icon={<LogOut size={18}/>} label="Sair" onClick={async () => {
                          await api('/api/auth/logout', {method: 'POST'})
@@ -2703,82 +4792,460 @@ function Dev() {
                 </div>
             }
         >
-            <div className="welcome-banner" style={{background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)', color: 'white'}}>
-                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end'}}>
-                     <div>
-                        <h1 style={{margin: 0, fontSize: '2rem', fontWeight: 800}}>Painel Developer</h1>
-                        <p style={{margin: '8px 0 0', opacity: 0.8}}>Gerencie todos os espaços e assinaturas.</p>
-                     </div>
-                     <ShieldCheck size={48} style={{opacity: 0.2}} />
-                 </div>
-            </div>
+            {tab === 'tenants' ? (
+                <>
+                    <div className="welcome-banner" style={{background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)', color: 'white'}}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end'}}>
+                            <div>
+                                <h1 style={{margin: 0, fontSize: '2rem', fontWeight: 800}}>Painel Developer</h1>
+                                <p style={{margin: '8px 0 0', opacity: 0.8}}>Gerencie todos os espaços e assinaturas.</p>
+                            </div>
+                            <ShieldCheck size={48} style={{opacity: 0.2}} />
+                        </div>
+                    </div>
 
-            <div className="card">
-                <div className="cardHeader" style={{display: 'flex', justifyContent: 'space-between'}}>
-                    <h2 className="cardTitle">Espaços Cadastrados</h2>
-                    <button className="btn btnPrimary" onClick={() => setShowNew(true)}>
-                        <Plus size={16} style={{marginRight: 8}}/> Novo Espaço
-                    </button>
-                </div>
-                
-                {loading ? <div style={{padding: 20}}>Carregando...</div> : (
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>URL</th>
-                                <th>Status</th>
-                                <th>Assinatura</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {tenants.map(t => (
-                                <tr key={t.id}>
-                                    <td>
-                                        <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
-                                            <div className="user-avatar-mini" style={{background: 'var(--primary)', color: 'white', fontSize: '0.75rem'}}>
-                                                {t.name.substring(0, 2).toUpperCase()}
-                                            </div>
-                                            <span style={{fontWeight: 600}}>{t.name}</span>
+                    <div className="card">
+                        <div className="cardHeader" style={{display: 'flex', justifyContent: 'space-between'}}>
+                            <h2 className="cardTitle">Espaços Cadastrados</h2>
+                            <button className="btn btnPrimary" onClick={() => setShowNew(true)}>
+                                <Plus size={16} style={{marginRight: 8 }}/> Novo Espaço
+                            </button>
+                        </div>
+                        
+                        {loading ? <div style={{padding: 20}}>Carregando...</div> : (
+                            <div className="table-scroll">
+                                <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>URL</th>
+                                        <th>Status</th>
+                                        <th>Assinatura</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredTenants.map(t => (
+                                        <tr key={t.id}>
+                                            <td>
+                                                <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+                                                    <div className="user-avatar-mini" style={{background: 'var(--primary)', color: 'white', fontSize: '0.75rem'}}>
+                                                        {t.name.substring(0, 2).toUpperCase()}
+                                                    </div>
+                                                    <span style={{fontWeight: 600}}>{t.name}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <a
+                                                    href={(() => {
+                                                      if (typeof window === 'undefined') return `http://${t.slug}.localhost:5173`
+                                                      const host = window.location.hostname
+                                                      const port = window.location.port
+                                                      const protocol = window.location.protocol
+                                                      const rootHost = host.toLowerCase().startsWith('dev.') ? host.slice(4) : host
+                                                      return `${protocol}//${t.slug}.${rootHost}${port ? `:${port}` : ''}`
+                                                    })()}
+                                                    target="_blank"
+                                                    style={{color: 'var(--primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4}}
+                                                >
+                                                    {t.slug} <ChevronRight size={12}/>
+                                                </a>
+                                            </td>
+                                            <td>
+                                                {(() => {
+                                                    const m = statusMeta(t.status)
+                                                    return <span className={`status-badge ${m.className}`}>{m.label}</span>
+                                                })()}
+                                            </td>
+                                            <td>
+                                                {(() => {
+                                                    const m = subscriptionMeta(t)
+                                                    return <span className="pill" style={m.style}>{m.label}</span>
+                                                })()}
+                                            </td>
+                                            <td>
+                                                <button className="icon-btn" onClick={() => setEditingTenantId(t.id)} aria-label="Editar tenant"><Settings size={16}/></button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    <NewTenantModal 
+                        isOpen={showNew} 
+                        onClose={() => setShowNew(false)} 
+                        onSuccess={() => {
+                            loadTenants()
+                        }} 
+                    />
+                </>
+            ) : tab === 'integrations' ? (
+                <DevIntegrations />
+            ) : (
+                <div style={{maxWidth: 800, margin: '0 auto', width: '100%'}}>
+                    <div className="card">
+                        <div className="cardHeader">
+                            <div>
+                                <h2 className="cardTitle">Configurações</h2>
+                                <p className="cardDesc">Personalize sua experiência no painel de desenvolvedor.</p>
+                            </div>
+                        </div>
+                        
+                        <div className="cardBody">
+                            <h4 style={{fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 20, marginTop: 0}}>Aparência</h4>
+                            
+                            {/* Theme Toggle */}
+                            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24}}>
+                                <div style={{display: 'flex', gap: 16, alignItems: 'center'}}>
+                                    <div style={{
+                                        width: 40, 
+                                        height: 40, 
+                                        borderRadius: '50%', 
+                                        background: 'var(--bg-subtle)', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center',
+                                        color: 'var(--text-main)'
+                                    }}>
+                                        {devTheme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
+                                    </div>
+                                    <div>
+                                        <div style={{fontWeight: 600, fontSize: '1rem'}}>Modo Escuro</div>
+                                        <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>
+                                            {devTheme === 'dark' ? 'Ativado' : 'Desativado'}
                                         </div>
-                                    </td>
-                                    <td>
-                                        <a
-                                            href={(() => {
-                                              if (typeof window === 'undefined') return `http://${t.slug}.localhost:5173`
-                                              const host = window.location.hostname
-                                              const port = window.location.port
-                                              const protocol = window.location.protocol
-                                              const rootHost = host.toLowerCase().startsWith('dev.') ? host.slice(4) : host
-                                              return `${protocol}//${t.slug}.${rootHost}${port ? `:${port}` : ''}`
-                                            })()}
-                                            target="_blank"
-                                            style={{color: 'var(--primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4}}
-                                        >
-                                            {t.slug} <ChevronRight size={12}/>
-                                        </a>
-                                    </td>
-                                    <td><span className="status-badge status-success">Ativo</span></td>
-                                    <td><span className="pill">Pro</span></td>
-                                    <td>
-                                        <button className="icon-btn"><Settings size={16}/></button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-            </div>
+                                    </div>
+                                </div>
+                                <Switch 
+                                    checked={devTheme === 'dark'} 
+                                    onChange={() => {
+                                        const next = toggleDevTheme()
+                                        setDevTheme(next)
+                                    }} 
+                                />
+                            </div>
 
-            <NewTenantModal 
-                isOpen={showNew} 
-                onClose={() => setShowNew(false)} 
-                onSuccess={() => {
-                    loadTenants()
-                }} 
+                            {/* Color Picker */}
+                            <div style={{marginBottom: 8}}>
+                                <div style={{display: 'flex', gap: 16}}>
+                                    <div style={{
+                                        width: 40, 
+                                        height: 40, 
+                                        borderRadius: '50%', 
+                                        background: 'var(--bg-subtle)', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center',
+                                        color: 'var(--text-main)'
+                                    }}>
+                                        <Palette size={20} />
+                                    </div>
+                                    <div style={{flex: 1}}>
+                                        <div style={{fontWeight: 600, fontSize: '1rem', marginBottom: 4}}>Cor de Destaque</div>
+                                        <div style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 12}}>
+                                            Escolha a cor principal para o painel administrativo.
+                                        </div>
+                                        
+                                        <ColorPicker 
+                                            value={devColor}
+                                            onChange={(c) => {
+                                                setDevColor(c)
+                                                setDevPrimaryColor(c)
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{height: 1, background: 'var(--border)', margin: '24px 0'}} />
+
+                            <h4 style={{fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 20}}>Sistema</h4>
+
+                            <div style={{
+                                padding: 16, 
+                                background: 'var(--bg-subtle)', 
+                                border: '1px solid var(--border)', 
+                                borderRadius: 8, 
+                                display: 'flex', 
+                                gap: 16
+                            }}>
+                                <div style={{color: 'var(--primary-600)', marginTop: 2}}>
+                                    <ShieldCheck size={24} />
+                                </div>
+                                <div>
+                                    <div style={{fontWeight: 600, marginBottom: 4, color: 'var(--text-main)'}}>Ambiente Seguro</div>
+                                    <div style={{fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5}}>
+                                        Você está no ambiente de desenvolvimento. O acesso administrativo é restrito ao subdomínio <code>dev.</code> para garantir a segurança da plataforma.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <TenantEditModal
+                tenantId={editingTenantId}
+                isOpen={!!editingTenantId}
+                onClose={() => setEditingTenantId(null)}
+                onUpdated={() => loadTenants()}
             />
         </Shell>
+    )
+}
+
+function ConfirmModal({
+    isOpen,
+    title,
+    description,
+    confirmText = 'Confirmar',
+    cancelText = 'Cancelar',
+    onConfirm,
+    onCancel,
+    variant = 'danger',
+    loading = false
+}: {
+    isOpen: boolean
+    title: string
+    description: ReactNode
+    confirmText?: string
+    cancelText?: string
+    onConfirm: () => void
+    onCancel: () => void
+    variant?: 'danger' | 'primary'
+    loading?: boolean
+}) {
+    if (!isOpen) return null
+    return (
+        <div className="modal-overlay" style={{zIndex: 200}} onClick={loading ? undefined : onCancel}>
+            <div className="modal-content" style={{maxWidth: 400}} onClick={e => e.stopPropagation()}>
+                <div style={{padding: 24}}>
+                    <div style={{display: 'flex', gap: 12, marginBottom: 16}}>
+                        <div style={{
+                            width: 40, height: 40, borderRadius: '50%', 
+                            background: variant === 'danger' ? '#fee2e2' : 'var(--bg-subtle)', 
+                            color: variant === 'danger' ? '#991b1b' : 'var(--primary-600)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                        }}>
+                            {variant === 'danger' ? <Trash2 size={20} /> : <Check size={20} />}
+                        </div>
+                        <div>
+                            <h3 className="cardTitle" style={{fontSize: '1.1rem', marginBottom: 8}}>{title}</h3>
+                            <div style={{fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5}}>
+                                {description}
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{display: 'flex', gap: 10, justifyContent: 'flex-end'}}>
+                        <button className="btn" onClick={onCancel} disabled={loading}>{cancelText}</button>
+                        <button 
+                            className={`btn ${variant === 'danger' ? '' : 'btnPrimary'}`}
+                            style={variant === 'danger' ? {background: '#dc2626', color: 'white', border: 'none'} : {}}
+                            onClick={onConfirm}
+                            disabled={loading}
+                        >
+                            {loading ? 'Processando...' : confirmText}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function TenantEditModal({
+    tenantId,
+    isOpen,
+    onClose,
+    onUpdated
+}: {
+    tenantId: string | null
+    isOpen: boolean
+    onClose: () => void
+    onUpdated: () => void
+}) {
+    const [loading, setLoading] = useState(false)
+    const [saving, setSaving] = useState(false)
+    const [deleting, setDeleting] = useState(false)
+    const [showConfirmDelete, setShowConfirmDelete] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [form, setForm] = useState({
+        name: '',
+        slug: '',
+        status: 'ACTIVE' as 'ACTIVE' | 'SUSPENDED' | 'DISABLED',
+        primaryColor: '#6366f1',
+        logoUrl: ''
+    })
+
+    useEffect(() => {
+        if (!isOpen || !tenantId) return
+        setError(null)
+        setLoading(true)
+        api<{
+            tenant: {
+                id: string
+                slug: string
+                name: string
+                primaryColor: string
+                logoUrl: string | null
+                status: 'ACTIVE' | 'SUSPENDED' | 'DISABLED'
+            }
+        }>(`/api/dev/tenants/${encodeURIComponent(tenantId)}`).then((res) => {
+            if (!res.ok) {
+                setError(res.error.message)
+                return
+            }
+            setForm({
+                name: res.data.tenant.name,
+                slug: res.data.tenant.slug,
+                status: res.data.tenant.status,
+                primaryColor: res.data.tenant.primaryColor,
+                logoUrl: res.data.tenant.logoUrl ?? ''
+            })
+        }).finally(() => {
+            setLoading(false)
+        })
+    }, [isOpen, tenantId])
+
+    async function save() {
+        if (!tenantId) return
+        setSaving(true)
+        setError(null)
+        try {
+            const res = await api<{ tenant: TenantDev }>(`/api/dev/tenants/${encodeURIComponent(tenantId)}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    name: form.name.trim(),
+                    slug: form.slug.trim().toLowerCase(),
+                    status: form.status,
+                    primaryColor: form.primaryColor.trim(),
+                    logoUrl: form.logoUrl.trim() ? form.logoUrl.trim() : null
+                })
+            })
+            if (!res.ok) {
+                setError(res.error.message)
+                return
+            }
+            onUpdated()
+            onClose()
+        } catch {
+            setError('Falha ao salvar tenant')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    async function remove() {
+        if (!tenantId) return
+        setDeleting(true)
+        setError(null)
+        try {
+            const res = await api<{ ok: true }>(`/api/dev/tenants/${encodeURIComponent(tenantId)}`, { method: 'DELETE' })
+            if (!res.ok) {
+                setError(res.error.message)
+                return
+            }
+            onUpdated()
+            onClose()
+        } catch {
+            setError('Falha ao excluir tenant')
+        } finally {
+            setDeleting(false)
+            setShowConfirmDelete(false)
+        }
+    }
+
+    if (!isOpen) return null
+
+    return (
+        <>
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" style={{maxWidth: 560}} onClick={(e) => e.stopPropagation()}>
+                <div style={{padding: '1.5rem 2rem', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <div>
+                        <div className="cardTitle" style={{fontSize: '1.25rem'}}>Configurar Espaço</div>
+                        <div style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>{tenantId}</div>
+                    </div>
+                    <button className="icon-btn" onClick={onClose} aria-label="Fechar"><XCircle size={16} /></button>
+                </div>
+                <div style={{padding: '2rem'}}>
+                    {loading ? (
+                        <div>Carregando...</div>
+                    ) : (
+                        <div className="form-stack">
+                            <div className="row">
+                                <div className="input-group">
+                                    <label className="label">Nome</label>
+                                    <input className="input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+                                </div>
+                                <div className="input-group">
+                                    <label className="label">Status</label>
+                                    <select className="input" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as 'ACTIVE' | 'SUSPENDED' | 'DISABLED' }))}>
+                                        <option value="ACTIVE">Ativo</option>
+                                        <option value="SUSPENDED">Suspenso</option>
+                                        <option value="DISABLED">Desativado</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="input-group">
+                                <label className="label">Slug</label>
+                                <div className="input-wrapper">
+                                    <Link2 size={16} className="input-icon" />
+                                    <input className="input has-icon" value={form.slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))} />
+                                </div>
+                            </div>
+
+                            <div className="row">
+                                <div className="input-group">
+                                    <label className="label">Cor primária</label>
+                                    <ColorPicker 
+                                        value={form.primaryColor} 
+                                        onChange={(c) => setForm({...form, primaryColor: c})} 
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="input-group">
+                                <label className="label">Logo (URL)</label>
+                                <div className="input-wrapper">
+                                    <ImageIcon size={16} className="input-icon" />
+                                    <input className="input has-icon" value={form.logoUrl} onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))} placeholder="https://..." />
+                                </div>
+                            </div>
+
+                            {error && <div className="pill" style={{color: 'var(--danger)'}}>{error}</div>}
+                        </div>
+                    )}
+                </div>
+                <div style={{padding: '1.25rem 2rem', background: 'var(--bg-subtle)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 12}}>
+                    <button className="btn" onClick={() => setShowConfirmDelete(true)} disabled={loading || saving || deleting} style={{borderColor: 'rgba(239,68,68,0.35)', color: 'var(--danger)'}}>
+                        <Trash2 size={16} /> Excluir
+                    </button>
+                    <div style={{display: 'flex', gap: 10}}>
+                        <button className="btn" onClick={onClose} disabled={saving || deleting}>Cancelar</button>
+                        <button className="btn btnPrimary" onClick={save} disabled={loading || saving || deleting || !form.name.trim() || !form.slug.trim()}>
+                            {saving ? 'Salvando...' : 'Salvar'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <ConfirmModal 
+            isOpen={showConfirmDelete}
+            title="Excluir Espaço?"
+            description="Esta ação removerá permanentemente o espaço e todos os seus dados (agendamentos, clientes, configurações). Não pode ser desfeita."
+            confirmText="Sim, excluir espaço"
+            onConfirm={remove}
+            onCancel={() => setShowConfirmDelete(false)}
+            loading={deleting}
+            variant="danger"
+        />
+        </>
     )
 }
 
@@ -2791,6 +5258,13 @@ function UnifiedLogin(props: { hostTenant?: TenantPublic | null } = {}) {
   const [loading, setLoading] = useState(false)
   const [loginSuccess, setLoginSuccess] = useState(false)
 
+  const [allowDevBootstrap, setAllowDevBootstrap] = useState(false)
+  const [bootstrapEmail, setBootstrapEmail] = useState('')
+  const [bootstrapPassword, setBootstrapPassword] = useState('')
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null)
+  const [bootstrapLoading, setBootstrapLoading] = useState(false)
+  const [bootstrapSuccess, setBootstrapSuccess] = useState(false)
+
   const isTenant = !!props.hostTenant
   const accent = props.hostTenant?.primaryColor ?? 'var(--primary-600)'
   const brandName = props.hostTenant?.name ?? 'Lash Space'
@@ -2801,6 +5275,19 @@ function UnifiedLogin(props: { hostTenant?: TenantPublic | null } = {}) {
     setAppMode(isTenant ? 'tenant' : 'public')
     if (props.hostTenant) applyTenantTheme(props.hostTenant)
   }, [props.hostTenant])
+
+  useEffect(() => {
+    if (isTenant) return
+    let mounted = true
+    api<{ user: SessionUser | null; allowDevBootstrap?: boolean }>('/api/auth/me').then((res) => {
+      if (!mounted) return
+      if (!res.ok) return
+      setAllowDevBootstrap(Boolean(res.data.allowDevBootstrap))
+    })
+    return () => {
+      mounted = false
+    }
+  }, [isTenant])
 
   async function handleLogin() {
     setLoading(true)
@@ -2832,6 +5319,30 @@ function UnifiedLogin(props: { hostTenant?: TenantPublic | null } = {}) {
         return
       }
     }, 1500)
+  }
+
+  async function handleBootstrap() {
+    setBootstrapLoading(true)
+    setBootstrapError(null)
+    setBootstrapSuccess(false)
+    try {
+      const res = await api<{ ok: true }>('/api/dev/bootstrap', {
+        method: 'POST',
+        body: JSON.stringify({ email: bootstrapEmail, password: bootstrapPassword }),
+      })
+      if (!res.ok) {
+        setBootstrapError(res.error.message)
+        return
+      }
+      setBootstrapSuccess(true)
+      setAllowDevBootstrap(false)
+      setEmail(bootstrapEmail)
+      setPassword(bootstrapPassword)
+    } catch {
+      setBootstrapError('Erro ao criar usuário DEV')
+    } finally {
+      setBootstrapLoading(false)
+    }
   }
 
   return (
@@ -2875,6 +5386,58 @@ function UnifiedLogin(props: { hostTenant?: TenantPublic | null } = {}) {
               <>
                 <h1 className="authRefTitle">Entrar na sua conta</h1>
             <p className="authRefSubtitle">Acesse o painel e continue de onde parou.</p>
+
+            {allowDevBootstrap ? (
+              <div style={{
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 14,
+                background: 'var(--bg-subtle)',
+                marginBottom: 14
+              }}>
+                <div style={{fontWeight: 800, color: 'var(--gray-900)', marginBottom: 6}}>Primeiro acesso (criar DEV)</div>
+                <div style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 10}}>
+                  Não existe usuário DEV ainda. Crie o primeiro para habilitar o console.
+                </div>
+                <div style={{display: 'grid', gap: 10}}>
+                  <input
+                    className="authRefInput"
+                    value={bootstrapEmail}
+                    onChange={(e) => setBootstrapEmail(e.target.value)}
+                    placeholder="dev@seu-dominio.com"
+                    inputMode="email"
+                    autoComplete="email"
+                  />
+                  <input
+                    className="authRefInput"
+                    type={showPassword ? 'text' : 'password'}
+                    value={bootstrapPassword}
+                    onChange={(e) => setBootstrapPassword(e.target.value)}
+                    placeholder="Senha (mín. 8 caracteres)"
+                    autoComplete="new-password"
+                  />
+                  {bootstrapError ? (
+                    <div className="authRefError">
+                      <XCircle size={16} />
+                      <span>{bootstrapError}</span>
+                    </div>
+                  ) : null}
+                  {bootstrapSuccess ? (
+                    <div className="pill" style={{color: 'var(--success)', justifyContent: 'center'}}>
+                      Usuário DEV criado. Faça login.
+                    </div>
+                  ) : null}
+                  <button
+                    className="authRefPrimary"
+                    type="button"
+                    onClick={handleBootstrap}
+                    disabled={bootstrapLoading || !bootstrapEmail || bootstrapPassword.length < 8}
+                  >
+                    {bootstrapLoading ? 'Criando...' : 'Criar DEV'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             <div className="authRefForm">
               <label className="authRefField">
@@ -2990,22 +5553,26 @@ function DateScroller({
   value, 
   onChange, 
   min, 
-  max 
+  max,
+  getDateStatus,
 }: { 
   value: string; 
   onChange: (val: string) => void;
   min: string;
   max: string;
+  getDateStatus?: (ymd: string) => { disabled: boolean; label?: string };
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   
   const dates = useMemo(() => {
     const arr = []
-    const start = new Date(min)
-    const end = new Date(max)
-    const curr = new Date(start)
+    // Parse YYYY-MM-DD manually to avoid UTC conversion issues
+    const [minY, minM, minD] = min.split('-').map(Number)
+    const [maxY, maxM, maxD] = max.split('-').map(Number)
     
-    // Add extra buffer days at start for alignment if needed, but for now just list range
+    const curr = new Date(minY, minM - 1, minD)
+    const end = new Date(maxY, maxM - 1, maxD)
+    
     while (curr <= end) {
       arr.push(new Date(curr))
       curr.setDate(curr.getDate() + 1)
@@ -3032,19 +5599,24 @@ function DateScroller({
       
       <div className="dateScrollerContainer" ref={scrollRef}>
         {dates.map(d => {
-          const dStr = d.toISOString().split('T')[0] // YYYY-MM-DD
+          // Format as YYYY-MM-DD using local time components
+          const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
           const isSelected = value === dStr
           const isToday = new Date().toDateString() === d.toDateString()
+          const status = getDateStatus ? getDateStatus(dStr) : { disabled: false }
           
           return (
             <div 
               key={dStr} 
-              className={`dateCard ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
-              onClick={() => onChange(dStr)}
+              className={`dateCard ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${status.disabled ? 'disabled' : ''}`}
+              onClick={() => {
+                if (!status.disabled) onChange(dStr)
+              }}
             >
               <span className="dateCardWeek">{weekDays[d.getDay()]}</span>
               <span className="dateCardDay">{d.getDate()}</span>
               <span className="dateCardMonth">{months[d.getMonth()]}</span>
+              {status.disabled && <span className="dateCardStatus">{status.label ?? 'Fechado'}</span>}
             </div>
           )
         })}
@@ -3072,7 +5644,7 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
 
   const [me, setMe] = useState<SessionUser | null>(null)
   const [tenant, setTenant] = useState<TenantPublic | null>(null)
-  const [services, setServices] = useState<Array<{ id: string; name: string; durationMinutes: number; priceCents: number }>>([])
+  const [services, setServices] = useState<Array<{ id: string; name: string; durationMinutes: number; priceCents: number; coverUrl?: string | null }>>([])
   const [booking, setBooking] = useState<{
     timezone: string
     currency: string
@@ -3094,6 +5666,8 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
   const [authName, setAuthName] = useState('')
   const [authPhone, setAuthPhone] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+
+  const [blocks, setBlocks] = useState<Array<{ startsAt: string; endsAt: string; kind: 'appointment' | 'time_off' }>>([])
 
   useEffect(() => {
     let mounted = true
@@ -3132,6 +5706,112 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
     }
   }, [slug, props.tenant])
 
+  const utcForLocalTime = (input: {
+    timeZone: string
+    year: number
+    month: number
+    day: number
+    hour: number
+    minute: number
+    second?: number
+  }) => {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: input.timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
+
+    const targetUtc = Date.UTC(
+      input.year,
+      input.month - 1,
+      input.day,
+      input.hour,
+      input.minute,
+      input.second ?? 0,
+    )
+
+    let utc = new Date(targetUtc)
+    for (let i = 0; i < 4; i++) {
+      const parts = fmt.formatToParts(utc)
+      const get = (type: string) => parts.find((p) => p.type === type)?.value
+      const y = Number(get('year'))
+      const m = Number(get('month'))
+      const d = Number(get('day'))
+      const hh = Number(get('hour'))
+      const mm = Number(get('minute'))
+      const ss = Number(get('second'))
+      if (![y, m, d, hh, mm, ss].every(Number.isFinite)) return utc
+
+      const seenUtc = Date.UTC(y, m - 1, d, hh, mm, ss)
+      const diff = targetUtc - seenUtc
+      if (diff === 0) break
+      utc = new Date(utc.getTime() + diff)
+    }
+
+    return utc
+  }
+
+  const parseYmd = (ymd: string) => {
+    const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(ymd)
+    if (!m) return null
+    const year = Number(m[1])
+    const month = Number(m[2])
+    const day = Number(m[3])
+    if (![year, month, day].every(Number.isFinite)) return null
+    return { year, month, day }
+  }
+
+  const weekdayIndexForDate = (ymd: string, timeZone: string) => {
+    const p = parseYmd(ymd)
+    if (!p) return null
+    const dt = utcForLocalTime({ timeZone, year: p.year, month: p.month, day: p.day, hour: 12, minute: 0, second: 0 })
+    const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+    const fmt = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' })
+    const token = fmt.format(dt)
+    const idx = weekdayMap[token]
+    return typeof idx === 'number' ? idx : null
+  }
+
+  const utcForYmdTime = (ymd: string, time: string, timeZone: string) => {
+    const p = parseYmd(ymd)
+    if (!p) return null
+    const m = /^([0-9]{2}):([0-9]{2})$/.exec(time)
+    if (!m) return null
+    const hour = Number(m[1])
+    const minute = Number(m[2])
+    if (![hour, minute].every(Number.isFinite)) return null
+    return utcForLocalTime({ timeZone, year: p.year, month: p.month, day: p.day, hour, minute, second: 0 })
+  }
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setBlocks([])
+      return
+    }
+    let mounted = true
+    const url = slug
+      ? `/api/public/tenant/${encodeURIComponent(slug)}/availability?date=${encodeURIComponent(selectedDate)}&_=${Date.now()}`
+      : `/api/public/availability?date=${encodeURIComponent(selectedDate)}&_=${Date.now()}`
+
+    api<{ blocks: Array<{ startsAt: string; endsAt: string; kind: 'appointment' | 'time_off' }> }>(url).then((res) => {
+      if (!mounted) return
+      if (!res.ok) {
+        setBlocks([])
+        return
+      }
+      console.log('Availability blocks:', res.data.blocks)
+      setBlocks(res.data.blocks)
+    })
+    return () => {
+      mounted = false
+    }
+  }, [slug, selectedDate])
+
   const selectedService = useMemo(() => {
     return services.find((s) => s.id === selectedServiceId) ?? null
   }, [services, selectedServiceId])
@@ -3151,11 +5831,24 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
     return { min: toYmd(min), max: toYmd(max) }
   }, [booking])
 
-  const timesForSelectedDate = useMemo(() => {
-    if (!booking || !selectedService || !selectedDate) return []
-    const day = new Date(`${selectedDate}T00:00:00`).getDay()
+  const dateStatusFor = useMemo(() => {
+    if (!booking) return () => ({ disabled: false, label: undefined as string | undefined })
+    return (ymd: string) => {
+      const day = weekdayIndexForDate(ymd, booking.timezone)
+      if (day === null) return { disabled: true, label: 'Indisponível' }
+      const ranges = booking.businessHours.filter((h) => h.weekday === day)
+      if (ranges.length === 0) return { disabled: true, label: 'Fechado' }
+      return { disabled: false, label: undefined }
+    }
+  }, [booking])
+
+  const timeSlotsForSelectedDate = useMemo(() => {
+    if (!booking || !selectedService || !selectedDate) return [] as Array<{ time: string; status: 'available' | 'blocked' | 'notice'; reason: string }>
+    const timeZone = booking.timezone
+    const day = weekdayIndexForDate(selectedDate, timeZone)
+    if (day === null) return []
     const ranges = booking.businessHours.filter((h) => h.weekday === day)
-    const stepMinutes = Math.max(5, booking.bookingRules.slotStepMinutes)
+    const stepMinutes = Math.max(30, booking.bookingRules.slotStepMinutes)
     const times: string[] = []
     for (const r of ranges) {
       const lastStart = r.endMinute - selectedService.durationMinutes
@@ -3169,11 +5862,90 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
     const minNoticeMinutes = booking.bookingRules.minNoticeMinutes
     const now = new Date()
     const cutoff = new Date(now.getTime() + minNoticeMinutes * 60_000)
-    return times.filter((t) => {
-      const dt = new Date(`${selectedDate}T${t}:00`)
-      return dt.getTime() >= cutoff.getTime()
-    })
-  }, [booking, selectedDate, selectedService])
+
+    const overlaps = (aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) => {
+      return !(bEnd.getTime() <= aStart.getTime() || bStart.getTime() >= aEnd.getTime())
+    }
+
+    const parsedBlocks = blocks
+      .map((b) => {
+        const s = new Date(b.startsAt)
+        const e = new Date(b.endsAt)
+        if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null
+        return { s, e, kind: b.kind }
+      })
+      .filter(Boolean) as Array<{ s: Date; e: Date; kind: 'appointment' | 'time_off' }>
+
+    // Dynamic Gap Filling: Add slots immediately after each block ends
+    for (const b of parsedBlocks) {
+      // Get end time of block in local minutes
+      // We need to convert UTC block end to local minutes to check against business hours
+      // This is tricky because we have UTC dates but need local minutes for validation
+      // Let's use the formatter approach
+      const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+      
+      const parts = fmt.formatToParts(b.e)
+      const h = Number(parts.find(p => p.type === 'hour')?.value)
+      const m = Number(parts.find(p => p.type === 'minute')?.value)
+      
+      if (Number.isFinite(h) && Number.isFinite(m)) {
+        const minutes = h * 60 + m
+        // Check if this time is within any business range
+        const validRange = ranges.find(r => 
+          minutes >= r.startMinute && 
+          minutes <= r.endMinute - selectedService.durationMinutes // Must fit service
+        )
+        
+        if (validRange) {
+          const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+          if (!times.includes(timeStr)) {
+            times.push(timeStr)
+          }
+        }
+      }
+    }
+    
+    // Sort times
+    times.sort()
+
+    return times.map((t) => {
+      const startUtc = utcForYmdTime(selectedDate, t, timeZone)
+      if (!startUtc) return { time: t, status: 'blocked', reason: 'Indisponível' }
+      if (startUtc.getTime() < cutoff.getTime()) return { time: t, status: 'notice', reason: 'Aviso mínimo' }
+      const endUtc = new Date(startUtc.getTime() + selectedService.durationMinutes * 60_000)
+      if (parsedBlocks.length === 0) return { time: t, status: 'available', reason: '' }
+      
+      // Check if this slot is directly occupied (start matches exactly or is inside a block)
+      const occupied = parsedBlocks.find(b => startUtc.getTime() >= b.s.getTime() && startUtc.getTime() < b.e.getTime())
+      if (occupied) {
+        const reason = occupied.kind === 'time_off' ? 'Bloqueado' : 'Reservado'
+        return { time: t, status: 'blocked', reason }
+      }
+
+      // Check if duration conflicts (slot is free, but service doesn't fit)
+      const conflict = parsedBlocks.find((b) => overlaps(startUtc, endUtc, b.s, b.e))
+      if (conflict) {
+        // Slot is technically free, but duration causes overlap. Mark as blocked but without "Reserved" text.
+        return { time: t, status: 'blocked', reason: 'duration_conflict' }
+      }
+
+      return { time: t, status: 'available', reason: '' }
+    }).filter(s => s.status === 'available' || s.reason === 'Reservado' || s.reason === 'Bloqueado')
+  }, [booking, selectedDate, selectedService, blocks])
+
+  const availableSlots = useMemo(() => timeSlotsForSelectedDate.filter((t) => t.status === 'available'), [timeSlotsForSelectedDate])
+  const hasDisabledSlots = useMemo(() => timeSlotsForSelectedDate.some((t) => t.status !== 'available'), [timeSlotsForSelectedDate])
+
+  useEffect(() => {
+    if (!selectedTime) return
+    const ok = timeSlotsForSelectedDate.some((s) => s.time === selectedTime && s.status === 'available')
+    if (!ok) setSelectedTime(null)
+  }, [selectedTime, timeSlotsForSelectedDate])
 
   async function handleAuth() {
     setAuthLoading(true)
@@ -3214,7 +5986,13 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
     if (!selectedService || !selectedTime || !selectedDate) return
     setActionError(null)
     setSaving(true)
-    const startsAt = new Date(`${selectedDate}T${selectedTime}:00`)
+    const timeZone = booking?.timezone ?? 'America/Sao_Paulo'
+    const startsAt = utcForYmdTime(selectedDate, selectedTime, timeZone)
+    if (!startsAt) {
+      setSaving(false)
+      setActionError('Data inválida')
+      return
+    }
     const res = await api<{ appointment: { id: string } }>('/api/client/appointments', {
       method: 'POST',
       body: JSON.stringify({ serviceId: selectedService.id, startsAt: startsAt.toISOString() }),
@@ -3224,10 +6002,12 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
       setActionError(res.error.message)
       return
     }
+    // Refresh client appointments cache or data if needed, but nav will remount
     nav(withBasePath(basePath, '/cliente'))
   }
 
   const money = (cents: number) => `R$ ${(cents / 100).toFixed(2).replace('.', ',')}`
+  const selectedDateStatus = selectedDate ? dateStatusFor(selectedDate) : null
 
   if (loading) {
     return <div className="bookingRefLayout"><div className="bookingRefCard" style={{alignItems: 'center', justifyContent: 'center'}}>Carregando...</div></div>
@@ -3302,7 +6082,11 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
                     }}
                   >
                     <div className="bookingServiceImgPlaceholder">
-                      <Sparkles size={32} strokeWidth={1.5} />
+                      {s.coverUrl ? (
+                        <img src={s.coverUrl} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <Sparkles size={32} strokeWidth={1.5} />
+                      )}
                     </div>
                     <div className="bookingServiceInfo">
                       <div className="bookingServiceName">{s.name}</div>
@@ -3325,34 +6109,53 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
                   max={dateLimits.max}
                   onChange={(val) => {
                     setSelectedDate(val)
+                    setSelectedTime(null)
                     setStep(3)
                   }}
+                  getDateStatus={dateStatusFor}
                 />
                 <div className="dateScrollerHint">
                   Selecione uma data para visualizar a disponibilidade
                 </div>
+                {selectedDateStatus?.disabled && (
+                  <div className="bookingDateWarning">Esse dia está indisponível.</div>
+                )}
               </div>
             )}
 
             {step === 3 && (
               <div className="bookingCalendarWrapper">
-                 {timesForSelectedDate.length === 0 ? (
+                 {timeSlotsForSelectedDate.length === 0 ? (
                   <div className="text-center text-muted">Sem horários disponíveis para este dia.</div>
                 ) : (
-                  <div className="bookingTimeGrid">
-                    {timesForSelectedDate.map((t) => (
-                      <button
-                        key={t}
-                        className={`bookingTimeBtn ${selectedTime === t ? 'selected' : ''}`}
-                        onClick={() => {
-                          setSelectedTime(t)
-                          setStep(4)
-                        }}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    {availableSlots.length === 0 && (
+                      <div className="bookingTimeAlert">Todos os horários desse dia estão indisponíveis.</div>
+                    )}
+                    {hasDisabledSlots && availableSlots.length > 0 && (
+                      <div className="bookingTimeNotice">Alguns horários estão indisponíveis.</div>
+                    )}
+                    <div className="bookingTimeGrid">
+                      {timeSlotsForSelectedDate.map((slot) => (
+                        <button
+                          key={slot.time}
+                          className={`bookingTimeBtn ${selectedTime === slot.time ? 'selected' : ''} ${slot.status !== 'available' ? 'disabled' : ''} ${slot.status === 'notice' ? 'notice' : ''} ${slot.status === 'blocked' ? 'blocked' : ''}`}
+                          onClick={() => {
+                            if (slot.status !== 'available') return
+                            setSelectedTime(slot.time)
+                            setStep(4)
+                          }}
+                          disabled={slot.status !== 'available'}
+                          style={slot.status === 'blocked' ? { opacity: 0.5, cursor: 'not-allowed', background: 'var(--gray-100)', color: 'var(--gray-400)', borderColor: 'transparent' } : {}}
+                        >
+                          <span>{slot.time}</span>
+                          {slot.status !== 'available' && (
+                            <span className="bookingTimeReason"></span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             )}

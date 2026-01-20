@@ -12,6 +12,9 @@ export type TenantDev = TenantPublic & {
   createdAt: string
   adminEmail: string | null
   userCount: number
+  status?: 'ACTIVE' | 'SUSPENDED' | 'DISABLED'
+  subscriptionStatus?: string | null
+  subscriptionPeriodEnd?: string | null
 }
 
 export type SessionUser = {
@@ -20,6 +23,7 @@ export type SessionUser = {
   role: Role
   tenantId: string | null
   tenantSlug: string | null
+  subscriptionStatus?: string | null
 }
 
 export type CalendarEvent = {

@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
+import { getDb } from './db.js'
 import { forbidden, unauthorized } from './http.js'
 import type { Role } from './security.js'
 import { verifySession } from './security.js'
@@ -43,4 +44,37 @@ export function requireRole(...roles: Role[]) {
     if (!roles.includes(req.sessionUser.role)) return next(forbidden())
     next()
   }
+}
+
+export function requireActiveSubscription(req: Request, _res: Response, next: NextFunction) {
+  // Ignorar se não tiver tenant resolvido (ex: dev host ou login sem tenant)
+  if (!req.resolvedTenant) return next()
+  
+  // Se for admin, verifica assinatura
+  // (Poderíamos checar para todos os users do tenant, mas o admin é o principal)
+  
+  const db = getDb()
+
+  // Se estiver em modo DEV (localhost ou dev host), podemos ignorar ou simular
+  // Mas como o user pediu Test Mode explícito, vamos implementar a checagem real
+  
+  // Check Test Mode Global
+  const isTestMode = (db.prepare(`SELECT value FROM platform_settings WHERE key = 'test_mode'`).get() as { value: string } | undefined)?.value === 'true'
+  
+  if (isTestMode) return next()
+
+  // Consultando o banco
+  const sub = db.prepare(`
+    SELECT status FROM appmax_subscriptions 
+    WHERE tenant_id = ? 
+    ORDER BY updated_at DESC LIMIT 1
+  `).get(req.resolvedTenant.id) as { status: string } | undefined
+
+  if (!sub || sub.status !== 'ACTIVE') {
+    // Permitir algumas rotas específicas se necessário, mas o bloqueio é geral
+    // Retornamos um código específico para o frontend saber que é erro de assinatura
+    return next(forbidden('Assinatura inativa ou não encontrada', 'SUBSCRIPTION_REQUIRED'))
+  }
+
+  next()
 }
