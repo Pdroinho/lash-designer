@@ -506,6 +506,20 @@ function SubscriptionPopup({ isOpen, user, isTestMode }: { isOpen: boolean; user
                 
                 <div style={{marginTop: 24, fontSize: '0.8rem', color: 'var(--text-muted)'}}>
                     Precisa de ajuda? Entre em contato com o suporte.
+                    <div style={{height: 1, background: 'var(--border)', margin: '24px 0'}} />
+
+                    <h4 style={{fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 20}}>Hostinger & IA</h4>
+                    <div className="form-stack">
+                        <div className="input-group">
+                            <label className="label">Hostinger API Token</label>
+                            <input className="input" type="password" value={settings['hostinger_api_token'] || ''} onChange={e => handleChange('hostinger_api_token', e.target.value)} placeholder="Token do hPanel" />
+                            <p style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4}}>Usado para criar subdomínios automaticamente.</p>
+                        </div>
+                        <div className="input-group">
+                            <label className="label">DeepSeek API Key</label>
+                            <input className="input" type="password" value={settings['deepseek_api_key'] || ''} onChange={e => handleChange('deepseek_api_key', e.target.value)} />
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -577,26 +591,38 @@ function Shell(props: {
             {props.actions}
             
             <div className="search-trigger">
+                {/* Autofill Trap: Hidden inputs to capture browser autofill attempts */}
+                <div style={{position: 'absolute', opacity: 0, pointerEvents: 'none', height: 0, width: 0, overflow: 'hidden'}}>
+                    <input type="text" tabIndex={-1} autoComplete="off" />
+                    <input type="password" tabIndex={-1} autoComplete="off" />
+                </div>
                 <Search size={14} />
                 {props.onSearch ? (
-                    <input 
-                        className="search-input"
-                        placeholder="Buscar..."
-                        value={props.searchValue ?? ''}
-                        onChange={(e) => props.onSearch?.(e.target.value)}
-                        autoComplete="off"
-                        name="search_query"
-                        type="search"
-                        style={{
-                            border: 'none',
-                            background: 'transparent',
-                            outline: 'none',
-                            fontSize: '0.9rem',
-                            width: '100%',
-                            color: 'var(--text-main)',
-                            padding: 0
-                        }}
-                    />
+                    <form 
+                        onSubmit={(e) => e.preventDefault()} 
+                        autoComplete="off" 
+                        style={{flex: 1, display: 'flex'}}
+                    >
+                        <input 
+                            className="search-input"
+                            placeholder="Buscar..."
+                            value={props.searchValue ?? ''}
+                            onChange={(e) => props.onSearch?.(e.target.value)}
+                            autoComplete="new-password"
+                            name="search_query_safe"
+                            type="search"
+                            data-lpignore="true"
+                            style={{
+                                border: 'none',
+                                background: 'transparent',
+                                outline: 'none',
+                                fontSize: '0.9rem',
+                                width: '100%',
+                                color: 'var(--text-main)',
+                                padding: 0
+                            }}
+                        />
+                    </form>
                 ) : (
                     <span style={{flex: 1}}>Buscar...</span>
                 )}
@@ -4699,6 +4725,21 @@ function DevIntegrations() {
                         <div className="input-group">
                             <label className="label">Global API Key</label>
                             <input className="input" type="password" value={settings['evolution_api_key'] || ''} onChange={e => handleChange('evolution_api_key', e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div style={{height: 1, background: 'var(--border)', margin: '24px 0'}} />
+
+                    <h4 style={{fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 20}}>Hostinger & IA</h4>
+                    <div className="form-stack">
+                        <div className="input-group">
+                            <label className="label">Hostinger API Token</label>
+                            <input className="input" type="password" value={settings['hostinger_api_token'] || ''} onChange={e => handleChange('hostinger_api_token', e.target.value)} placeholder="Token do hPanel" />
+                            <p style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4}}>Usado para criar subdomínios automaticamente.</p>
+                        </div>
+                        <div className="input-group">
+                            <label className="label">DeepSeek API Key</label>
+                            <input className="input" type="password" value={settings['deepseek_api_key'] || ''} onChange={e => handleChange('deepseek_api_key', e.target.value)} />
                         </div>
                     </div>
                 </div>

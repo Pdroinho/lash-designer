@@ -887,6 +887,39 @@ app.post('/api/dev/bootstrap', requireDevHost, async (req, res, next) => {
   }
 })
 
+app.get('/api/dev/settings', requireDevHost, requireRole('DEV'), (req, res, next) => {
+  try {
+    const settings = db.prepare('SELECT key, value FROM platform_settings').all() as Array<{ key: string; value: string }>
+    const map: Record<string, string> = {}
+    settings.forEach((s) => (map[s.key] = s.value))
+    res.json({ settings: map })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/dev/settings', requireDevHost, requireRole('DEV'), (req, res, next) => {
+  try {
+    const body = z.record(z.string()).parse(req.body)
+    const now = new Date().toISOString()
+    
+    const tx = db.transaction(() => {
+        Object.entries(body).forEach(([key, value]) => {
+            db.prepare(`
+                INSERT INTO platform_settings (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+            `).run(key, value, now)
+        })
+    })
+    tx()
+    
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
 app.get('/api/dev/users', requireDevHost, requireRole('DEV'), (req, res, next) => {
   try {
     const users = db
@@ -1017,6 +1050,16 @@ app.post('/api/dev/tenants', requireDevHost, requireRole('DEV'), async (req, res
     })
 
     tx()
+
+    // Hostinger Integration
+    try {
+        const hToken = (db.prepare("SELECT value FROM platform_settings WHERE key = 'hostinger_api_token'").get() as { value: string } | undefined)?.value
+        if (hToken) {
+            await createHostingerSubdomain(body.slug, hToken)
+        }
+    } catch (err) {
+        console.error('[Hostinger] Error triggering subdomain creation:', err)
+    }
 
     const tenant = db
       .prepare(
