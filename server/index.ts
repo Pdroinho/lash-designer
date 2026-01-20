@@ -1185,7 +1185,7 @@ app.get('/api/dev/integrations', requireDevHost, requireRole('DEV'), (req, res, 
 
 app.post('/api/dev/integrations', requireDevHost, requireRole('DEV'), (req, res, next) => {
   try {
-    const body = z.record(z.string()).parse(req.body || {})
+    const body = z.record(z.string()).parse(req.body ?? {})
     const now = new Date().toISOString()
     
     const stmt = db.prepare(`
