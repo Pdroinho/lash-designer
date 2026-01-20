@@ -10,7 +10,11 @@ const envSchema = z.object({
     .optional()
     .transform((v) => (v ? Number(v) : 3000))
     .pipe(z.number().int().positive()),
-  DATABASE_PATH: z.string().default('./data/app.db'),
+  DATABASE_PATH: z.string().default(
+    process.env.NODE_ENV === 'production' 
+      ? '../lash_saas_storage/app.db' 
+      : './data/app.db'
+  ),
   JWT_SECRET: z.string().min(16).default('change-me-in-production-please'),
   FRONTEND_ORIGIN: z.string().optional(),
   DEV_HOST: z.string().optional(),

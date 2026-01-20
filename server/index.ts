@@ -13,7 +13,8 @@ import { badRequest, handleError, notFound, unauthorized } from './http.js'
 import { migrate } from './migrate.js'
 import { hashPassword, signSession, verifyPassword } from './security.js'
 
-console.log(`[Startup] DATABASE_PATH: ${env.DATABASE_PATH}`)
+console.log(`[Startup] DATABASE_PATH (Env): ${env.DATABASE_PATH}`)
+console.log(`[Startup] DATABASE_PATH (Resolved): ${path.resolve(env.DATABASE_PATH)}`)
 console.log(`[Startup] NODE_ENV: ${env.NODE_ENV}`)
 
 migrate()
