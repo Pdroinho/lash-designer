@@ -3321,17 +3321,8 @@ if (env.NODE_ENV === 'production') {
   const clientDir = path.resolve('dist/client')
   app.use(express.static(clientDir))
   app.get(/^(?!\/api).*$/, (req, res, next) => {
-    const host = (req.hostname ?? '').toLowerCase()
-    const devHost = env.DEV_HOST ? host === env.DEV_HOST.toLowerCase() : host.startsWith('dev.')
-    const p = req.path
-
-    if (devHost) {
-      if (p !== '/' && p !== '/login' && !p.startsWith('/dev')) return next(notFound())
-      res.sendFile(path.join(clientDir, 'index.html'))
-      return
-    }
-
-    if (p.startsWith('/dev')) return next(notFound())
+    // Basic catch-all to serve index.html for all non-API routes
+    // React Router will handle the routing logic (redirects, etc) on the client side
     res.sendFile(path.join(clientDir, 'index.html'))
   })
 }
