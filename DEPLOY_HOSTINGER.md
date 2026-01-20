@@ -56,12 +56,13 @@ Se você não usa Git, pode subir os arquivos manualmente.
 
 1. **Prepare os arquivos:**
    - No seu computador, apague a pasta `node_modules`, `dist` e `.git` (se houver).
+   - **IMPORTANTE:** Apague a pasta `data` do seu zip ou certifique-se de não incluí-la. Se você subir a pasta `data` do seu computador, **ela irá sobrescrever o banco de dados de produção e você perderá seus usuários!**
    - Zipe todos os arquivos restantes do projeto em um arquivo `projeto.zip`.
 
 2. **Upload:**
    - Acesse o Gerenciador de Arquivos da Hostinger.
    - Faça upload do `projeto.zip` na pasta `public_html` ou onde desejar.
-   - Extraia o zip.
+   - Extraia o zip (selecione "Sobrescrever arquivos existentes" com cuidado - o ideal é não sobrescrever a pasta `data` se ela já existir no servidor).
 
 3. **Instalação:**
    - Acesse o terminal da hospedagem (SSH).
@@ -90,7 +91,7 @@ Se você não usa Git, pode subir os arquivos manualmente.
 
 - **Erro de Permissão:** Se tiver problemas com permissão, rode `chmod +x node_modules/.bin/vite` ou `chmod +x node_modules/.bin/tsc`.
 - **Porta em Uso:** Se a porta 3000 estiver ocupada, mude no arquivo `.env` para outra (ex: 8080 ou 4000).
-- **Banco de Dados:** O sistema usa SQLite (`data.db`). Este arquivo será criado automaticamente na raiz. **Certifique-se de que a pasta tem permissão de escrita.**
+- **Banco de Dados:** O sistema usa SQLite (`data/app.db`). Este arquivo será criado automaticamente dentro da pasta `data`. **Certifique-se de que a pasta `data` não seja sobrescrita durante os deploys.**
 
 ---
 

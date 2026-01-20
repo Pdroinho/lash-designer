@@ -508,18 +508,7 @@ function SubscriptionPopup({ isOpen, user, isTestMode }: { isOpen: boolean; user
                     Precisa de ajuda? Entre em contato com o suporte.
                     <div style={{height: 1, background: 'var(--border)', margin: '24px 0'}} />
 
-                    <h4 style={{fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 20}}>Hostinger & IA</h4>
-                    <div className="form-stack">
-                        <div className="input-group">
-                            <label className="label">Hostinger API Token</label>
-                            <input className="input" type="password" value={settings['hostinger_api_token'] || ''} onChange={e => handleChange('hostinger_api_token', e.target.value)} placeholder="Token do hPanel" />
-                            <p style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4}}>Usado para criar subdomínios automaticamente.</p>
-                        </div>
-                        <div className="input-group">
-                            <label className="label">DeepSeek API Key</label>
-                            <input className="input" type="password" value={settings['deepseek_api_key'] || ''} onChange={e => handleChange('deepseek_api_key', e.target.value)} />
-                        </div>
-                    </div>
+
                 </div>
             </div>
         </div>
