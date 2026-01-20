@@ -7,7 +7,7 @@
   "main": "dist/server/index.js",
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"tsx watch server/index.ts\" \"vite\"",
-    "build": "vite build && tsc -p server/tsconfig.json && node scripts/hostinger-postbuild.js",
+    "build": "node scripts/hostinger-postbuild.js restore && vite build && tsc -p server/tsconfig.json && node scripts/hostinger-postbuild.js rename",
     "start": "node dist/server/index.js",
     "postinstall": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit",

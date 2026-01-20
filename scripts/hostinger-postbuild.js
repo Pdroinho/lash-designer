@@ -1,8 +1,24 @@
 import fs from 'fs';
 import path from 'path';
 
-// Só executa se for produção
-if (process.env.NODE_ENV === 'production') {
+// Função para restaurar o nome original
+function restore() {
+    const rootDir = process.cwd();
+    const indexHtml = path.join(rootDir, 'index.html');
+    const indexBackup = path.join(rootDir, 'index.original.html');
+
+    if (fs.existsSync(indexBackup)) {
+        try {
+            console.log('[Hostinger Fix] Restaurando index.html original antes do build...');
+            fs.renameSync(indexBackup, indexHtml);
+        } catch (err) {
+            console.error('[Hostinger Fix] Erro ao restaurar:', err);
+        }
+    }
+}
+
+// Função para renomear (pós-build)
+function rename() {
     const rootDir = process.cwd();
     const indexHtml = path.join(rootDir, 'index.html');
     const indexBackup = path.join(rootDir, 'index.original.html');
@@ -15,5 +31,23 @@ if (process.env.NODE_ENV === 'production') {
         } catch (err) {
             console.error('[Hostinger Fix] Erro ao renomear:', err);
         }
+    }
+}
+
+// Argumentos da linha de comando
+const args = process.argv.slice(2);
+const command = args[0];
+
+if (command === 'restore') {
+    restore();
+} else if (command === 'rename') {
+    // Só renomeia se for produção
+    if (process.env.NODE_ENV === 'production') {
+        rename();
+    }
+} else {
+    // Comportamento padrão (retrocompatibilidade)
+    if (process.env.NODE_ENV === 'production') {
+        rename();
     }
 }
