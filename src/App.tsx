@@ -46,7 +46,8 @@ import {
   BellRing,
   CreditCard,
   MessageSquare,
-  Lock
+  Lock,
+  Database
 } from 'lucide-react'
 
 function withBasePath(basePath: string, path: string) {
@@ -4737,6 +4738,113 @@ function DevIntegrations() {
     )
 }
 
+function DevBackup() {
+    const [importing, setImporting] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const handleExport = () => {
+        const link = document.createElement('a')
+        link.href = '/api/dev/backup/export'
+        link.setAttribute('download', 'lash-saas-backup.db')
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
+
+    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        
+        if (!confirm('ATENÇÃO: Importar um backup irá SOBRESCREVER todos os dados atuais. Um backup automático do estado atual será criado antes, mas o processo é arriscado. Deseja continuar?')) {
+            if (fileInputRef.current) fileInputRef.current.value = ''
+            return
+        }
+
+        setImporting(true)
+        try {
+            const reader = new FileReader()
+            reader.onload = async () => {
+                const base64 = (reader.result as string).split(',')[1]
+                const res = await api('/api/dev/backup/import', {
+                    method: 'POST',
+                    body: JSON.stringify({ fileData: base64 })
+                })
+                
+                if (res.ok) {
+                    alert('Backup importado com sucesso! O sistema pode precisar ser reiniciado.')
+                    window.location.reload()
+                } else {
+                    alert('Erro ao importar backup: ' + (res.error?.message || 'Erro desconhecido'))
+                }
+            }
+            reader.readAsDataURL(file)
+        } catch (err) {
+            console.error(err)
+            alert('Erro ao processar arquivo')
+        } finally {
+            setImporting(false)
+            if (fileInputRef.current) fileInputRef.current.value = ''
+        }
+    }
+
+    return (
+        <div style={{maxWidth: 800, margin: '0 auto', width: '100%'}}>
+            <div className="card">
+                <div className="cardHeader">
+                    <h2 className="cardTitle">Backup & Restauração</h2>
+                    <p className="cardDesc">Exporte e importe o banco de dados completo do sistema.</p>
+                </div>
+                <div className="cardBody">
+                    <div className="grid grid-2" style={{gap: 20}}>
+                        <div style={{padding: 20, background: 'var(--bg-subtle)', borderRadius: 8, border: '1px solid var(--border)'}}>
+                            <h3 style={{fontSize: '1rem', marginTop: 0}}>Exportar Dados</h3>
+                            <p style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>
+                                Baixe uma cópia completa do banco de dados (SQLite) atual.
+                            </p>
+                            <button className="btn btnPrimary" onClick={handleExport} style={{width: '100%'}}>
+                                <Database size={16} style={{marginRight: 8}} />
+                                Baixar Backup (.db)
+                            </button>
+                        </div>
+
+                        <div style={{padding: 20, background: 'var(--bg-subtle)', borderRadius: 8, border: '1px solid var(--border)'}}>
+                            <h3 style={{fontSize: '1rem', marginTop: 0}}>Importar Dados</h3>
+                            <p style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>
+                                Restaure o sistema a partir de um arquivo de backup (.db).
+                            </p>
+                            <input 
+                                type="file" 
+                                accept=".db,.sqlite" 
+                                ref={fileInputRef}
+                                style={{display: 'none'}} 
+                                onChange={handleImport}
+                            />
+                            <button 
+                                className="btn" 
+                                onClick={() => fileInputRef.current?.click()} 
+                                disabled={importing}
+                                style={{width: '100%', background: 'white', border: '1px solid var(--border)'}}
+                            >
+                                <Upload size={16} style={{marginRight: 8}} />
+                                {importing ? 'Importando...' : 'Carregar Backup'}
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div style={{marginTop: 20, padding: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 8, fontSize: '0.85rem', display: 'flex', gap: 10, alignItems: 'flex-start'}}>
+                        <div style={{marginTop: 2}}><ShieldCheck size={16} /></div>
+                        <div>
+                            <strong>Atenção:</strong> A importação substitui todo o banco de dados atual. 
+                            Certifique-se de ter um backup recente antes de prosseguir.
+                            O sistema fará um backup automático de segurança (`.bak`) antes da substituição.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 function Dev() {
     const nav = useNavigate()
     const [me, setMe] = useState<SessionUser | null>(null)
@@ -4747,7 +4855,7 @@ function Dev() {
         return false
     })
     const [showNew, setShowNew] = useState(false)
-    const [tab, setTab] = useState<'tenants' | 'settings' | 'integrations'>('tenants')
+    const [tab, setTab] = useState<'tenants' | 'settings' | 'integrations' | 'backups'>('tenants')
     const [editingTenantId, setEditingTenantId] = useState<string | null>(null)
     const [devTheme, setDevTheme] = useState<DevThemeMode>(() => getDevTheme())
     const [devColor, setDevColor] = useState<string>(() => getDevPrimaryColor() ?? '#6366f1')
@@ -4919,6 +5027,7 @@ function Dev() {
                 <div className="nav-group">
                     <SidebarItem active={tab === 'tenants'} icon={<LayoutDashboard size={18}/>} label="Tenants" onClick={() => setTab('tenants')} />
                     <SidebarItem active={tab === 'integrations'} icon={<Webhook size={18}/>} label="Integrações" onClick={() => setTab('integrations')} />
+                    <SidebarItem active={tab === 'backups'} icon={<Database size={18}/>} label="Backups" onClick={() => setTab('backups')} />
                     <SidebarItem active={tab === 'settings'} icon={<Settings size={18}/>} label="Configurações" onClick={() => setTab('settings')} />
                     <div className="navDivider" />
                     <SidebarItem icon={<LogOut size={18}/>} label="Sair" onClick={async () => {
@@ -5020,6 +5129,8 @@ function Dev() {
                 </>
             ) : tab === 'integrations' ? (
                 <DevIntegrations />
+            ) : tab === 'backups' ? (
+                <DevBackup />
             ) : (
                 <div style={{maxWidth: 800, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 24}}>
                     <DevUsers />
