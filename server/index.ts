@@ -12,6 +12,7 @@ import { env } from './env.js'
 import { badRequest, handleError, notFound, unauthorized } from './http.js'
 import { migrate } from './migrate.js'
 import { hashPassword, signSession, verifyPassword } from './security.js'
+import { createHostingerSubdomain } from './hostinger.js'
 
 migrate()
 const db = getDb()
