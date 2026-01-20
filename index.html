@@ -7,6 +7,29 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <title>Lash Designer Space</title>
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        // Ignora erros de redimensionamento comuns e inofensivos
+        if (msg === 'ResizeObserver loop limit exceeded') return;
+        
+        var div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.top = '0';
+        div.style.left = '0';
+        div.style.width = '100%';
+        div.style.backgroundColor = '#fee2e2';
+        div.style.color = '#991b1b';
+        div.style.padding = '20px';
+        div.style.zIndex = '999999';
+        div.style.fontFamily = 'monospace';
+        div.style.whiteSpace = 'pre-wrap';
+        div.style.boxSizing = 'border-box';
+        div.innerHTML = '<strong>Erro de Carregamento:</strong><br>' + 
+          (msg || 'Erro desconhecido') + '<br>' +
+          '<small>' + (url || '') + ':' + (line || '?') + '</small>';
+        document.body.appendChild(div);
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>
