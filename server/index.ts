@@ -22,6 +22,8 @@ const isDevHost = (hostname: string) => {
   const host = (hostname ?? '').toLowerCase()
   if (env.DEV_HOST) return host === env.DEV_HOST.toLowerCase()
   if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return env.NODE_ENV !== 'production'
+  // Suporte a subdomínios em produção (ex: dev.lashdesigner.space)
+  if (host.startsWith('dev.') && host.endsWith('.lashdesigner.space')) return true
   return host.startsWith('dev.')
 }
 
@@ -48,6 +50,10 @@ const getTenantSlugFromHostname = (hostname: string) => {
   const reserved = new Set(['www', 'app', 'api', 'dev'])
   const first = parts[0]
   if (!first || reserved.has(first)) return null
+
+  // Correção: Permitir dev.lashdesigner.space como exceção se necessário, mas geralmente dev é reservado
+  // Se o host for exatamente dev.lashdesigner.space, não deve ser tratado como tenant slug 'dev'
+  if (first === 'dev' && parts.length === 3 && parts[1] === 'lashdesigner' && parts[2] === 'space') return null
 
   if (!/^[a-z0-9-]+$/.test(first)) return null
   return first
