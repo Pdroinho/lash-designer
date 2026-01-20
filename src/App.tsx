@@ -584,6 +584,9 @@ function Shell(props: {
                         placeholder="Buscar..."
                         value={props.searchValue ?? ''}
                         onChange={(e) => props.onSearch?.(e.target.value)}
+                        autoComplete="off"
+                        name="search_query"
+                        type="search"
                         style={{
                             border: 'none',
                             background: 'transparent',
@@ -4529,6 +4532,109 @@ function NewTenantModal({
     )
 }
 
+function DevUsers() {
+    const [users, setUsers] = useState<{id: string, email: string, createdAt: string}[]>([])
+    const [loading, setLoading] = useState(true)
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [creating, setCreating] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+
+    useEffect(() => {
+        load()
+    }, [])
+
+    async function load() {
+        setLoading(true)
+        const res = await api<{users: {id: string, email: string, createdAt: string}[]}>('/api/dev/users')
+        if(res.ok) setUsers(res.data.users)
+        setLoading(false)
+    }
+
+    async function create() {
+        if(!email || !password) return
+        setCreating(true)
+        setError(null)
+        const res = await api<{user: {id: string, email: string, createdAt: string}}>('/api/dev/users', {
+            method: 'POST',
+            body: JSON.stringify({ email, password })
+        })
+        if(res.ok) {
+            setUsers(prev => [res.data.user, ...prev])
+            setEmail('')
+            setPassword('')
+        } else {
+            setError(res.error.message)
+        }
+        setCreating(false)
+    }
+
+    async function remove(id: string) {
+        if(!confirm('Remover este usuário?')) return
+        const res = await api<{ok: boolean}>(`/api/dev/users/${id}`, { method: 'DELETE' })
+        if(res.ok) {
+            setUsers(prev => prev.filter(u => u.id !== id))
+        } else {
+            alert(res.error.message)
+        }
+    }
+
+    return (
+        <div style={{maxWidth: 800, margin: '0 auto', width: '100%'}}>
+            <div className="card">
+                <div className="cardHeader">
+                    <h2 className="cardTitle">Usuários do Sistema</h2>
+                </div>
+                <div className="cardBody">
+                    <div className="form-stack" style={{marginBottom: 24}}>
+                        <div className="row">
+                            <div className="input-group">
+                                <label className="label">Novo Usuário (Email)</label>
+                                <input className="input" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@exemplo.com" />
+                            </div>
+                            <div className="input-group">
+                                <label className="label">Senha</label>
+                                <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mín. 8 caracteres" />
+                            </div>
+                        </div>
+                        {error && <div className="pill" style={{color: 'var(--danger)'}}>{error}</div>}
+                        <button className="btn btnPrimary" onClick={create} disabled={creating || !email || password.length < 8} style={{alignSelf: 'flex-start'}}>
+                            {creating ? 'Criando...' : 'Adicionar Usuário'}
+                        </button>
+                    </div>
+
+                    <div className="table-scroll">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Criado em</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loading ? (
+                                    <tr><td colSpan={3} style={{textAlign: 'center', padding: 20}}>Carregando...</td></tr>
+                                ) : users.map(u => (
+                                    <tr key={u.id}>
+                                        <td>{u.email}</td>
+                                        <td>{new Date(u.createdAt).toLocaleDateString('pt-BR')}</td>
+                                        <td style={{textAlign: 'right'}}>
+                                            <button className="icon-btn" onClick={() => remove(u.id)} style={{color: 'var(--danger)', marginLeft: 'auto'}}>
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 function DevIntegrations() {
     const [settings, setSettings] = useState<Record<string, string>>({})
     const [loading, setLoading] = useState(true)
@@ -4885,7 +4991,8 @@ function Dev() {
             ) : tab === 'integrations' ? (
                 <DevIntegrations />
             ) : (
-                <div style={{maxWidth: 800, margin: '0 auto', width: '100%'}}>
+                <div style={{maxWidth: 800, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 24}}>
+                    <DevUsers />
                     <div className="card">
                         <div className="cardHeader">
                             <div>
@@ -5249,7 +5356,7 @@ function TenantEditModal({
     )
 }
 
-function UnifiedLogin(props: { hostTenant?: TenantPublic | null } = {}) {
+function UnifiedLogin(props: { hostTenant?: TenantPublic | null; isDevHost?: boolean } = {}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [keepSigned, setKeepSigned] = useState(false)
@@ -5272,9 +5379,13 @@ function UnifiedLogin(props: { hostTenant?: TenantPublic | null } = {}) {
   const pageStyle: CssVarStyle = { '--auth-accent': accent }
 
   useEffect(() => {
-    setAppMode(isTenant ? 'tenant' : 'public')
-    if (props.hostTenant) applyTenantTheme(props.hostTenant)
-  }, [props.hostTenant])
+    if (props.isDevHost) {
+        setAppMode('dev')
+    } else {
+        setAppMode(isTenant ? 'tenant' : 'public')
+        if (props.hostTenant) applyTenantTheme(props.hostTenant)
+    }
+  }, [props.hostTenant, props.isDevHost])
 
   useEffect(() => {
     if (isTenant) return
@@ -6406,9 +6517,9 @@ export default function App() {
   if (isDevHost) {
     return (
       <Routes>
-        <Route path="/" element={<RootEntry loginElement={<UnifiedLogin />} renderWhenAuthenticated={() => <Dev />} />} />
+        <Route path="/" element={<RootEntry loginElement={<UnifiedLogin isDevHost />} renderWhenAuthenticated={() => <Dev />} />} />
         <Route path="/dev" element={<Dev />} />
-        <Route path="/login" element={<UnifiedLogin />} />
+        <Route path="/login" element={<UnifiedLogin isDevHost />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     )

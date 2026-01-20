@@ -887,6 +887,52 @@ app.post('/api/dev/bootstrap', requireDevHost, async (req, res, next) => {
   }
 })
 
+app.get('/api/dev/users', requireDevHost, requireRole('DEV'), (req, res, next) => {
+  try {
+    const users = db
+      .prepare(`SELECT id, email, created_at as createdAt FROM users WHERE role = 'DEV' ORDER BY created_at DESC`)
+      .all()
+    res.json({ users })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/dev/users', requireDevHost, requireRole('DEV'), async (req, res, next) => {
+  try {
+    const body = z.object({ email: z.string().email(), password: z.string().min(8) }).parse(req.body)
+    const email = body.email.toLowerCase()
+    
+    const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+    if (exists) throw badRequest('E-mail já cadastrado', 'EMAIL_ALREADY_USED')
+
+    const id = randomUUID()
+    const passwordHash = await hashPassword(body.password)
+    const now = new Date().toISOString()
+
+    db.prepare(
+      `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at)
+       VALUES (?, NULL, ?, ?, 'DEV', ?)`
+    ).run(id, email, passwordHash, now)
+
+    res.json({ user: { id, email, createdAt: now } })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.delete('/api/dev/users/:id', requireDevHost, requireRole('DEV'), (req, res, next) => {
+  try {
+    const id = z.string().uuid().parse(req.params.id)
+    if (id === req.sessionUser?.id) throw badRequest('Não é possível excluir o próprio usuário', 'CANNOT_DELETE_SELF')
+
+    db.prepare('DELETE FROM users WHERE id = ? AND role = \'DEV\'').run(id)
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
 app.post('/api/dev/tenants', requireDevHost, requireRole('DEV'), async (req, res, next) => {
   try {
     const body = z
