@@ -1055,8 +1055,14 @@ app.post('/api/dev/tenants', requireDevHost, requireRole('DEV'), async (req, res
     // Hostinger Integration
     try {
         const hToken = (db.prepare("SELECT value FROM platform_settings WHERE key = 'hostinger_api_token'").get() as { value: string } | undefined)?.value
+        
+        console.log(`[Hostinger] Token found: ${!!hToken}`)
+        
         if (hToken) {
+            console.log(`[Hostinger] Triggering subdomain creation for ${body.slug}`)
             await createHostingerSubdomain(body.slug, hToken)
+        } else {
+            console.log('[Hostinger] No token found, skipping subdomain creation')
         }
     } catch (err) {
         console.error('[Hostinger] Error triggering subdomain creation:', err)
