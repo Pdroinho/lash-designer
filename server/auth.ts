@@ -27,7 +27,44 @@ export function sessionMiddleware(req: Request, _res: Response, next: NextFuncti
   if (typeof token === 'string' && token.length > 0) {
     const payload = verifySession(token)
     if (payload) {
-      req.sessionUser = { id: payload.sub, role: payload.role, tenantId: payload.tenantId }
+      try {
+        const db = getDb()
+        const row = db
+          .prepare(
+            `
+              SELECT id,
+                     role,
+                     tenant_id as tenantId,
+                     session_version as sessionVersion
+              FROM users
+              WHERE id = ?
+              LIMIT 1
+            `,
+          )
+          .get(payload.sub) as
+          | { id: string; role: string; tenantId: string | null; sessionVersion: number }
+          | undefined
+
+        if (!row) {
+          next()
+          return
+        }
+
+        if (row.sessionVersion !== payload.sessionVersion) {
+          next()
+          return
+        }
+
+        if (row.role !== 'DEV' && row.role !== 'ADMIN' && row.role !== 'CLIENT') {
+          next()
+          return
+        }
+
+        req.sessionUser = { id: row.id, role: row.role, tenantId: row.tenantId ?? null }
+      } catch {
+        next()
+        return
+      }
     }
   }
   next()

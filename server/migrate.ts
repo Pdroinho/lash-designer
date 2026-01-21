@@ -361,4 +361,11 @@ export function migrate() {
       `)
     }
   })
+
+  apply(13, () => {
+    const cols = db.prepare("PRAGMA table_info('users')").all() as Array<{ name: string }>
+    const hasSessionVersion = cols.some((c) => c.name === 'session_version')
+    if (hasSessionVersion) return
+    db.exec(`ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0;`)
+  })
 }

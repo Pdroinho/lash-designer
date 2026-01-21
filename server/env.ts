@@ -16,10 +16,18 @@ const envSchema = z.object({
       : './data/app.db'
   ),
   JWT_SECRET: z.string().min(16).default('change-me-in-production-please'),
+  APPMAX_WEBHOOK_SECRET: z.string().min(16).optional(),
+  EVOLUTION_WEBHOOK_SECRET: z.string().min(16).optional(),
   FRONTEND_ORIGIN: z.string().optional(),
   DEV_HOST: z.string().optional(),
 })
 
 export type Env = z.infer<typeof envSchema>
 
-export const env: Env = envSchema.parse(process.env)
+export const env: Env = (() => {
+  const parsed = envSchema.parse(process.env)
+  if (parsed.NODE_ENV === 'production' && parsed.JWT_SECRET === 'change-me-in-production-please') {
+    throw new Error('JWT_SECRET inseguro em produção')
+  }
+  return parsed
+})()

@@ -22,10 +22,8 @@ import {
   XCircle,
   MoreHorizontal,
   Edit2,
-  TestTube,
   ChevronLeft,
   ChevronRight,
-  Chrome,
   Image as ImageIcon,
   Link2,
   Upload,
@@ -42,7 +40,6 @@ import {
   Sun,
   Palette,
   Globe,
-  Key,
   Webhook,
   BellRing,
   CreditCard,
@@ -50,8 +47,6 @@ import {
   Lock,
   Database,
   Download,
-  FileText,
-  Filter
 } from 'lucide-react'
 
 function PortalMenu({ 
@@ -1140,7 +1135,7 @@ function AdminServices() {
 
     const coverFileInputRef = useRef<HTMLInputElement | null>(null)
     const [coverBusy, setCoverBusy] = useState(false)
-    const [coverFileName, setCoverFileName] = useState<string | null>(null)
+    const [, setCoverFileName] = useState<string | null>(null)
     const [coverError, setCoverError] = useState<string | null>(null)
     const [coverDragOver, setCoverDragOver] = useState(false)
 
@@ -2124,8 +2119,8 @@ function AdminCalendar() {
                 startTime: minuteToTime(r.startMinute),
                 endTime: minuteToTime(r.endMinute),
                 lunchEnabled: false,
-                lunchStart: '12:00',
-                lunchEnd: '13:00',
+                lunchStart: minuteToTime(lunch.lunchStart),
+                lunchEnd: minuteToTime(lunch.lunchEnd),
             }
         }
         const r1 = ranges[0]
@@ -5169,14 +5164,6 @@ function Dev() {
         )
     }, [tenants, searchTerm])
 
-    const statusMeta = (raw?: string) => {
-        const v = (raw ?? 'ACTIVE').trim().toUpperCase()
-        if (v === 'ACTIVE') return { label: 'Ativo', className: 'status-success' }
-        if (v === 'SUSPENDED') return { label: 'Suspenso', className: 'status-pending' }
-        if (v === 'DISABLED') return { label: 'Desativado', className: 'status-warning' }
-        return { label: v || '—', className: 'status-warning' }
-    }
-
     const subscriptionMeta = (t: TenantDev) => {
         const raw = (t.subscriptionStatus ?? '').trim()
         if (!raw) {
@@ -7318,7 +7305,16 @@ function NewTransactionModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; 
 
 function ExtractModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [loading, setLoading] = useState(false)
-  const [transactions, setTransactions] = useState<any[]>([])
+  type FinanceTransactionRow = {
+    id: string
+    date: string
+    description: string | null
+    category: string | null
+    type: 'INCOME' | 'EXPENSE'
+    amountCents: number
+    status: string
+  }
+  const [transactions, setTransactions] = useState<FinanceTransactionRow[]>([])
   const [start, setStart] = useState(() => {
     const d = new Date()
     d.setDate(1) // 1st of current month
@@ -7334,8 +7330,10 @@ function ExtractModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
   async function load() {
       setLoading(true)
       try {
-          const res = await api<{transactions: any[]}>(`/api/admin/finance/extract?start=${new Date(start).toISOString()}&end=${new Date(end + 'T23:59:59').toISOString()}&type=${type}`)
-          if(res.ok) setTransactions(res.data.transactions)
+          const res = await api<{ transactions: FinanceTransactionRow[] }>(
+            `/api/admin/finance/extract?start=${new Date(start).toISOString()}&end=${new Date(end + 'T23:59:59').toISOString()}&type=${type}`,
+          )
+          if (res.ok) setTransactions(res.data.transactions)
       } catch (err) {
           console.error(err)
       } finally {

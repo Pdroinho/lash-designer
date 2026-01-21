@@ -3,24 +3,152 @@ import cors from 'cors'
 import express from 'express'
 import type { NextFunction, Request, Response } from 'express'
 import helmet from 'helmet'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, timingSafeEqual } from 'node:crypto'
+import { copyFileSync, existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
-import { sessionMiddleware, requireRole, requireActiveSubscription } from './auth.js'
+import { sessionMiddleware, requireAuth, requireRole, requireActiveSubscription } from './auth.js'
 import { getDb } from './db.js'
 import { env } from './env.js'
 import { badRequest, handleError, notFound, unauthorized } from './http.js'
 import { migrate } from './migrate.js'
 import { hashPassword, signSession, verifyPassword } from './security.js'
 
-console.log(`[Startup] DATABASE_PATH (Config): ${env.DATABASE_PATH}`)
-console.log(`[Startup] DATABASE_PATH (Resolved): ${path.resolve(env.DATABASE_PATH)}`)
-console.log(`[Startup] NODE_ENV: ${env.NODE_ENV}`)
+if (env.NODE_ENV !== 'production') {
+  console.log(`[Startup] DATABASE_PATH (Config): ${env.DATABASE_PATH}`)
+  console.log(`[Startup] DATABASE_PATH (Resolved): ${path.resolve(env.DATABASE_PATH)}`)
+  console.log(`[Startup] NODE_ENV: ${env.NODE_ENV}`)
+}
 
 migrate()
 const db = getDb()
 
 const app = express()
+
+app.disable('x-powered-by')
+if (env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1)
+}
+
+type RateLimiterOptions = {
+  windowMs: number
+  max: number
+  keyPrefix: string
+  keyFn?: (req: Request) => string
+}
+
+const createRateLimiter = (opts: RateLimiterOptions) => {
+  const hits = new Map<string, { count: number; resetAt: number }>()
+  const prune = (now: number) => {
+    if (hits.size < 15_000) return
+    for (const [k, v] of hits) {
+      if (v.resetAt <= now) hits.delete(k)
+    }
+  }
+  return (req: Request, res: Response, next: NextFunction) => {
+    const now = Date.now()
+    prune(now)
+    const ip = (req.ip || req.socket.remoteAddress || 'unknown').toString()
+    const k = (() => {
+      if (!opts.keyFn) return ip
+      try {
+        const v = String(opts.keyFn(req) ?? '').trim().toLowerCase()
+        return v ? v : ip
+      } catch {
+        return ip
+      }
+    })()
+    const key = `${opts.keyPrefix}:${k}`
+    const v = hits.get(key)
+    if (!v || v.resetAt <= now) {
+      hits.set(key, { count: 1, resetAt: now + opts.windowMs })
+      next()
+      return
+    }
+
+    v.count += 1
+    hits.set(key, v)
+    if (v.count > opts.max) {
+      const retryAfterSec = Math.max(1, Math.ceil((v.resetAt - now) / 1000))
+      res.setHeader('Retry-After', String(retryAfterSec))
+      res.status(429).json({ message: 'Muitas requisições', code: 'RATE_LIMITED' })
+      return
+    }
+    next()
+  }
+}
+
+const requireSameOrigin = (req: Request, res: Response, next: NextFunction) => {
+  const method = (req.method || 'GET').toUpperCase()
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next()
+  const p = req.path || ''
+  if (!p.startsWith('/api/')) return next()
+  if (p.startsWith('/api/webhooks/')) return next()
+  if (env.NODE_ENV !== 'production') return next()
+
+  const source = (req.headers.origin || req.headers.referer || '').toString()
+  if (!source) {
+    res.status(403).json({ message: 'Origem inválida', code: 'ORIGIN_REQUIRED' })
+    return
+  }
+
+  let hostname: string | null = null
+  try {
+    hostname = new URL(source).hostname.toLowerCase()
+  } catch {
+    hostname = null
+  }
+  const reqHost = (req.hostname || '').toLowerCase()
+  if (!hostname || !reqHost || hostname !== reqHost) {
+    res.status(403).json({ message: 'Origem inválida', code: 'ORIGIN_MISMATCH' })
+    return
+  }
+  next()
+}
+
+const safeTimingEqual = (a: string, b: string) => {
+  const aa = Buffer.from(a)
+  const bb = Buffer.from(b)
+  if (aa.length !== bb.length) return false
+  return timingSafeEqual(aa, bb)
+}
+
+const getWebhookSecret = (req: Request) => {
+  const header = (() => {
+    const v = req.headers['x-webhook-secret']
+    if (typeof v === 'string') return v
+    if (Array.isArray(v) && typeof v[0] === 'string') return v[0]
+    return null
+  })()
+  if (header && header.trim()) return header.trim()
+
+  const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : ''
+  if (auth.toLowerCase().startsWith('bearer ')) {
+    const v = auth.slice('bearer '.length).trim()
+    if (v) return v
+  }
+
+  const q = typeof req.query?.secret === 'string' ? req.query.secret : ''
+  if (q && q.trim()) return q.trim()
+
+  return null
+}
+
+const requireWebhookSecret = (secret?: string) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!secret) return next()
+    const provided = getWebhookSecret(req)
+    if (!provided) {
+      res.status(401).json({ message: 'Não autorizado', code: 'WEBHOOK_SECRET_REQUIRED' })
+      return
+    }
+    if (!safeTimingEqual(provided, secret)) {
+      res.status(401).json({ message: 'Não autorizado', code: 'WEBHOOK_SECRET_INVALID' })
+      return
+    }
+    next()
+  }
+}
 
 const isDevHost = (hostname: string) => {
   const host = (hostname ?? '').toLowerCase()
@@ -227,11 +355,97 @@ app.use(
     credentials: true,
   }),
 )
-app.use(helmet())
-app.use(express.json({ limit: '50mb' }))
+app.use(
+  helmet({
+    contentSecurityPolicy:
+      env.NODE_ENV === 'production'
+        ? {
+            useDefaults: true,
+            directives: {
+              "base-uri": ["'self'"],
+              "object-src": ["'none'"],
+              "frame-ancestors": ["'none'"],
+              "img-src": ["'self'", 'data:', 'https:'],
+              "script-src": ["'self'"],
+              "style-src": ["'self'", "'unsafe-inline'"],
+              "connect-src": ["'self'", 'https:'],
+              "font-src": ["'self'", 'data:', 'https:'],
+            },
+          }
+        : false,
+    crossOriginEmbedderPolicy: false,
+    hsts: env.NODE_ENV === 'production' ? { maxAge: 15552000, includeSubDomains: true, preload: true } : false,
+    referrerPolicy: { policy: 'no-referrer' },
+  }),
+)
+
+const jsonSmall = express.json({ limit: '2mb' })
+const jsonLarge = express.json({ limit: '50mb' })
+app.use((req, res, next) => {
+  if (req.path === '/api/dev/backup/import') return jsonLarge(req, res, next)
+  return jsonSmall(req, res, next)
+})
+
+app.use(express.urlencoded({ extended: false, limit: '64kb' }))
 app.use(cookieParser())
 app.use(resolveTenantFromSubdomain)
 app.use(sessionMiddleware)
+app.use(requireSameOrigin)
+
+app.use((req, res, next) => {
+  if ((req.path || '').startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store')
+  }
+  next()
+})
+
+const apiLimiter = createRateLimiter({ windowMs: 60_000, max: 600, keyPrefix: 'api' })
+app.use('/api', (req, res, next) => {
+  if ((req.path || '').startsWith('/webhooks/')) return next()
+  apiLimiter(req, res, next)
+})
+
+const webhooksLimiter = createRateLimiter({ windowMs: 60_000, max: 120, keyPrefix: 'webhooks' })
+app.use('/api/webhooks', (req, res, next) => {
+  webhooksLimiter(req, res, next)
+})
+
+const authLoginLimiter = createRateLimiter({ windowMs: 60_000, max: 12, keyPrefix: 'auth:login' })
+const authRegisterLimiter = createRateLimiter({ windowMs: 60_000, max: 6, keyPrefix: 'auth:register' })
+const authFastLoginLimiter = createRateLimiter({ windowMs: 60_000, max: 10, keyPrefix: 'auth:fast' })
+const authLoginUserLimiter = createRateLimiter({
+  windowMs: 15 * 60_000,
+  max: 20,
+  keyPrefix: 'auth:login:user',
+  keyFn: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email : ''
+    const v = email.trim().toLowerCase()
+    return v && v.includes('@') ? v : ''
+  },
+})
+const authRegisterUserLimiter = createRateLimiter({
+  windowMs: 15 * 60_000,
+  max: 10,
+  keyPrefix: 'auth:register:user',
+  keyFn: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email : ''
+    const v = email.trim().toLowerCase()
+    return v && v.includes('@') ? v : ''
+  },
+})
+const authFastLoginUserLimiter = createRateLimiter({
+  windowMs: 15 * 60_000,
+  max: 25,
+  keyPrefix: 'auth:fast:user',
+  keyFn: (req) => {
+    const phone = typeof req.body?.phone === 'string' ? req.body.phone : ''
+    const clean = phone.replace(/\D/g, '')
+    return clean.length >= 8 ? clean : ''
+  },
+})
+const devBootstrapLimiter = createRateLimiter({ windowMs: 60_000, max: 4, keyPrefix: 'dev:bootstrap' })
+const devBackupExportLimiter = createRateLimiter({ windowMs: 60_000, max: 6, keyPrefix: 'dev:backup:export' })
+const devBackupImportLimiter = createRateLimiter({ windowMs: 60_000, max: 2, keyPrefix: 'dev:backup:import' })
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
@@ -584,7 +798,7 @@ app.get('/api/auth/me', (req, res, next) => {
   }
 })
 
-app.post('/api/auth/login', async (req, res, next) => {
+app.post('/api/auth/login', authLoginLimiter, authLoginUserLimiter, async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -604,13 +818,14 @@ app.post('/api/auth/login', async (req, res, next) => {
           email: string
           passwordHash: string
           role: 'DEV' | 'ADMIN' | 'CLIENT'
+          sessionVersion: number
         }
       | undefined => {
       if (isDev) {
         return db
           .prepare(
             `
-              SELECT id, tenant_id as tenantId, email, password_hash as passwordHash, role
+              SELECT id, tenant_id as tenantId, email, password_hash as passwordHash, role, session_version as sessionVersion
               FROM users
               WHERE email = ?
                 AND tenant_id IS NULL
@@ -624,6 +839,7 @@ app.post('/api/auth/login', async (req, res, next) => {
               email: string
               passwordHash: string
               role: 'DEV' | 'ADMIN' | 'CLIENT'
+              sessionVersion: number
             }
           | undefined
       }
@@ -633,7 +849,7 @@ app.post('/api/auth/login', async (req, res, next) => {
       return db
         .prepare(
           `
-            SELECT id, tenant_id as tenantId, email, password_hash as passwordHash, role
+            SELECT id, tenant_id as tenantId, email, password_hash as passwordHash, role, session_version as sessionVersion
             FROM users
             WHERE email = ?
               AND tenant_id = ?
@@ -647,6 +863,7 @@ app.post('/api/auth/login', async (req, res, next) => {
             email: string
             passwordHash: string
             role: 'DEV' | 'ADMIN' | 'CLIENT'
+            sessionVersion: number
           }
         | undefined
     })()
@@ -663,7 +880,12 @@ app.post('/api/auth/login', async (req, res, next) => {
       throw unauthorized('Use o subdomínio da sua loja para entrar.', 'TENANT_HOST_MISMATCH')
     }
 
-    const token = signSession({ sub: row.id, role: row.role, tenantId: row.tenantId ?? null })
+    const token = signSession({
+      sub: row.id,
+      role: row.role,
+      tenantId: row.tenantId ?? null,
+      sessionVersion: row.sessionVersion,
+    })
     res.cookie('session', token, {
       httpOnly: true,
       sameSite: 'lax',
@@ -696,11 +918,24 @@ app.post('/api/auth/login', async (req, res, next) => {
 })
 
 app.post('/api/auth/logout', (_req, res) => {
-  res.clearCookie('session', { path: '/' })
+  res.clearCookie('session', { path: '/', sameSite: 'lax', secure: env.NODE_ENV === 'production' })
   res.json({ ok: true })
 })
 
-app.post('/api/auth/register-client', async (req, res, next) => {
+app.post('/api/auth/logout-all', requireAuth, (req, res, next) => {
+  try {
+    const sessionUser = req.sessionUser
+    if (!sessionUser) return next(unauthorized())
+
+    db.prepare('UPDATE users SET session_version = session_version + 1 WHERE id = ?').run(sessionUser.id)
+    res.clearCookie('session', { path: '/', sameSite: 'lax', secure: env.NODE_ENV === 'production' })
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/auth/register-client', authRegisterLimiter, authRegisterUserLimiter, async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -745,7 +980,7 @@ app.post('/api/auth/register-client', async (req, res, next) => {
 
     tx()
 
-    const token = signSession({ sub: userId, role: 'CLIENT', tenantId: tenant.id })
+    const token = signSession({ sub: userId, role: 'CLIENT', tenantId: tenant.id, sessionVersion: 0 })
     res.cookie('session', token, {
       httpOnly: true,
       sameSite: 'lax',
@@ -768,7 +1003,7 @@ app.post('/api/auth/register-client', async (req, res, next) => {
   }
 })
 
-app.post('/api/auth/client-fast-login', async (req, res, next) => {
+app.post('/api/auth/client-fast-login', authFastLoginLimiter, authFastLoginUserLimiter, async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -794,9 +1029,11 @@ app.post('/api/auth/client-fast-login', async (req, res, next) => {
     const dummyEmail = `${cleanPhone}@${tenant.slug}.client`
 
     const existingUser = db
-      .prepare('SELECT id, password_hash, role FROM users WHERE email = ? AND tenant_id = ? LIMIT 1')
+      .prepare(
+        'SELECT id, password_hash, role, session_version as sessionVersion FROM users WHERE email = ? AND tenant_id = ? LIMIT 1',
+      )
       .get(dummyEmail, tenant.id) as
-      | { id: string; password_hash: string; role: string }
+      | { id: string; password_hash: string; role: string; sessionVersion: number }
       | undefined
 
     let userId = existingUser?.id
@@ -839,13 +1076,18 @@ app.post('/api/auth/client-fast-login', async (req, res, next) => {
 
     if (!userId) throw new Error('Falha ao autenticar usuário')
 
-    const token = signSession({ sub: userId, role: 'CLIENT', tenantId: tenant.id })
+    const token = signSession({
+      sub: userId,
+      role: 'CLIENT',
+      tenantId: tenant.id,
+      sessionVersion: existingUser?.sessionVersion ?? 0,
+    })
     res.cookie('session', token, {
       httpOnly: true,
       sameSite: 'lax',
       secure: env.NODE_ENV === 'production',
       path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 30 * 12, // 1 year for convenience
+      maxAge: 1000 * 60 * 60 * 24 * 30,
     })
 
     res.json({
@@ -863,7 +1105,7 @@ app.post('/api/auth/client-fast-login', async (req, res, next) => {
   }
 })
 
-app.post('/api/dev/bootstrap', requireDevHost, async (req, res, next) => {
+app.post('/api/dev/bootstrap', requireDevHost, devBootstrapLimiter, async (req, res, next) => {
   try {
     const allowDevBootstrap =
       (db.prepare(`SELECT COUNT(1) as n FROM users WHERE role = 'DEV'`).get() as { n: number })
@@ -1276,11 +1518,15 @@ app.delete('/api/dev/tenants/:tenantId', requireDevHost, requireRole('DEV'), (re
     const tx = db.transaction(() => {
         // Explicitly delete appointments first because of ON DELETE RESTRICT constraints
         db.prepare('DELETE FROM appointments WHERE tenant_id = ?').run(tenantId)
-        console.log(`[DeleteTenant] Deleted appointments for tenant ${tenantId}`)
+        if (env.NODE_ENV !== 'production') {
+            console.log(`[DeleteTenant] Deleted appointments for tenant ${tenantId}`)
+        }
         
         // Now delete the tenant - CASCADE will handle other tables
         db.prepare('DELETE FROM tenants WHERE id = ?').run(tenantId)
-        console.log(`[DeleteTenant] Deleted tenant ${tenantId}`)
+        if (env.NODE_ENV !== 'production') {
+            console.log(`[DeleteTenant] Deleted tenant ${tenantId}`)
+        }
     })
     
     tx()
@@ -1356,23 +1602,42 @@ app.get('/api/dev/notifications', requireDevHost, requireRole('DEV'), (req, res,
       LIMIT ?
     `).all(limit) as Array<{ id: string; eventType: string; payload: string; receivedAt: string }>
 
-    const notifications = events.map(e => {
-      let data: any = {}
-      try {
-        data = JSON.parse(e.payload)
-      } catch {
-        data = {}
+    const notifications = events.map((e) => {
+      const data: Record<string, unknown> = (() => {
+        try {
+          const parsed: unknown = JSON.parse(e.payload)
+          if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
+          return {}
+        } catch {
+          return {}
+        }
+      })()
+
+      const customerRaw = data.customer
+      const customer =
+        customerRaw && typeof customerRaw === 'object' ? (customerRaw as Record<string, unknown>) : null
+      const firstName = customer && typeof customer.firstname === 'string' ? customer.firstname : ''
+      const lastName = customer && typeof customer.lastname === 'string' ? customer.lastname : ''
+      const customerName = firstName ? `${firstName} ${lastName}`.trim() : 'Cliente'
+
+      const totalRaw = data.total
+      let totalNumber: number | null = null
+      if (typeof totalRaw === 'number' && Number.isFinite(totalRaw)) totalNumber = totalRaw
+      if (typeof totalRaw === 'string') {
+        const n = Number(totalRaw)
+        if (Number.isFinite(n)) totalNumber = n
       }
-      
-      const customerName = data.customer?.firstname ? `${data.customer.firstname} ${data.customer.lastname || ''}` : 'Cliente'
-      const total = data.total ? (Number(data.total) / 100).toFixed(2) : '0.00'
+      const total = totalNumber !== null ? (totalNumber / 100).toFixed(2) : '0.00'
 
       return {
         id: e.id,
-        title: e.eventType === 'payment_approved' || e.eventType === 'PaymentApproved' ? 'Pagamento Aprovado' : 'Novo Pedido',
+        title:
+          e.eventType === 'payment_approved' || e.eventType === 'PaymentApproved'
+            ? 'Pagamento Aprovado'
+            : 'Novo Pedido',
         desc: `${customerName} - R$ ${total}`,
         time: e.receivedAt,
-        type: e.eventType
+        type: e.eventType,
       }
     })
 
@@ -1382,12 +1647,13 @@ app.get('/api/dev/notifications', requireDevHost, requireRole('DEV'), (req, res,
   }
 })
 
-app.get('/api/dev/backup/export', requireDevHost, requireRole('DEV'), (req, res, next) => {
+app.get('/api/dev/backup/export', requireDevHost, devBackupExportLimiter, requireRole('DEV'), (req, res, next) => {
   try {
     const dbPath = path.resolve(env.DATABASE_PATH)
     res.download(dbPath, 'lash-saas-backup.db', (err) => {
         if (err) {
-            console.error('Download error:', err)
+            const msg = err instanceof Error ? err.message : String(err)
+            console.error('Download error:', msg)
             if (!res.headersSent) {
                 res.status(500).send('Erro ao exportar banco de dados')
             }
@@ -1398,7 +1664,7 @@ app.get('/api/dev/backup/export', requireDevHost, requireRole('DEV'), (req, res,
   }
 })
 
-app.post('/api/dev/backup/import', requireDevHost, requireRole('DEV'), (req, res, next) => {
+app.post('/api/dev/backup/import', requireDevHost, devBackupImportLimiter, requireRole('DEV'), (req, res, next) => {
   try {
     const body = z.object({
         fileData: z.string().min(1) // base64
@@ -1409,14 +1675,13 @@ app.post('/api/dev/backup/import', requireDevHost, requireRole('DEV'), (req, res
     
     // Backup current
     try {
-        const fs = require('node:fs')
-        if (fs.existsSync(dbPath)) {
-            fs.copyFileSync(dbPath, backupPath)
+        if (existsSync(dbPath)) {
+            copyFileSync(dbPath, backupPath)
         }
         
         // Write new
         const buffer = Buffer.from(body.fileData, 'base64')
-        fs.writeFileSync(dbPath, buffer)
+        writeFileSync(dbPath, buffer)
         
         // Re-open DB connection (optional, but good practice if better-sqlite3 caches handles)
         // Since we are using a singleton getDb(), we might need to restart the process to be 100% safe,
@@ -1426,18 +1691,21 @@ app.post('/api/dev/backup/import', requireDevHost, requireRole('DEV'), (req, res
         // For this simple implementation, we will just write. If it fails, we have the backup.
         // Ideally, user should restart the server after import.
         
-        console.log('[Backup] Database imported successfully')
+        if (env.NODE_ENV !== 'production') {
+            console.log('[Backup] Database imported successfully')
+        }
         res.json({ ok: true, message: 'Banco de dados importado. Reinicie o servidor se notar anomalias.' })
     } catch (e) {
-        console.error('[Backup] Import failed:', e)
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error('[Backup] Import failed:', msg)
         // Try restore
         try {
-            const fs = require('node:fs')
-            if (fs.existsSync(backupPath)) {
-                fs.copyFileSync(backupPath, dbPath)
+            if (existsSync(backupPath)) {
+                copyFileSync(backupPath, dbPath)
             }
         } catch (restoreErr) {
-            console.error('[Backup] Restore failed:', restoreErr)
+            const msg2 = restoreErr instanceof Error ? restoreErr.message : String(restoreErr)
+            console.error('[Backup] Restore failed:', msg2)
         }
         throw badRequest('Falha ao importar banco de dados')
     }
@@ -1446,7 +1714,7 @@ app.post('/api/dev/backup/import', requireDevHost, requireRole('DEV'), (req, res
   }
 })
 
-app.post('/api/webhooks/appmax', async (req, res, next) => {
+app.post('/api/webhooks/appmax', requireWebhookSecret(env.APPMAX_WEBHOOK_SECRET), async (req, res, next) => {
   try {
     const body = req.body
     const event = body.event || body.type || 'unknown'
@@ -1479,7 +1747,9 @@ app.post('/api/webhooks/appmax', async (req, res, next) => {
             } else {
                 db.prepare(`INSERT INTO appmax_subscriptions (id, tenant_id, status, created_at, updated_at) VALUES (?, ?, 'ACTIVE', ?, ?)`).run(subId, user.tenant_id, now, now)
             }
-            console.log(`[Appmax] Subscription activated for tenant ${user.tenant_id} via email ${customerEmail}`)
+            if (env.NODE_ENV !== 'production') {
+                console.log('[Appmax] Subscription activated')
+            }
         }
       }
     }
@@ -1540,10 +1810,8 @@ app.get('/api/admin/subscription/checkout-url', requireRole('ADMIN'), (req, res,
 // Middleware for admin routes - Check Subscription
 app.use('/api/admin', requireActiveSubscription)
 
-app.post('/api/webhooks/evolution', async (req, res, next) => {
+app.post('/api/webhooks/evolution', requireWebhookSecret(env.EVOLUTION_WEBHOOK_SECRET), async (req, res, next) => {
   try {
-    // Basic evolution webhook handler - just log for now
-    console.log('Evolution Webhook:', req.body)
     res.json({ ok: true })
   } catch (err) {
     next(err)
@@ -2799,7 +3067,7 @@ app.patch('/api/admin/finance/goals', requireRole('ADMIN'), (req, res, next) => 
       .parse(req.body)
 
     const updates: string[] = []
-    const params: any[] = []
+    const params: Array<string | number> = []
 
     if (body.revenueGoalCents !== undefined) {
       updates.push('monthly_revenue_goal_cents = ?')
@@ -3718,7 +3986,7 @@ app.all('/api/*path', (_req, _res, next) => next(notFound()))
 if (env.NODE_ENV === 'production') {
   const clientDir = path.resolve('dist/client')
   app.use(express.static(clientDir))
-  app.get(/^(?!\/api).*$/, (req, res, next) => {
+  app.get(/^(?!\/api).*$/, (req, res) => {
     // Basic catch-all to serve index.html for all non-API routes
     // React Router will handle the routing logic (redirects, etc) on the client side
     res.sendFile(path.join(clientDir, 'index.html'))
