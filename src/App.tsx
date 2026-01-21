@@ -4252,9 +4252,26 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
 
   if (authLoading) {
       return (
-          <div className="authContainer">
-              <div className="text-center">Carregando painel...</div>
+        <Shell
+          title="Visão Geral"
+          subtitle="Gestão do Espaço"
+          user={me}
+          isTestMode={isTestMode}
+          sidebar={
+            <div className="nav-group">
+              <div className="nav-label">Principal</div>
+              <SidebarItem active icon={<LayoutDashboard size={18}/>} label="Dashboard" onClick={() => {}} />
+              <SidebarItem icon={<Calendar size={18}/>} label="Agenda" onClick={() => {}} />
+              <SidebarItem icon={<Users size={18}/>} label="Clientes" onClick={() => {}} />
+            </div>
+          }
+        >
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16}}>
+            <div className="card skeleton-card skeleton" style={{height: 140}} />
+            <div className="card skeleton-card skeleton" style={{height: 140}} />
+            <div className="card skeleton-card skeleton" style={{height: 140}} />
           </div>
+        </Shell>
       )
   }
 
@@ -5210,41 +5227,7 @@ function Dev() {
         }
     }
 
-    if (!me) return (
-        <div className="app-shell">
-            <aside className="app-sidebar">
-                <div className="sidebar-logo">
-                    <div className="logo-icon">
-                        <Sparkles size={18} />
-                    </div>
-                    <span>Lash Space</span>
-                </div>
-            </aside>
-            <main className="app-main">
-                <header className="app-header">
-                    <div className="header-left">
-                        <div className="header-title">Developer Console</div>
-                        <div className="header-subtitle">Preparando ambiente</div>
-                    </div>
-                </header>
-                <div className="app-content" style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                    <div className="card" style={{padding: 24, borderRadius: 16, maxWidth: 320, width: '100%', textAlign: 'center'}}>
-                        <div style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: '999px',
-                            margin: '0 auto 12px',
-                            border: '3px solid var(--primary-200)',
-                            borderTopColor: 'var(--primary-600)',
-                            animation: 'spin 0.8s linear infinite'
-                        }} />
-                        <div style={{fontWeight: 600, fontSize: '0.95rem', marginBottom: 4}}>Carregando console</div>
-                        <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>Buscando suas permissões e espaços cadastrados...</div>
-                    </div>
-                </div>
-            </main>
-        </div>
-    )
+    const loadingDev = !me
 
     return (
         <Shell
@@ -5374,7 +5357,12 @@ function Dev() {
                             </button>
                         </div>
                         
-                        {loading ? <div style={{padding: 20}}>Carregando...</div> : (
+                        {loadingDev || loading ? (
+                            <div style={{display: 'flex', flexDirection: 'column', gap: 12}}>
+                                <div className="skeleton skeleton-text" style={{width: '40%', height: 12}} />
+                                <div className="skeleton skeleton-card" style={{height: 220}} />
+                            </div>
+                        ) : (
                             <>
                             <div className="table-scroll desktop-only">
                                 <table className="data-table">

@@ -4060,10 +4060,30 @@ textarea.input {
   justify-content: center;
   font-size: 1.1rem;
 }
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, var(--gray-100), var(--gray-200), var(--gray-100));
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
+}
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.skeleton-pill {
+  border-radius: 999px;
+}
+
+.skeleton-text {
+  border-radius: 999px;
+  height: 0.8rem;
+}
+
+.skeleton-card {
+  border-radius: var(--radius-lg);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 .finance-filter-btn {
