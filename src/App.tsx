@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from './api'
 import type { SessionUser, TenantDev, TenantPublic, CalendarEvent } from './types'
 import { applyTenantTheme, getDevTheme, initDevTheme, setAppMode, toggleDevTheme, type DevThemeMode, getDevPrimaryColor, setDevPrimaryColor } from './theme'
@@ -47,8 +48,108 @@ import {
   CreditCard,
   MessageSquare,
   Lock,
-  Database
+  Database,
+  Download,
+  FileText,
+  Filter
 } from 'lucide-react'
+
+function PortalMenu({ 
+    trigger, 
+    children 
+}: { 
+    trigger: (isOpen: boolean) => ReactNode, 
+    children: (close: () => void) => ReactNode 
+}) {
+    const [isOpen, setIsOpen] = useState(false)
+    const triggerRef = useRef<HTMLDivElement>(null)
+    const menuRef = useRef<HTMLDivElement>(null)
+    const [pos, setPos] = useState({ top: 0, left: 0 })
+
+    const toggle = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!isOpen) {
+            const rect = triggerRef.current?.getBoundingClientRect()
+            if (rect) {
+                setPos({ 
+                    top: rect.bottom + window.scrollY + 4, 
+                    left: rect.right + window.scrollX 
+                })
+            }
+            setIsOpen(true)
+        } else {
+            setIsOpen(false)
+        }
+    }
+
+    useEffect(() => {
+        if (!isOpen) return
+        
+        function handleClickOutside(event: MouseEvent) {
+            // If click is inside menu, don't close (unless specific action closes it)
+            if (menuRef.current && menuRef.current.contains(event.target as Node)) {
+                return
+            }
+            // If click is inside trigger, it's handled by toggle (stopPropagation there helps, but 
+            // since we use document listener, it fires before React onClick if we use capture? 
+            // No, React events are delegated. Native document listener fires first? 
+            // Actually standard document listener fires after bubbling.
+            // So: Click Trigger -> Trigger onClick (stops prop) -> Document listener NOT fired?
+            // If we stop prop in React onClick, it stops bubbling to document React listeners, 
+            // but native document listeners might still fire if not handled correctly.
+            // Let's keep it simple: Just check if target is trigger.
+            if (triggerRef.current && triggerRef.current.contains(event.target as Node)) {
+                return
+            }
+            setIsOpen(false)
+        }
+        
+        function updatePos() {
+             const rect = triggerRef.current?.getBoundingClientRect()
+             if (rect) {
+                 setPos({ 
+                     top: rect.bottom + window.scrollY + 4, 
+                     left: rect.right + window.scrollX 
+                 })
+             } else {
+                 setIsOpen(false)
+             }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        window.addEventListener('resize', updatePos)
+        window.addEventListener('scroll', updatePos, true)
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+            window.removeEventListener('resize', updatePos)
+            window.removeEventListener('scroll', updatePos, true)
+        }
+    }, [isOpen])
+
+    return (
+        <>
+            <div ref={triggerRef} onClick={toggle} style={{display: 'inline-block', cursor: 'pointer'}}>
+                {trigger(isOpen)}
+            </div>
+            {isOpen && createPortal(
+                <div 
+                    ref={menuRef}
+                    onClick={e => e.stopPropagation()}
+                    className="portal-menu-content"
+                    style={{
+                        top: pos.top,
+                        left: pos.left,
+                        transform: 'translateX(-100%)'
+                    }}
+                >
+                    {children(() => setIsOpen(false))}
+                </div>,
+                document.body
+            )}
+        </>
+    )
+}
 
 function withBasePath(basePath: string, path: string) {
   const p = path.startsWith('/') ? path : `/${path}`
@@ -119,7 +220,13 @@ type AdminFinanceData = {
     expensesCents: number
     profitCents: number
   }
-  lastExpenses: Array<{ id: string; amountCents: number; method: string; note: string | null; createdAt: string }>
+  goals: {
+    revenueCents: number
+    newClients: number
+    currentRevenueCents: number
+    currentNewClients: number
+  }
+  lastCashTransactions: Array<{ id: string; type: 'INCOME' | 'EXPENSE'; amountCents: number; method: string; note: string | null; createdAt: string }>
   lastEntries: Array<{ id: string; startsAt: string; status: string; serviceName: string; priceCents: number; clientEmail: string; clientName: string | null }>
   monthly: Array<{ ym: string; entriesCents: number; expensesCents: number }>
 }
@@ -569,10 +676,10 @@ function Shell(props: {
               <Menu size={20} />
             </button>
             <div style={{display: 'flex', flexDirection: 'column'}}>
-              <div style={{display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, letterSpacing: '0.02em', textTransform: 'uppercase'}}>
-                <span>Lash Space</span>
-                <ChevronRight size={12}/>
-                <span style={{color: 'var(--primary-600)'}}>{props.title}</span>
+              <div className="header-breadcrumb">
+                <span className="breadcrumb-root">Lash Space</span>
+                <ChevronRight size={12} className="breadcrumb-separator"/>
+                <span className="breadcrumb-current">{props.title}</span>
               </div>
             </div>
           </div>
@@ -651,19 +758,7 @@ function Shell(props: {
 // --- Admin Components ---
 
 function AdminDashboard({ me, stats, onRefresh }: { me: SessionUser | null; stats: AdminStats | null; onRefresh?: () => void }) {
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
   const [updating, setUpdating] = useState(false)
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpenId(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   async function handleStatusChange(id: string, status: string) {
     if (updating) return
@@ -673,7 +768,6 @@ function AdminDashboard({ me, stats, onRefresh }: { me: SessionUser | null; stat
       body: JSON.stringify({ status })
     })
     setUpdating(false)
-    setMenuOpenId(null)
     if (onRefresh) onRefresh()
   }
 
@@ -866,55 +960,34 @@ function AdminDashboard({ me, stats, onRefresh }: { me: SessionUser | null; stat
                     <td>{appt.time}</td>
                     <td><span className={`status-badge ${appt.statusClass}`}>{appt.status}</span></td>
                     <td>
-                        <div style={{position: 'relative'}}>
-                            <button 
-                                className="icon-btn" 
-                                style={{width: 32, height: 32}}
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    setMenuOpenId(menuOpenId === appt.id ? null : appt.id)
-                                }}
-                            >
-                                <MoreHorizontal size={16}/>
-                            </button>
-                            {menuOpenId === appt.id && (
-                                <div 
-                                    ref={menuRef}
-                                    style={{
-                                        position: 'absolute',
-                                        right: 0,
-                                        top: '100%',
-                                        marginTop: 4,
-                                        background: 'white',
-                                        border: '1px solid var(--gray-200)',
-                                        borderRadius: 8,
-                                        boxShadow: 'var(--shadow-lg)',
-                                        zIndex: 10,
-                                        minWidth: 160,
-                                        padding: 4
-                                    }}
-                                >
+                        <PortalMenu
+                            trigger={(isOpen) => (
+                                <button className="icon-btn" style={{width: 32, height: 32, background: isOpen ? 'var(--gray-100)' : 'transparent', border: 'none'}}>
+                                    <MoreHorizontal size={16}/>
+                                </button>
+                            )}
+                        >
+                            {(close) => (
+                                <>
                                     {appt.rawStatus !== 'CONFIRMED' && (
                                         <button 
-                                            className="btn btn-ghost" 
-                                            onClick={() => handleStatusChange(appt.id, 'CONFIRMED')}
-                                            style={{width: '100%', justifyContent: 'flex-start', fontSize: '0.85rem', gap: 8}}
+                                            className="btn-menu-item" 
+                                            onClick={() => { handleStatusChange(appt.id, 'CONFIRMED'); close() }}
                                         >
-                                            <Check size={14} color="var(--success)" /> Confirmar
+                                            <Check size={16} color="var(--success)" /> Confirmar
                                         </button>
                                     )}
                                     {appt.rawStatus !== 'CANCELLED' && (
                                         <button 
-                                            className="btn btn-ghost" 
-                                            onClick={() => handleStatusChange(appt.id, 'CANCELLED')}
-                                            style={{width: '100%', justifyContent: 'flex-start', fontSize: '0.85rem', gap: 8, color: 'var(--danger)'}}
+                                            className="btn-menu-item danger" 
+                                            onClick={() => { handleStatusChange(appt.id, 'CANCELLED'); close() }}
                                         >
-                                            <XCircle size={14} /> Cancelar
+                                            <XCircle size={16} /> Cancelar
                                         </button>
                                     )}
-                                </div>
+                                </>
                             )}
-                        </div>
+                        </PortalMenu>
                     </td>
                     </tr>
                 ))}
@@ -934,53 +1007,34 @@ function AdminDashboard({ me, stats, onRefresh }: { me: SessionUser | null; stat
                                 <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>{appt.service}</div>
                             </div>
                         </div>
-                        <button 
-                            className="icon-btn" 
-                            style={{width: 32, height: 32}}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                setMenuOpenId(menuOpenId === appt.id ? null : appt.id)
-                            }}
+                        <PortalMenu
+                            trigger={(isOpen) => (
+                                <button className="icon-btn" style={{width: 32, height: 32, background: isOpen ? 'var(--gray-100)' : 'transparent', border: 'none'}}>
+                                    <MoreHorizontal size={16}/>
+                                </button>
+                            )}
                         >
-                            <MoreHorizontal size={16}/>
-                        </button>
-                        {menuOpenId === appt.id && (
-                            <div 
-                                ref={menuRef}
-                                style={{
-                                    position: 'absolute',
-                                    right: 16,
-                                    top: 48,
-                                    marginTop: 0,
-                                    background: 'white',
-                                    border: '1px solid var(--gray-200)',
-                                    borderRadius: 8,
-                                    boxShadow: 'var(--shadow-lg)',
-                                    zIndex: 10,
-                                    minWidth: 160,
-                                    padding: 4
-                                }}
-                            >
-                                {appt.rawStatus !== 'CONFIRMED' && (
-                                    <button 
-                                        className="btn btn-ghost" 
-                                        onClick={() => handleStatusChange(appt.id, 'CONFIRMED')}
-                                        style={{width: '100%', justifyContent: 'flex-start', fontSize: '0.85rem', gap: 8}}
-                                    >
-                                        <Check size={14} color="var(--success)" /> Confirmar
-                                    </button>
-                                )}
-                                {appt.rawStatus !== 'CANCELLED' && (
-                                    <button 
-                                        className="btn btn-ghost" 
-                                        onClick={() => handleStatusChange(appt.id, 'CANCELLED')}
-                                        style={{width: '100%', justifyContent: 'flex-start', fontSize: '0.85rem', gap: 8, color: 'var(--danger)'}}
-                                    >
-                                        <XCircle size={14} /> Cancelar
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                            {(close) => (
+                                <>
+                                    {appt.rawStatus !== 'CONFIRMED' && (
+                                        <button 
+                                            className="btn-menu-item" 
+                                            onClick={() => { handleStatusChange(appt.id, 'CONFIRMED'); close() }}
+                                        >
+                                            <Check size={16} color="var(--success)" /> Confirmar
+                                        </button>
+                                    )}
+                                    {appt.rawStatus !== 'CANCELLED' && (
+                                        <button 
+                                            className="btn-menu-item danger" 
+                                            onClick={() => { handleStatusChange(appt.id, 'CANCELLED'); close() }}
+                                        >
+                                            <XCircle size={16} /> Cancelar
+                                        </button>
+                                    )}
+                                </>
+                            )}
+                        </PortalMenu>
                     </div>
                     <div className="mobile-appointment-row">
                         <div style={{display: 'flex', alignItems: 'center', gap: 6, color: 'var(--gray-600)', fontWeight: 500}}>
@@ -1871,15 +1925,37 @@ function AdminCalendar() {
         return { startsLocal: `${y}-${m}-${d}T09:00`, endsLocal: `${y}-${m}-${d}T18:00`, reason: '' }
     })
     
+    // Responsive Days Logic
+    const [daysToShow, setDaysToShow] = useState(7)
+    
+    useEffect(() => {
+        const handleResize = () => {
+            const w = window.innerWidth
+            if (w < 640) setDaysToShow(1)
+            else if (w < 1024) setDaysToShow(3)
+            else setDaysToShow(7)
+        }
+        handleResize() // init
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
     // Helpers for Date Manipulation
     const getWeekDays = (date: Date) => {
         const start = new Date(date)
-        const day = start.getDay()
-        const diff = start.getDate() - day + (day === 0 ? -6 : 1) // Adjust when day is Sunday
-        start.setDate(diff)
+        
+        if (daysToShow === 7) {
+            // Standard week view (Sunday to Saturday)
+            const day = start.getDay()
+            const diff = start.getDate() - day
+            start.setDate(diff)
+        } else {
+            // Rolling view (starts from current date)
+            // No adjustment needed, start from 'date'
+        }
         start.setHours(0,0,0,0)
         
-        return Array.from({ length: 7 }, (_, i) => {
+        return Array.from({ length: daysToShow }, (_, i) => {
             const d = new Date(start)
             d.setDate(start.getDate() + i)
             return d
@@ -1906,7 +1982,7 @@ function AdminCalendar() {
         })
     }
 
-    const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate])
+    const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate, daysToShow])
     const monthDays = useMemo(() => getMonthDays(currentDate), [currentDate])
 
     useEffect(() => {
@@ -2190,14 +2266,14 @@ function AdminCalendar() {
     
     const nextPeriod = () => {
         const d = new Date(currentDate)
-        if (view === 'week') d.setDate(d.getDate() + 7)
+        if (view === 'week') d.setDate(d.getDate() + daysToShow)
         else d.setMonth(d.getMonth() + 1)
         setCurrentDate(d)
     }
 
     const prevPeriod = () => {
         const d = new Date(currentDate)
-        if (view === 'week') d.setDate(d.getDate() - 7)
+        if (view === 'week') d.setDate(d.getDate() - daysToShow)
         else d.setMonth(d.getMonth() - 1)
         setCurrentDate(d)
     }
@@ -2268,7 +2344,7 @@ function AdminCalendar() {
     async function fetchEvents() {
         setLoading(true)
         const rangeStart = view === 'week' ? weekDays[0] : monthDays[0]
-        const rangeEnd = view === 'week' ? weekDays[6] : monthDays[monthDays.length - 1]
+        const rangeEnd = view === 'week' ? weekDays[weekDays.length - 1] : monthDays[monthDays.length - 1]
 
         const start = new Date(rangeStart)
         start.setHours(0, 0, 0, 0)
@@ -2328,7 +2404,8 @@ function AdminCalendar() {
 
     const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
     const weekDayNames = weekdayNamesShort
-    const hours = Array.from({ length: 11 }, (_, i) => i + 8) // 8:00 to 18:00
+    // Hours from 08:00 to 23:00 (16 hours total) to fill the screen better
+    const hours = Array.from({ length: 16 }, (_, i) => i + 8) 
 
     return (
         <div className="agenda-layout animate-entry">
@@ -2389,10 +2466,10 @@ function AdminCalendar() {
 
                     <div className="calendar-grid-wrapper" style={{opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s', flexDirection: view === 'month' ? 'column' : 'row', overflow: view === 'week' ? 'auto' : 'hidden'}}>
                         {view === 'week' ? (
-                            <div style={{ flex: 1, minWidth: 'fit-content' }}>
+                            <div style={{ flex: 1, minWidth: daysToShow > 3 ? 'fit-content' : '100%' }}>
                                 {/* Sticky Header Row */}
-                                <div className="calendar-days-header" style={{ position: 'sticky', top: 0, zIndex: 30, width: '100%', minWidth: 'fit-content' }}>
-                                    <div className="calendar-header-cell empty" style={{ flex: '0 0 70px', width: 70, minWidth: 70, position: 'sticky', left: 0, zIndex: 40, background: 'white', borderRight: '1px solid var(--gray-100)' }}></div>
+                                <div className="calendar-days-header" style={{ position: 'sticky', top: 0, zIndex: 30, width: '100%', minWidth: daysToShow > 3 ? 'fit-content' : '100%' }}>
+                                    <div className="calendar-header-cell empty" style={{ position: 'sticky', left: 0, zIndex: 40, background: 'white', borderRight: '1px solid var(--gray-100)' }}></div>
                                     {weekDays.map((date) => {
                                         const isToday = new Date().toDateString() === date.toDateString()
                                         return (
@@ -2405,9 +2482,9 @@ function AdminCalendar() {
                                 </div>
                                 
                                 {/* Body Row */}
-                                <div style={{ display: 'flex', minWidth: 'fit-content' }}>
+                                <div style={{ display: 'flex', minWidth: daysToShow > 3 ? 'fit-content' : '100%' }}>
                                     {/* Sticky Time Column */}
-                                    <div className="calendar-time-column" style={{ position: 'sticky', left: 0, zIndex: 20, background: 'white', borderRight: '1px solid var(--gray-100)', width: 70, minWidth: 70 }}>
+                                    <div className="calendar-time-column" style={{ position: 'sticky', left: 0, zIndex: 20, background: 'white', borderRight: '1px solid var(--gray-100)' }}>
                                         {hours.map(h => (
                                             <div key={h} className="calendar-time-slot">
                                                 {h}:00
@@ -3798,22 +3875,24 @@ function AdminFinance() {
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all')
     const [finance, setFinance] = useState<AdminFinanceData | null>(null)
+    const [showTransactionModal, setShowTransactionModal] = useState(false)
+    const [showExtractModal, setShowExtractModal] = useState(false)
+    const [showGoalsModal, setShowGoalsModal] = useState(false)
     const filters = ['all', 'income', 'expense'] as const
 
-    useEffect(() => {
-        let mounted = true
+    const loadData = () => {
         setLoading(true)
         api<AdminFinanceData>('/api/admin/finance').then(res => {
-            if (!mounted) return
             if (res.ok) setFinance(res.data)
             setLoading(false)
         })
-        return () => {
-            mounted = false
-        }
+    }
+
+    useEffect(() => {
+        loadData()
     }, [])
 
-    if (loading) {
+    if (loading && !finance) {
         return (
             <div style={{display: 'flex', justifyContent: 'center', padding: 40}}>
                 <div className="spinner" />
@@ -3854,10 +3933,10 @@ function AdminFinance() {
             dateText: new Date(a.startsAt).toLocaleString('pt-BR'),
             category: 'Serviço'
         })),
-        ...(finance?.lastExpenses ?? []).map(e => ({
-            id: `ex_${e.id}`,
-            title: e.note?.trim() ? e.note.trim() : 'Despesa',
-            type: 'expense' as const,
+        ...(finance?.lastCashTransactions ?? []).map(e => ({
+            id: `cash_${e.id}`,
+            title: e.note?.trim() ? e.note.trim() : (e.type === 'INCOME' ? 'Receita' : 'Despesa'),
+            type: e.type.toLowerCase() as 'income' | 'expense',
             amount: e.amountCents,
             at: e.createdAt,
             dateText: new Date(e.createdAt).toLocaleString('pt-BR'),
@@ -3869,6 +3948,22 @@ function AdminFinance() {
         if (filter === 'all') return true
         return t.type === filter
     })
+
+    const handleDeleteTransaction = async (id: string) => {
+        if (!id.startsWith('cash_')) return
+        if (!confirm('Tem certeza que deseja excluir esta movimentação?')) return
+        
+        const rawId = id.replace('cash_', '')
+        const res = await api<{ ok: true }>(`/api/admin/finance/transactions/${rawId}`, {
+            method: 'DELETE'
+        })
+        
+        if (res.ok) {
+            loadData()
+        } else {
+            alert('Erro ao excluir: ' + (res.error?.message || 'Desconhecido'))
+        }
+    }
 
     return (
         <div className="finance-grid">
@@ -3960,6 +4055,7 @@ function AdminFinance() {
                                     <th>Categoria</th>
                                     <th>Data</th>
                                     <th style={{textAlign: 'right'}}>Valor</th>
+                                    <th style={{width: 40}}></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -3985,6 +4081,18 @@ function AdminFinance() {
                                         }}>
                                             {t.type === 'income' ? '+' : '-'}{formatBRL(t.amount / 100)}
                                         </td>
+                                        <td>
+                                            {t.id.startsWith('cash_') && (
+                                                <button 
+                                                    className="icon-btn" 
+                                                    style={{color: 'var(--gray-400)', width: 32, height: 32, opacity: 0.6}}
+                                                    onClick={() => handleDeleteTransaction(t.id)}
+                                                    title="Excluir movimentação"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -4004,41 +4112,86 @@ function AdminFinance() {
                         {formatBRL(stats.profit / 100)}
                     </div>
                     <div className="grid grid-2" style={{position: 'relative', zIndex: 1}}>
-                        <button className="btn" style={{background: 'white', color: 'var(--primary-600)', border: 'none', fontWeight: 600, height: 48}}>
-                            Sacar
+                        <button 
+                            className="btn" 
+                            style={{background: 'white', color: 'var(--primary-600)', border: 'none', fontWeight: 600, height: 48}}
+                            onClick={() => setShowTransactionModal(true)}
+                        >
+                            Nova Movimentação
                         </button>
-                        <button className="btn" style={{background: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 600, height: 48}}>
+                        <button 
+                            className="btn" 
+                            style={{background: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 600, height: 48}}
+                            onClick={() => setShowExtractModal(true)}
+                        >
                             Extrato
                         </button>
                     </div>
                 </div>
 
                 <div className="card">
-                    <div className="cardHeader">
+                    <div className="cardHeader" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                         <h3 className="cardTitle">Metas do Mês</h3>
+                        <button className="icon-btn" onClick={() => setShowGoalsModal(true)} style={{width: 32, height: 32}}>
+                            <Edit2 size={14} />
+                        </button>
                     </div>
                     <div className="cardBody">
                         <div style={{marginBottom: 20}}>
                             <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8}}>
                                 <span style={{fontWeight: 500, color: 'var(--gray-700)'}}>Faturamento</span>
-                                <span style={{fontWeight: 700, color: 'var(--success)'}}>85%</span>
+                                <span style={{fontWeight: 700, color: 'var(--success)'}}>
+                                    {Math.round((finance?.goals?.currentRevenueCents || 0) / (finance?.goals?.revenueCents || 1) * 100)}%
+                                </span>
                             </div>
                             <div style={{height: 10, background: 'var(--gray-100)', borderRadius: 5, overflow: 'hidden'}}>
-                                <div style={{width: '85%', height: '100%', background: 'var(--success)', borderRadius: 5}} />
+                                <div style={{
+                                    width: `${Math.min(100, (finance?.goals?.currentRevenueCents || 0) / (finance?.goals?.revenueCents || 1) * 100)}%`, 
+                                    height: '100%', 
+                                    background: 'var(--success)', 
+                                    borderRadius: 5,
+                                    transition: 'width 0.5s ease-out'
+                                }} />
+                            </div>
+                            <div style={{marginTop: 4, fontSize: '0.75rem', color: 'var(--gray-500)', textAlign: 'right'}}>
+                                {formatBRL((finance?.goals?.currentRevenueCents || 0) / 100)} / {formatBRL((finance?.goals?.revenueCents || 0) / 100)}
                             </div>
                         </div>
                         <div>
                             <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8}}>
                                 <span style={{fontWeight: 500, color: 'var(--gray-700)'}}>Novos Clientes</span>
-                                <span style={{fontWeight: 700, color: 'var(--primary-600)'}}>60%</span>
+                                <span style={{fontWeight: 700, color: 'var(--primary-600)'}}>
+                                    {Math.round((finance?.goals?.currentNewClients || 0) / (finance?.goals?.newClients || 1) * 100)}%
+                                </span>
                             </div>
                             <div style={{height: 10, background: 'var(--gray-100)', borderRadius: 5, overflow: 'hidden'}}>
-                                <div style={{width: '60%', height: '100%', background: 'var(--primary-500)', borderRadius: 5}} />
+                                <div style={{
+                                    width: `${Math.min(100, (finance?.goals?.currentNewClients || 0) / (finance?.goals?.newClients || 1) * 100)}%`, 
+                                    height: '100%', 
+                                    background: 'var(--primary-500)', 
+                                    borderRadius: 5,
+                                    transition: 'width 0.5s ease-out'
+                                }} />
+                            </div>
+                            <div style={{marginTop: 4, fontSize: '0.75rem', color: 'var(--gray-500)', textAlign: 'right'}}>
+                                {finance?.goals?.currentNewClients || 0} / {finance?.goals?.newClients || 0} clientes
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {showTransactionModal && <NewTransactionModal isOpen={true} onClose={() => setShowTransactionModal(false)} onSuccess={loadData} />}
+            {showExtractModal && <ExtractModal isOpen={true} onClose={() => setShowExtractModal(false)} />}
+            {showGoalsModal && finance?.goals && (
+                <GoalsModal 
+                    isOpen={true} 
+                    onClose={() => setShowGoalsModal(false)} 
+                    onSuccess={loadData}
+                    initialRevenue={finance.goals.revenueCents}
+                    initialNewClients={finance.goals.newClients}
+                />
+            )}
         </div>
     )
 }
@@ -4057,6 +4210,12 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
   const [tab, setTab] = useState<'dashboard' | 'calendar' | 'services' | 'clients' | 'finance' | 'settings' | 'evolution'>('dashboard')
 
   const [stats, setStats] = useState<AdminStats | null>(null)
+
+  function loadStats() {
+    api<AdminStats>('/api/admin/dashboard').then(res => {
+        if(res.ok) setStats(res.data)
+    })
+  }
 
   useEffect(() => {
     setAppMode('admin')
@@ -4084,10 +4243,8 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
         }
         setAuthLoading(false)
     })
-    // Mock stats load
-    api<AdminStats>('/api/admin/dashboard').then(res => {
-        if(res.ok) setStats(res.data)
-    })
+    
+    loadStats()
   }, [])
 
   if (authLoading) {
@@ -4140,7 +4297,7 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
             </div>
         }
     >
-        {tab === 'dashboard' ? <AdminDashboard me={me} stats={stats} /> : null}
+        {tab === 'dashboard' ? <AdminDashboard me={me} stats={stats} onRefresh={loadStats} /> : null}
         
         {tab === 'services' ? <AdminServices /> : null}
 
@@ -4795,23 +4952,59 @@ function DevBackup() {
                     <p className="cardDesc">Exporte e importe o banco de dados completo do sistema.</p>
                 </div>
                 <div className="cardBody">
-                    <div className="grid grid-2" style={{gap: 20}}>
-                        <div style={{padding: 20, background: 'var(--bg-subtle)', borderRadius: 8, border: '1px solid var(--border)'}}>
-                            <h3 style={{fontSize: '1rem', marginTop: 0}}>Exportar Dados</h3>
-                            <p style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>
-                                Baixe uma cópia completa do banco de dados (SQLite) atual.
-                            </p>
-                            <button className="btn btnPrimary" onClick={handleExport} style={{width: '100%'}}>
-                                <Database size={16} style={{marginRight: 8}} />
+                    <div className="grid grid-2 backup-grid" style={{gap: 24}}>
+                        <div style={{
+                            padding: 24, 
+                            background: 'var(--bg-subtle)', 
+                            borderRadius: 16, 
+                            border: '1px solid var(--border)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 16,
+                            justifyContent: 'space-between'
+                        }}>
+                            <div>
+                                <div style={{
+                                    width: 48, height: 48, borderRadius: 12, 
+                                    background: 'var(--primary-100)', color: 'var(--primary-700)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16
+                                }}>
+                                    <Database size={24} />
+                                </div>
+                                <h3 style={{fontSize: '1.1rem', marginTop: 0, marginBottom: 8, fontWeight: 700, color: 'var(--text-main)'}}>Exportar Dados</h3>
+                                <p style={{fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0}}>
+                                    Baixe uma cópia completa do banco de dados (SQLite) atual para segurança.
+                                </p>
+                            </div>
+                            <button className="btn btnPrimary" onClick={handleExport} style={{width: '100%', height: 44}}>
+                                <Database size={18} style={{marginRight: 8}} />
                                 Baixar Backup (.db)
                             </button>
                         </div>
 
-                        <div style={{padding: 20, background: 'var(--bg-subtle)', borderRadius: 8, border: '1px solid var(--border)'}}>
-                            <h3 style={{fontSize: '1rem', marginTop: 0}}>Importar Dados</h3>
-                            <p style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>
-                                Restaure o sistema a partir de um arquivo de backup (.db).
-                            </p>
+                        <div style={{
+                            padding: 24, 
+                            background: 'var(--bg-subtle)', 
+                            borderRadius: 16, 
+                            border: '1px solid var(--border)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 16,
+                            justifyContent: 'space-between'
+                        }}>
+                            <div>
+                                <div style={{
+                                    width: 48, height: 48, borderRadius: 12, 
+                                    background: 'var(--primary-100)', color: 'var(--primary-700)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16
+                                }}>
+                                    <Upload size={24} />
+                                </div>
+                                <h3 style={{fontSize: '1.1rem', marginTop: 0, marginBottom: 8, fontWeight: 700, color: 'var(--text-main)'}}>Importar Dados</h3>
+                                <p style={{fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0}}>
+                                    Restaure o sistema a partir de um arquivo de backup (.db) anterior.
+                                </p>
+                            </div>
                             <input 
                                 type="file" 
                                 accept=".db,.sqlite" 
@@ -4823,18 +5016,19 @@ function DevBackup() {
                                 className="btn" 
                                 onClick={() => fileInputRef.current?.click()} 
                                 disabled={importing}
-                                style={{width: '100%', background: 'white', border: '1px solid var(--border)'}}
+                                style={{width: '100%', height: 44, background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-main)'}}
                             >
-                                <Upload size={16} style={{marginRight: 8}} />
+                                <Upload size={18} style={{marginRight: 8}} />
                                 {importing ? 'Importando...' : 'Carregar Backup'}
                             </button>
                         </div>
                     </div>
                     
-                    <div style={{marginTop: 20, padding: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 8, fontSize: '0.85rem', display: 'flex', gap: 10, alignItems: 'flex-start'}}>
-                        <div style={{marginTop: 2}}><ShieldCheck size={16} /></div>
+                    <div style={{marginTop: 24, padding: 16, background: 'rgba(254, 226, 226, 0.5)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#991b1b', borderRadius: 12, fontSize: '0.9rem', display: 'flex', gap: 12, alignItems: 'flex-start'}}>
+                        <div style={{marginTop: 2}}><ShieldCheck size={20} /></div>
                         <div>
-                            <strong>Atenção:</strong> A importação substitui todo o banco de dados atual. 
+                            <strong style={{display: 'block', marginBottom: 4}}>Atenção</strong>
+                            A importação substitui todo o banco de dados atual. 
                             Certifique-se de ter um backup recente antes de prosseguir.
                             O sistema fará um backup automático de segurança (`.bak`) antes da substituição.
                         </div>
@@ -4924,32 +5118,44 @@ function Dev() {
         const isActive = ['ACTIVE', 'PAID', 'TRIAL', 'TRIALING', 'APPROVED'].some((k) => v.includes(k))
         const isPastDue = ['PAST_DUE', 'OVERDUE', 'LATE'].some((k) => v.includes(k))
         const isInactive = ['CANCELLED', 'CANCELED', 'EXPIRED', 'INACTIVE'].some((k) => v.includes(k))
+        const isTrial = ['TRIAL', 'TRIALING'].some((k) => v.includes(k))
 
         const endIso = (t.subscriptionPeriodEnd ?? '').trim()
         const endDate = endIso ? new Date(endIso) : null
         const endText = endDate && Number.isFinite(endDate.getTime()) ? ` até ${endDate.toLocaleDateString('pt-BR')}` : ''
 
+        if (isTrial) {
+            return {
+                label: `Teste${endText}`,
+                className: 'status-pending',
+                style: { background: '#eff6ff', color: '#1e40af' } as CSSProperties
+            }
+        }
         if (isActive) {
             return {
                 label: `Ativa${endText}`,
-                style: { background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' } as CSSProperties
+                className: 'status-success',
+                style: { background: '#dcfce7', color: '#166534' } as CSSProperties
             }
         }
         if (isPastDue) {
             return {
-                label: `Em atraso${endText}`,
-                style: { background: '#fef9c3', color: '#854d0e', border: '1px solid #fde68a' } as CSSProperties
+                label: `Atrasada`,
+                className: 'status-warning',
+                style: { background: '#fef9c3', color: '#854d0e' } as CSSProperties
             }
         }
         if (isInactive) {
             return {
-                label: `Inativa${endText}`,
-                style: { background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' } as CSSProperties
+                label: `Cancelada`,
+                className: 'status-warning',
+                style: { background: '#fee2e2', color: '#991b1b' } as CSSProperties
             }
         }
         return {
-            label: `${raw}${endText}`,
-            style: { background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border)' } as CSSProperties
+            label: `${raw || 'Sem plano'}`,
+            className: 'status-warning',
+            style: { background: 'var(--bg-subtle)', color: 'var(--text-muted)' } as CSSProperties
         }
     }
 
@@ -4966,6 +5172,7 @@ function Dev() {
             actions={
                 <div style={{display: 'flex', gap: 20, alignItems: 'center', marginRight: 8}}>
                     <label 
+                        className="test-mode-toggle"
                         style={{
                             display: 'flex', 
                             alignItems: 'center', 
@@ -4975,7 +5182,7 @@ function Dev() {
                             transition: 'opacity 0.2s'
                         }}
                     >
-                        <div style={{
+                        <div className="test-mode-label" style={{
                             fontSize: '0.85rem', 
                             fontWeight: 600, 
                             color: testMode ? 'var(--text-main)' : 'var(--text-muted)'
@@ -5050,34 +5257,73 @@ function Dev() {
                     </div>
 
                     <div className="card">
-                        <div className="cardHeader" style={{display: 'flex', justifyContent: 'space-between'}}>
-                            <h2 className="cardTitle">Espaços Cadastrados</h2>
-                            <button className="btn btnPrimary" onClick={() => setShowNew(true)}>
+                        <div className="cardHeader" style={{display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap'}}>
+                            <div className="tenant-header-group">
+                                <h2 className="cardTitle" style={{whiteSpace: 'nowrap'}}>Espaços Cadastrados</h2>
+                                <div className="tenant-controls-mobile-row">
+                                    <div className="search-trigger mobile-only tenant-search-wrapper">
+                                        <Search size={14} />
+                                        <input 
+                                            className="search-input"
+                                            placeholder="Buscar espaço..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            style={{
+                                                border: 'none',
+                                                background: 'transparent',
+                                                outline: 'none',
+                                                fontSize: '0.9rem',
+                                                width: '100%',
+                                                color: 'var(--text-main)',
+                                                padding: 0
+                                            }}
+                                        />
+                                    </div>
+                                    <button className="btn btnPrimary mobile-only icon-btn-primary" onClick={() => setShowNew(true)} style={{padding: 0, width: 36, height: 36, borderRadius: '50%', minWidth: 36, display: 'none'}}>
+                                        <Plus size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                            <button className="btn btnPrimary desktop-only" onClick={() => setShowNew(true)}>
                                 <Plus size={16} style={{marginRight: 8 }}/> Novo Espaço
                             </button>
                         </div>
                         
                         {loading ? <div style={{padding: 20}}>Carregando...</div> : (
-                            <div className="table-scroll">
+                            <>
+                            <div className="table-scroll desktop-only">
                                 <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th>Nome</th>
-                                        <th>URL</th>
-                                        <th>Status</th>
+                                        <th style={{paddingLeft: 24}}>Espaço</th>
+                                        <th>Acesso</th>
                                         <th>Assinatura</th>
-                                        <th>Ações</th>
+                                        <th style={{textAlign: 'right', paddingRight: 24}}>Gerenciar</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredTenants.map(t => (
                                         <tr key={t.id}>
-                                            <td>
-                                                <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
-                                                    <div className="user-avatar-mini" style={{background: 'var(--primary)', color: 'white', fontSize: '0.75rem'}}>
+                                            <td style={{paddingLeft: 24}}>
+                                                <div style={{display: 'flex', alignItems: 'center', gap: 16}}>
+                                                    <div className="user-avatar-mini" style={{
+                                                        background: 'var(--primary-50)', 
+                                                        color: 'var(--primary-600)', 
+                                                        fontWeight: 700,
+                                                        fontSize: '0.9rem',
+                                                        width: 44, 
+                                                        height: 44,
+                                                        borderRadius: '12px',
+                                                        border: '1px solid var(--primary-100)'
+                                                    }}>
                                                         {t.name.substring(0, 2).toUpperCase()}
                                                     </div>
-                                                    <span style={{fontWeight: 600}}>{t.name}</span>
+                                                    <div style={{display: 'flex', flexDirection: 'column'}}>
+                                                        <span style={{fontWeight: 600, color: 'var(--text-main)', fontSize: '0.95rem'}}>{t.name}</span>
+                                                        {t.adminEmail && (
+                                                            <span style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>{t.adminEmail}</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td>
@@ -5091,31 +5337,102 @@ function Dev() {
                                                       return `${protocol}//${t.slug}.${rootHost}${port ? `:${port}` : ''}`
                                                     })()}
                                                     target="_blank"
-                                                    style={{color: 'var(--primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4}}
+                                                    style={{
+                                                        display: 'inline-flex', 
+                                                        alignItems: 'center', 
+                                                        gap: 8, 
+                                                        color: 'var(--text-muted)', 
+                                                        fontSize: '0.85rem', 
+                                                        fontWeight: 500,
+                                                        padding: '6px 12px',
+                                                        background: 'var(--bg-subtle)',
+                                                        borderRadius: '8px',
+                                                        textDecoration: 'none',
+                                                        transition: 'all 0.2s',
+                                                        border: '1px solid transparent'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.color = 'var(--primary-600)'
+                                                        e.currentTarget.style.background = 'var(--primary-50)'
+                                                        e.currentTarget.style.borderColor = 'var(--primary-100)'
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.color = 'var(--text-muted)'
+                                                        e.currentTarget.style.background = 'var(--bg-subtle)'
+                                                        e.currentTarget.style.borderColor = 'transparent'
+                                                    }}
                                                 >
-                                                    {t.slug} <ChevronRight size={12}/>
+                                                    <Globe size={14} />
+                                                    {t.slug}.lashspace.com.br
                                                 </a>
                                             </td>
                                             <td>
                                                 {(() => {
-                                                    const m = statusMeta(t.status)
-                                                    return <span className={`status-badge ${m.className}`}>{m.label}</span>
-                                                })()}
-                                            </td>
-                                            <td>
-                                                {(() => {
                                                     const m = subscriptionMeta(t)
-                                                    return <span className="pill" style={m.style}>{m.label}</span>
+                                                    return <span className={`status-badge ${m.className}`} style={m.style}>{m.label}</span>
                                                 })()}
                                             </td>
-                                            <td>
-                                                <button className="icon-btn" onClick={() => setEditingTenantId(t.id)} aria-label="Editar tenant"><Settings size={16}/></button>
+                                            <td style={{textAlign: 'right', paddingRight: 24}}>
+                                                <button className="icon-btn" onClick={() => setEditingTenantId(t.id)} aria-label="Editar tenant" style={{marginLeft: 'auto'}}>
+                                                    <Settings size={18}/>
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                                 </table>
                             </div>
+
+                            <div className="mobile-tenant-list">
+                                {filteredTenants.map(t => (
+                                    <div key={t.id} className="mobile-tenant-card">
+                                        <div style={{display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0}}>
+                                            <div className="user-avatar-mini" style={{
+                                                background: 'var(--primary-50)', 
+                                                color: 'var(--primary-600)', 
+                                                fontSize: '0.85rem', 
+                                                width: 40, 
+                                                height: 40, 
+                                                borderRadius: '10px',
+                                                border: '1px solid var(--primary-100)',
+                                                fontWeight: 700
+                                            }}>
+                                                {t.name.substring(0, 2).toUpperCase()}
+                                            </div>
+                                            <div style={{minWidth: 0, flex: 1}}>
+                                                <div style={{fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{t.name}</div>
+                                                <a
+                                                    href={(() => {
+                                                      if (typeof window === 'undefined') return `http://${t.slug}.localhost:5173`
+                                                      const host = window.location.hostname
+                                                      const port = window.location.port
+                                                      const protocol = window.location.protocol
+                                                      const rootHost = host.toLowerCase().startsWith('dev.') ? host.slice(4) : host
+                                                      return `${protocol}//${t.slug}.${rootHost}${port ? `:${port}` : ''}`
+                                                    })()}
+                                                    target="_blank"
+                                                    style={{fontSize: '0.8rem', color: 'var(--text-muted)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2}}
+                                                >
+                                                    <Globe size={10} />
+                                                    {t.slug}.lashspace.com.br
+                                                </a>
+                                            </div>
+                                        </div>
+                                        
+                                        <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                                             {(() => {
+                                                const m = subscriptionMeta(t)
+                                                // Simplified badge for mobile
+                                                return <span className={`status-badge ${m.className}`} style={{fontSize: '0.65rem', padding: '2px 6px', height: 20, display: 'flex', alignItems: 'center'}}>{m.label.split(' ')[0]}</span>
+                                            })()}
+                                            <button className="icon-btn" onClick={() => setEditingTenantId(t.id)} aria-label="Editar tenant" style={{width: 32, height: 32, background: 'var(--bg-subtle)', border: 'none'}}>
+                                                <Settings size={16} color="var(--text-muted)"/>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            </>
                         )}
                     </div>
 
@@ -5178,25 +5495,29 @@ function Dev() {
 
                             {/* Color Picker */}
                             <div style={{marginBottom: 8}}>
-                                <div style={{display: 'flex', gap: 16}}>
-                                    <div style={{
-                                        width: 40, 
-                                        height: 40, 
-                                        borderRadius: '50%', 
-                                        background: 'var(--bg-subtle)', 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        justifyContent: 'center',
-                                        color: 'var(--text-main)'
-                                    }}>
-                                        <Palette size={20} />
+                                <div style={{display: 'flex', gap: 16, flexDirection: 'column'}}>
+                                    <div style={{display: 'flex', gap: 16, alignItems: 'center'}}>
+                                        <div style={{
+                                            width: 40, 
+                                            height: 40, 
+                                            borderRadius: '50%', 
+                                            background: 'var(--bg-subtle)', 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center',
+                                            color: 'var(--text-main)',
+                                            flexShrink: 0
+                                        }}>
+                                            <Palette size={20} />
+                                        </div>
+                                        <div>
+                                            <div style={{fontWeight: 600, fontSize: '1rem'}}>Cor de Destaque</div>
+                                            <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>
+                                                Escolha a cor principal para o painel administrativo.
+                                            </div>
+                                        </div>
                                     </div>
                                     <div style={{flex: 1}}>
-                                        <div style={{fontWeight: 600, fontSize: '1rem', marginBottom: 4}}>Cor de Destaque</div>
-                                        <div style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 12}}>
-                                            Escolha a cor principal para o painel administrativo.
-                                        </div>
-                                        
                                         <ColorPicker 
                                             value={devColor}
                                             onChange={(c) => {
@@ -5752,7 +6073,12 @@ function UnifiedLogin(props: { hostTenant?: TenantPublic | null; isDevHost?: boo
               </div>
 
               <button className="authRefSocial" type="button" disabled>
-                <Chrome size={18} style={{ color: '#4285F4' }} />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
                 <span>Entrar com Google</span>
               </button>
 
@@ -5815,6 +6141,22 @@ function DateScroller({
   getDateStatus?: (ymd: string) => { disabled: boolean; label?: string };
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [showLeftArrow, setShowLeftArrow] = useState(false)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    const handleScroll = () => {
+      setShowLeftArrow(el.scrollLeft > 10)
+    }
+
+    el.addEventListener('scroll', handleScroll)
+    // Check initially
+    handleScroll()
+    
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [])
   
   const dates = useMemo(() => {
     const arr = []
@@ -5840,12 +6182,23 @@ function DateScroller({
   }
 
   // Weekday labels
-  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+  // Use formatting consistent with PT-BR
+  const getWeekDay = (d: Date) => {
+    const s = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' }).format(d).replace('.', '')
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
+  const getMonth = (d: Date) => {
+    const s = new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(d).replace('.', '')
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
   
   return (
     <div className="dateScrollerWrapper">
-      <button className="dateScrollBtn left" onClick={() => scroll('left')}>
+      <button 
+        className="dateScrollBtn left" 
+        onClick={() => scroll('left')}
+        style={{ opacity: showLeftArrow ? 1 : 0, pointerEvents: showLeftArrow ? 'auto' : 'none', transition: 'opacity 0.2s' }}
+      >
         <ChevronLeft size={20} />
       </button>
       
@@ -5865,20 +6218,26 @@ function DateScroller({
                 if (!status.disabled) onChange(dStr)
               }}
             >
-              <span className="dateCardWeek">{weekDays[d.getDay()]}</span>
+              <span className="dateCardWeek">{getWeekDay(d)}</span>
               <span className="dateCardDay">{d.getDate()}</span>
-              <span className="dateCardMonth">{months[d.getMonth()]}</span>
+              <span className="dateCardMonth">{getMonth(d)}</span>
               {status.disabled && <span className="dateCardStatus">{status.label ?? 'Fechado'}</span>}
             </div>
           )
         })}
       </div>
 
-      <button className="dateScrollBtn right" onClick={() => scroll('right')}>
+      <button 
+        className="dateScrollBtn right" 
+        onClick={() => scroll('right')}
+      >
         <ChevronRight size={20} />
       </button>
       
-      <div className="dateScrollerBlur left" />
+      <div 
+        className="dateScrollerBlur left" 
+        style={{ opacity: showLeftArrow ? 1 : 0, transition: 'opacity 0.2s' }}
+      />
       <div className="dateScrollerBlur right" />
     </div>
   )
@@ -6439,7 +6798,7 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
                          <ShieldCheck size={32} />
                       </div>
                       <h3 style={{fontSize: '1.25rem', marginBottom: 8}}>Confirmar Agendamento</h3>
-                      <p style={{color: 'var(--text-muted)'}}>Logado como <strong>{me.email}</strong></p>
+                      <p style={{color: 'var(--text-muted)'}}>Logado como <strong>{me.name || me.email}</strong></p>
                     </div>
                     
                     {actionError && <div className="pill" style={{color: 'var(--danger)', justifyContent: 'center'}}>{actionError}</div>}
@@ -6557,16 +6916,66 @@ function ClientPortal(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
         >
             <div className="card">
                 <div className="cardHeader"><h2 className="cardTitle">Meus Agendamentos</h2></div>
-                <div className="cardBody">
-                    <div className="list">
-                        {appointments.length === 0 ? <div className="text-center text-muted">Nenhum agendamento.</div> : null}
-                        {appointments.map(a => (
-                            <div className="listItem" key={a.id}>
-                                <div className="listItemTitle">{a.serviceName}</div>
-                                <div className="listItemMeta">{new Date(a.startsAt).toLocaleString()} · {a.status}</div>
-                            </div>
-                        ))}
-                    </div>
+                
+                {/* Desktop Table View */}
+                <div className="table-scroll">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th style={{paddingLeft: 24}}>Serviço</th>
+                                <th>Data e Horário</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {appointments.length === 0 ? (
+                                <tr><td colSpan={3} className="text-center text-muted" style={{padding: 40}}>Nenhum agendamento encontrado.</td></tr>
+                            ) : (
+                                appointments.map(a => {
+                                    let statusLabel = a.status
+                                    let statusClass = 'status-warning'
+                                    if (a.status === 'CONFIRMED') { statusLabel = 'Confirmado'; statusClass = 'status-success' }
+                                    else if (a.status === 'PENDING') { statusLabel = 'Pendente'; statusClass = 'status-pending' }
+                                    else if (a.status === 'CANCELLED') { statusLabel = 'Cancelado'; statusClass = 'status-warning' }
+
+                                    return (
+                                        <tr key={a.id}>
+                                            <td style={{fontWeight: 600, paddingLeft: 24}}>{a.serviceName}</td>
+                                            <td>{new Date(a.startsAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                                            <td><span className={`status-badge ${statusClass}`}>{statusLabel}</span></td>
+                                        </tr>
+                                    )
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Mobile List View */}
+                <div className="mobile-appointment-list" style={{padding: '1.5rem'}}>
+                    {appointments.length === 0 ? <div className="text-center text-muted">Nenhum agendamento.</div> : null}
+                    {appointments.map(a => {
+                            let statusLabel = a.status
+                            let statusClass = 'status-warning'
+                            if (a.status === 'CONFIRMED') { statusLabel = 'Confirmado'; statusClass = 'status-success' }
+                            else if (a.status === 'PENDING') { statusLabel = 'Pendente'; statusClass = 'status-pending' }
+                            else if (a.status === 'CANCELLED') { statusLabel = 'Cancelado'; statusClass = 'status-warning' }
+
+                            return (
+                                <div className="mobile-appointment-card" key={a.id}>
+                                    <div className="mobile-appointment-header">
+                                        <div style={{fontWeight: 700, color: 'var(--gray-900)'}}>{a.serviceName}</div>
+                                        <span className={`status-badge ${statusClass}`}>{statusLabel}</span>
+                                    </div>
+                                    <div className="mobile-appointment-row">
+                                        <div style={{display: 'flex', alignItems: 'center', gap: 6, color: 'var(--gray-600)'}}>
+                                            <Clock size={14} />
+                                            {new Date(a.startsAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                    })}
                 </div>
             </div>
         </Shell>
@@ -6626,6 +7035,332 @@ function RootEntry(props: {
 
   const next = me.role === 'CLIENT' ? '/cliente' : '/admin'
   return <Navigate to={next} replace />
+}
+
+function NewTransactionModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onClose: () => void; onSuccess: () => void }) {
+  const [loading, setLoading] = useState(false)
+  const [type, setType] = useState<'INCOME' | 'EXPENSE'>('EXPENSE')
+  const [amount, setAmount] = useState('')
+  const [method, setMethod] = useState('')
+  const [note, setNote] = useState('')
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+
+  // Custom select state
+  const [isSelectOpen, setIsSelectOpen] = useState(false)
+  const selectRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
+        setIsSelectOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value.replace(/\D/g, '')
+    if (!value) {
+      setAmount('')
+      return
+    }
+    const numberValue = Number(value) / 100
+    setAmount(numberValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      const parsedAmount = Math.round(Number(amount.replace(/\./g, '').replace(',', '.')) * 100)
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        alert('Valor inválido')
+        setLoading(false)
+        return
+      }
+
+      const res = await api('/api/admin/finance/transactions', {
+        method: 'POST',
+        body: JSON.stringify({
+          type,
+          amountCents: parsedAmount,
+          method,
+          note,
+          createdAt: new Date(date).toISOString()
+        })
+      })
+      
+      if (!res.ok) {
+        throw new Error(res.error?.message || 'Erro ao salvar')
+      }
+
+      onSuccess()
+      onClose()
+      // Reset form
+      setAmount('')
+      setMethod('')
+      setNote('')
+      setDate(new Date().toISOString().slice(0, 10))
+    } catch (err) {
+      console.error(err)
+      alert('Erro ao salvar movimentação: ' + (err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h3 className="modal-title">Nova Movimentação</h3>
+          <button className="icon-btn" onClick={onClose}><XCircle size={24} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="modal-body">
+            <div className="form-stack">
+                <div className="row">
+                    <div className="input-group">
+                        <label className="label">Tipo</label>
+                        <div className={`custom-select ${isSelectOpen ? 'open' : ''}`} ref={selectRef}>
+                            <div className="custom-select-trigger" onClick={() => setIsSelectOpen(!isSelectOpen)}>
+                                <span style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                                    {type === 'INCOME' ? 'Receita (Entrada)' : 'Despesa (Saída)'}
+                                </span>
+                                <ChevronRight size={16} style={{transform: 'rotate(90deg)', color: 'var(--gray-400)'}} />
+                            </div>
+                            <div className="custom-select-menu">
+                                <div 
+                                    className={`custom-select-option ${type === 'INCOME' ? 'selected' : ''}`} 
+                                    onClick={() => {
+                                        setType('INCOME')
+                                        setIsSelectOpen(false)
+                                    }}
+                                >
+                                    Receita (Entrada)
+                                </div>
+                                <div 
+                                    className={`custom-select-option ${type === 'EXPENSE' ? 'selected' : ''}`} 
+                                    onClick={() => {
+                                        setType('EXPENSE')
+                                        setIsSelectOpen(false)
+                                    }}
+                                >
+                                    Despesa (Saída)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="input-group">
+                        <label className="label">Data</label>
+                        <input 
+                            className="input" 
+                            type="date" 
+                            value={date} 
+                            onChange={e => setDate(e.target.value)} 
+                            required 
+                            lang="pt-BR"
+                        />
+                    </div>
+                </div>
+                <div className="input-group">
+                    <label className="label">Valor (R$)</label>
+                    <input className="input" value={amount} onChange={handleAmountChange} placeholder="0,00" required />
+                </div>
+                <div className="input-group">
+                    <label className="label">Categoria/Método</label>
+                    <input className="input" value={method} onChange={e => setMethod(e.target.value)} placeholder="Ex: Pix, Aluguel, Produtos..." />
+                </div>
+                <div className="input-group">
+                    <label className="label">Descrição</label>
+                    <textarea className="input" value={note} onChange={e => setNote(e.target.value)} placeholder="Detalhes da movimentação..." rows={3} />
+                </div>
+            </div>
+            <div className="modal-footer" style={{marginTop: 24, display: 'flex', justifyContent: 'flex-end', gap: 12}}>
+                <button type="button" className="btn" onClick={onClose}>Cancelar</button>
+                <button type="submit" className="btn btnPrimary" disabled={loading}>
+                    {loading ? 'Salvando...' : 'Salvar'}
+                </button>
+            </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ExtractModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const [loading, setLoading] = useState(false)
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [start, setStart] = useState(() => {
+    const d = new Date()
+    d.setDate(1) // 1st of current month
+    return d.toISOString().slice(0, 10)
+  })
+  const [end, setEnd] = useState(new Date().toISOString().slice(0, 10))
+  const [type, setType] = useState('all')
+
+  useEffect(() => {
+      if (isOpen) load()
+  }, [isOpen, start, end, type])
+
+  async function load() {
+      setLoading(true)
+      try {
+          const res = await api<{transactions: any[]}>(`/api/admin/finance/extract?start=${new Date(start).toISOString()}&end=${new Date(end + 'T23:59:59').toISOString()}&type=${type}`)
+          if(res.ok) setTransactions(res.data.transactions)
+      } catch (err) {
+          console.error(err)
+      } finally {
+          setLoading(false)
+      }
+  }
+
+  function handleExport() {
+      if (transactions.length === 0) return
+      
+      const csvContent = [
+          ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor', 'Status'],
+          ...transactions.map(t => [
+              new Date(t.date).toLocaleString('pt-BR'),
+              t.description || '-',
+              t.category || '-',
+              t.type === 'INCOME' ? 'Entrada' : 'Saída',
+              (t.amountCents / 100).toFixed(2).replace('.', ','),
+              t.status
+          ])
+      ].map(e => e.join(';')).join('\n')
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `extrato_${start}_${end}.csv`
+      link.click()
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content" style={{maxWidth: 800}}>
+        <div className="modal-header">
+          <h3 className="modal-title">Extrato Financeiro</h3>
+          <button className="icon-btn" onClick={onClose}><XCircle size={24} /></button>
+        </div>
+        <div className="modal-body">
+            <div className="finance-filter-group" style={{marginBottom: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end'}}>
+                <div className="input-group" style={{marginBottom: 0}}>
+                    <label className="label" style={{fontSize: '0.75rem'}}>Início</label>
+                    <input className="input" type="date" value={start} onChange={e => setStart(e.target.value)} style={{padding: '6px 10px'}} />
+                </div>
+                <div className="input-group" style={{marginBottom: 0}}>
+                    <label className="label" style={{fontSize: '0.75rem'}}>Fim</label>
+                    <input className="input" type="date" value={end} onChange={e => setEnd(e.target.value)} style={{padding: '6px 10px'}} />
+                </div>
+                <div className="input-group" style={{marginBottom: 0}}>
+                    <label className="label" style={{fontSize: '0.75rem'}}>Tipo</label>
+                    <select className="input" value={type} onChange={e => setType(e.target.value)} style={{padding: '6px 10px'}}>
+                        <option value="all">Todos</option>
+                        <option value="income">Entradas</option>
+                        <option value="expense">Saídas</option>
+                    </select>
+                </div>
+                <button className="btn" onClick={handleExport} disabled={transactions.length === 0} style={{marginLeft: 'auto', gap: 8}}>
+                    <Download size={16} /> Exportar CSV
+                </button>
+            </div>
+
+            <div className="table-scroll" style={{maxHeight: 400, border: '1px solid var(--border)', borderRadius: 8}}>
+                <table className="data-table">
+                    <thead style={{position: 'sticky', top: 0, zIndex: 1}}>
+                        <tr>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Categoria</th>
+                            <th style={{textAlign: 'right'}}>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loading ? (
+                            <tr><td colSpan={4} style={{textAlign: 'center', padding: 20}}>Carregando...</td></tr>
+                        ) : transactions.length === 0 ? (
+                            <tr><td colSpan={4} style={{textAlign: 'center', padding: 20, color: 'var(--text-muted)'}}>Nenhum registro encontrado</td></tr>
+                        ) : transactions.map(t => (
+                            <tr key={t.id}>
+                                <td style={{fontSize: '0.85rem'}}>{new Date(t.date).toLocaleDateString('pt-BR')} <span style={{color: 'var(--text-muted)'}}>{new Date(t.date).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span></td>
+                                <td style={{fontWeight: 500}}>{t.description || 'Sem descrição'}</td>
+                                <td><span className="pill">{t.category}</span></td>
+                                <td style={{textAlign: 'right', fontWeight: 600, color: t.type === 'INCOME' ? 'var(--success)' : 'var(--danger)'}}>
+                                    {t.type === 'INCOME' ? '+' : '-'}{formatBRL(t.amountCents / 100)}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function GoalsModal({ isOpen, onClose, onSuccess, initialRevenue, initialNewClients }: { isOpen: boolean; onClose: () => void; onSuccess: () => void; initialRevenue: number; initialNewClients: number }) {
+    const [loading, setLoading] = useState(false)
+    const [revenue, setRevenue] = useState(String(initialRevenue / 100))
+    const [newClients, setNewClients] = useState(String(initialNewClients))
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault()
+        setLoading(true)
+        try {
+            await api('/api/admin/finance/goals', {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    revenueGoalCents: Math.round(Number(revenue.replace(',', '.')) * 100),
+                    newClientsGoal: Number(newClients)
+                })
+            })
+            onSuccess()
+            onClose()
+        } catch (err) {
+            console.error(err)
+            alert('Erro ao salvar metas')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (!isOpen) return null
+
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content" style={{maxWidth: 400}}>
+                <div className="modal-header">
+                    <h3 className="modal-title">Definir Metas do Mês</h3>
+                    <button className="icon-btn" onClick={onClose}><XCircle size={24} /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="modal-body">
+                    <div className="form-stack">
+                        <div className="input-group">
+                            <label className="label">Meta de Faturamento (R$)</label>
+                            <input className="input" value={revenue} onChange={e => setRevenue(e.target.value)} required />
+                        </div>
+                        <div className="input-group">
+                            <label className="label">Meta de Novos Clientes</label>
+                            <input className="input" type="number" value={newClients} onChange={e => setNewClients(e.target.value)} required />
+                        </div>
+                    </div>
+                    <div className="modal-footer" style={{marginTop: 24, display: 'flex', justifyContent: 'flex-end', gap: 12}}>
+                        <button type="button" className="btn" onClick={onClose}>Cancelar</button>
+                        <button type="submit" className="btn btnPrimary" disabled={loading}>
+                            {loading ? 'Salvar' : 'Salvar'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    )
 }
 
 export default function App() {

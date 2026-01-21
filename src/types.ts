@@ -19,6 +19,7 @@ export type TenantDev = TenantPublic & {
 
 export type SessionUser = {
   id: string
+  name?: string
   email: string
   role: Role
   tenantId: string | null

@@ -257,6 +257,8 @@ app.get('/api/public/tenant/:slug', (req, res, next) => {
   }
 })
 
+
+
 app.get('/api/public/tenant', (req, res, next) => {
   try {
     const t = req.resolvedTenant
@@ -2582,6 +2584,17 @@ app.get('/api/admin/finance', requireRole('ADMIN'), (req, res, next) => {
     const sixMonthsStart = new Date(monthStart)
     sixMonthsStart.setMonth(sixMonthsStart.getMonth() - 5)
 
+    const goals = db
+      .prepare(
+        `
+          SELECT monthly_revenue_goal_cents as revenueGoalCents,
+                 monthly_new_clients_goal as newClientsGoal
+          FROM tenant_settings
+          WHERE tenant_id = ?
+        `,
+      )
+      .get(tenantId) as { revenueGoalCents: number; newClientsGoal: number } | undefined
+
     const entries = db
       .prepare(
         `
@@ -2594,33 +2607,34 @@ app.get('/api/admin/finance', requireRole('ADMIN'), (req, res, next) => {
       )
       .get(tenantId) as { entriesCents: number } | undefined
 
-    const expenses = db
+    const cashStats = db
       .prepare(
         `
-          SELECT COALESCE(SUM(amount_cents), 0) as expensesCents
+          SELECT 
+            COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount_cents ELSE 0 END), 0) as expensesCents,
+            COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount_cents ELSE 0 END), 0) as incomeCents
           FROM cash_transactions
           WHERE tenant_id = ?
-            AND type = 'EXPENSE'
         `,
       )
-      .get(tenantId) as { expensesCents: number } | undefined
+      .get(tenantId) as { expensesCents: number; incomeCents: number } | undefined
 
-    const lastExpenses = db
+    const lastCashTransactions = db
       .prepare(
         `
           SELECT id,
+                 type,
                  amount_cents as amountCents,
                  method,
                  note,
                  created_at as createdAt
           FROM cash_transactions
           WHERE tenant_id = ?
-            AND type = 'EXPENSE'
           ORDER BY created_at DESC
           LIMIT 100
         `,
       )
-      .all(tenantId) as Array<{ id: string; amountCents: number; method: string; note: string | null; createdAt: string }>
+      .all(tenantId) as Array<{ id: string; type: 'INCOME' | 'EXPENSE'; amountCents: number; method: string; note: string | null; createdAt: string }>
 
     const lastEntries = db
       .prepare(
@@ -2668,36 +2682,76 @@ app.get('/api/admin/finance', requireRole('ADMIN'), (req, res, next) => {
       )
       .all(tenantId, sixMonthsStart.toISOString()) as Array<{ ym: string; entriesCents: number }>
 
-    const expensesByMonth = db
+    const cashByMonth = db
       .prepare(
         `
           SELECT substr(created_at, 1, 7) as ym,
-                 COALESCE(SUM(amount_cents), 0) as expensesCents
+                 COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount_cents ELSE 0 END), 0) as expensesCents,
+                 COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount_cents ELSE 0 END), 0) as incomeCents
           FROM cash_transactions
           WHERE tenant_id = ?
-            AND type = 'EXPENSE'
             AND created_at >= ?
           GROUP BY ym
           ORDER BY ym ASC
         `,
       )
-      .all(tenantId, sixMonthsStart.toISOString()) as Array<{ ym: string; expensesCents: number }>
+      .all(tenantId, sixMonthsStart.toISOString()) as Array<{ ym: string; expensesCents: number; incomeCents: number }>
 
     const entriesByMonthMap = new Map(entriesByMonth.map((r) => [r.ym, r.entriesCents]))
-    const expensesByMonthMap = new Map(expensesByMonth.map((r) => [r.ym, r.expensesCents]))
+    const cashByMonthMap = new Map(cashByMonth.map((r) => [r.ym, r]))
+    
     const monthly = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(sixMonthsStart)
       d.setMonth(sixMonthsStart.getMonth() + i)
       const ym = d.toISOString().slice(0, 7)
+      const cash = cashByMonthMap.get(ym)
       return {
         ym,
-        entriesCents: entriesByMonthMap.get(ym) ?? 0,
-        expensesCents: expensesByMonthMap.get(ym) ?? 0,
+        entriesCents: (entriesByMonthMap.get(ym) ?? 0) + (cash?.incomeCents ?? 0),
+        expensesCents: cash?.expensesCents ?? 0,
       }
     })
 
-    const entriesCents = entries?.entriesCents ?? 0
-    const expensesCents = expenses?.expensesCents ?? 0
+    const entriesCents = (entries?.entriesCents ?? 0) + (cashStats?.incomeCents ?? 0)
+    const expensesCents = cashStats?.expensesCents ?? 0
+
+    // Current month progress
+    const currentMonthStart = monthStart.toISOString()
+    const currentMonthEntries = db
+      .prepare(
+        `
+          SELECT COALESCE(SUM(s.price_cents), 0) as entriesCents
+          FROM appointments a
+          JOIN services s ON s.id = a.service_id
+          WHERE a.tenant_id = ?
+            AND a.status = 'CONFIRMED'
+            AND a.starts_at >= ?
+        `,
+      )
+      .get(tenantId, currentMonthStart) as { entriesCents: number } | undefined
+
+    const currentMonthCash = db
+      .prepare(
+        `
+          SELECT COALESCE(SUM(amount_cents), 0) as incomeCents
+          FROM cash_transactions
+          WHERE tenant_id = ?
+            AND type = 'INCOME'
+            AND created_at >= ?
+        `,
+      )
+      .get(tenantId, currentMonthStart) as { incomeCents: number } | undefined
+
+    const currentMonthNewClients = db
+      .prepare(
+        `
+          SELECT COUNT(1) as newClientsCount
+          FROM clients
+          WHERE tenant_id = ?
+            AND created_at >= ?
+        `,
+      )
+      .get(tenantId, currentMonthStart) as { newClientsCount: number } | undefined
 
     res.json({
       totals: {
@@ -2705,10 +2759,51 @@ app.get('/api/admin/finance', requireRole('ADMIN'), (req, res, next) => {
         expensesCents,
         profitCents: entriesCents - expensesCents,
       },
-      lastExpenses,
+      goals: {
+        revenueCents: goals?.revenueGoalCents ?? 1000000,
+        newClients: goals?.newClientsGoal ?? 10,
+        currentRevenueCents: (currentMonthEntries?.entriesCents ?? 0) + (currentMonthCash?.incomeCents ?? 0),
+        currentNewClients: currentMonthNewClients?.newClientsCount ?? 0,
+      },
+      lastCashTransactions,
       lastEntries,
       monthly,
     })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.patch('/api/admin/finance/goals', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const body = z
+      .object({
+        revenueGoalCents: z.number().int().positive().optional(),
+        newClientsGoal: z.number().int().positive().optional(),
+      })
+      .parse(req.body)
+
+    const updates: string[] = []
+    const params: any[] = []
+
+    if (body.revenueGoalCents !== undefined) {
+      updates.push('monthly_revenue_goal_cents = ?')
+      params.push(body.revenueGoalCents)
+    }
+    if (body.newClientsGoal !== undefined) {
+      updates.push('monthly_new_clients_goal = ?')
+      params.push(body.newClientsGoal)
+    }
+
+    if (updates.length > 0) {
+      params.push(tenantId)
+      db.prepare(`UPDATE tenant_settings SET ${updates.join(', ')} WHERE tenant_id = ?`).run(...params)
+    }
+
+    res.json({ ok: true })
   } catch (err) {
     next(err)
   }
@@ -2812,15 +2907,135 @@ app.post('/api/admin/finance/expenses', requireRole('ADMIN'), (req, res, next) =
       `,
     ).run(id, tenantId, body.amountCents, body.method?.trim() || 'MANUAL', body.note?.trim() || null, now)
 
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/admin/finance/transactions', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const body = z
+      .object({
+        type: z.enum(['INCOME', 'EXPENSE']),
+        amountCents: z.number().int().positive(),
+        method: z.string().min(1).optional(),
+        note: z.string().optional(),
+        createdAt: z.string().datetime().optional(),
+      })
+      .parse(req.body)
+
+    const now = new Date().toISOString()
+    const createdAt = body.createdAt || now
+    const id = randomUUID()
+    
+    db.prepare(
+      `
+        INSERT INTO cash_transactions (id, tenant_id, type, amount_cents, method, note, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+    ).run(id, tenantId, body.type, body.amountCents, body.method?.trim() || 'MANUAL', body.note?.trim() || null, createdAt)
+
     res.json({
-      expense: {
+      transaction: {
         id,
+        type: body.type,
         amountCents: body.amountCents,
         method: body.method?.trim() || 'MANUAL',
         note: body.note?.trim() || null,
-        createdAt: now,
+        createdAt,
       },
     })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.delete('/api/admin/finance/transactions/:id', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const { id } = req.params
+
+    const result = db.prepare('DELETE FROM cash_transactions WHERE id = ? AND tenant_id = ?').run(id, tenantId)
+
+    if (result.changes === 0) {
+      return next(notFound('Transação não encontrada', 'TRANSACTION_NOT_FOUND'))
+    }
+
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.get('/api/admin/finance/extract', requireRole('ADMIN'), (req, res, next) => {
+  try {
+    const tenantId = req.sessionUser?.tenantId
+    if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
+
+    const q = z.object({
+      start: z.string().datetime().optional(),
+      end: z.string().datetime().optional(),
+      type: z.enum(['all', 'income', 'expense']).optional(),
+    }).parse({
+      start: typeof req.query.start === 'string' ? req.query.start : undefined,
+      end: typeof req.query.end === 'string' ? req.query.end : undefined,
+      type: typeof req.query.type === 'string' ? req.query.type : undefined,
+    })
+
+    const type = q.type || 'all'
+    const start = q.start || new Date(0).toISOString()
+    const end = q.end || new Date().toISOString()
+
+    const transactions = db.prepare(`
+      SELECT * FROM (
+        SELECT 
+          'appointment_' || a.id as id,
+          'INCOME' as type,
+          s.price_cents as amountCents,
+          'Serviço' as category,
+          COALESCE(c.name, u.email) as description,
+          a.starts_at as date,
+          'CONFIRMED' as status
+        FROM appointments a
+        JOIN services s ON s.id = a.service_id
+        JOIN users u ON u.id = a.client_user_id
+        LEFT JOIN clients c ON c.user_id = u.id AND c.tenant_id = a.tenant_id
+        WHERE a.tenant_id = ? 
+          AND a.status = 'CONFIRMED'
+          AND a.starts_at BETWEEN ? AND ?
+          AND (? = 'all' OR ? = 'income')
+
+        UNION ALL
+
+        SELECT 
+          'transaction_' || t.id as id,
+          t.type,
+          t.amount_cents as amountCents,
+          t.method as category,
+          t.note as description,
+          t.created_at as date,
+          'COMPLETED' as status
+        FROM cash_transactions t
+        WHERE t.tenant_id = ?
+          AND t.created_at BETWEEN ? AND ?
+          AND (
+            ? = 'all' 
+            OR (? = 'income' AND t.type = 'INCOME')
+            OR (? = 'expense' AND t.type = 'EXPENSE')
+          )
+      )
+      ORDER BY date DESC
+    `).all(
+      tenantId, start, end, type, type,
+      tenantId, start, end, type, type, type
+    )
+
+    res.json({ transactions })
   } catch (err) {
     next(err)
   }

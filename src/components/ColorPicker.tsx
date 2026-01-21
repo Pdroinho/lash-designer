@@ -62,8 +62,9 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
           {value === c && <Check size={16} color="white" style={{filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}/>}
         </div>
       ))}
-      <div style={{display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 280px', minWidth: 280}}>
-        <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+      <div style={{width: '100%', height: 0}} />
+      <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap'}}>
           <div style={{position: 'relative'}}>
             <button type="button" className="btn" style={{paddingLeft: 8, paddingRight: 12, gap: 8, background: 'var(--bg-card)'}}>
               <div style={{
@@ -91,11 +92,11 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
           
           <div style={{width: 1, height: 24, background: 'var(--border)'}} />
 
-          <div style={{flex: 1}}>
+          <div style={{width: 100}}>
             <input
               className="input"
               value={text}
-              style={{height: 40, padding: '0 12px', fontSize: '0.9rem'}}
+              style={{height: 40, padding: '0 12px', fontSize: '0.9rem', width: '100%'}}
               onChange={(e) => {
                 setText(e.target.value)
                 setError(null)
@@ -109,9 +110,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
             />
           </div>
         </div>
-        {error && (
-          <div style={{color: 'var(--danger)', fontSize: '0.85rem', paddingLeft: 4}}>{error}</div>
-        )}
+        {error && <div style={{fontSize: '0.75rem', color: 'var(--danger)', marginTop: 4}}>{error}</div>}
       </div>
     </div>
   )

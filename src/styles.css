@@ -235,17 +235,98 @@ a { text-decoration: none; color: inherit; }
   z-index: 40;
 }
 
-.header-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--gray-800);
+.header-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.breadcrumb-current {
+  color: var(--primary-600);
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 1rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+/* Responsive Header */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 1rem;
+    height: 60px;
+  }
+
+  .header-breadcrumb {
+    font-size: 0.85rem; /* Larger on mobile for better readability of just title */
+  }
+
+  .breadcrumb-root,
+  .breadcrumb-separator {
+    display: none;
+  }
+
+  .test-mode-label {
+    display: block !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap;
+  }
+  
+  .test-mode-toggle {
+    gap: 6px !important;
+  }
+
+  .search-trigger {
+    /* Allow override via inline styles or specific class if needed, but default behavior for header search */
+    /* We need to be careful not to break the new search input we just added in the card header */
+  }
+
+  /* Specific fix for header search trigger only */
+  .header-actions .search-trigger {
+    width: 36px !important;
+    padding: 0 !important;
+    justify-content: center;
+    border-radius: 50% !important;
+  }
+
+  .header-actions .search-trigger span,
+  .header-actions .search-trigger form {
+    display: none !important;
+  }
+
+  .header-actions {
+    gap: 0.5rem;
+  }
+  
+  /* Hide user email on mobile sidebar footer if needed, but sidebar is hidden anyway */
+  
+  .mobile-toggle {
+    display: flex;
+    margin-right: 12px;
+  }
+
+  /* Sidebar Mobile Logic */
+  .app-sidebar {
+    position: fixed;
+    left: -100%;
+    top: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 100;
+    box-shadow: none;
+  }
+
+  .app-sidebar.open {
+    left: 0;
+    box-shadow: 0 0 40px rgba(0,0,0,0.2);
+  }
 }
 
 .icon-btn {
@@ -351,6 +432,25 @@ a { text-decoration: none; color: inherit; }
   font-size: 0.9rem;
 }
 
+.mobile-tenant-list {
+  display: none;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.mobile-tenant-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
 @media (max-width: 768px) {
   .grid-2-1 {
     gap: 1.5rem;
@@ -370,9 +470,68 @@ a { text-decoration: none; color: inherit; }
     display: flex;
   }
 
+  .mobile-tenant-list {
+    display: flex;
+  }
+
   .cardHeader, .cardBody {
     padding: 1.25rem;
   }
+}
+
+.tenant-header-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.tenant-search-wrapper {
+  flex: 1;
+  max-width: 300px;
+}
+
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: flex !important;
+  }
+  
+  .tenant-header-group {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 1rem;
+  }
+  
+  .tenant-search-wrapper {
+    max-width: none;
+    width: 100%;
+  }
+
+  .tenant-controls-mobile-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .icon-btn-primary {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-600) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+.tenant-controls-mobile-row {
+  display: flex;
+  flex: 1;
 }
 
 .grid-1-1 {
@@ -495,6 +654,18 @@ a { text-decoration: none; color: inherit; }
 
   .mobile-day-label {
     display: block !important;
+  }
+
+  .welcome-banner {
+    padding: 1.5rem !important;
+  }
+
+  .welcome-banner h1 {
+    font-size: 1.5rem !important;
+  }
+
+  .welcome-banner p {
+    font-size: 0.9rem !important;
   }
 }
 
@@ -708,6 +879,55 @@ a { text-decoration: none; color: inherit; }
 .btn-ghost:hover {
   background: var(--gray-100);
   color: var(--gray-900);
+}
+
+/* --- Portal Menu & Items --- */
+.portal-menu-content {
+  position: absolute;
+  z-index: 9999;
+  min-width: 200px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0,0,0,0.05);
+  padding: 6px;
+  border: 1px solid var(--gray-100);
+  animation: portalFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes portalFadeIn {
+  from { opacity: 0; transform: translateX(-100%) translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateX(-100%) translateY(0) scale(1); }
+}
+
+.btn-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-main);
+  cursor: pointer;
+  text-align: left;
+  gap: 10px;
+  transition: all 0.15s;
+}
+
+.btn-menu-item:hover {
+  background-color: var(--gray-50);
+  color: var(--gray-900);
+}
+
+.btn-menu-item.danger {
+  color: var(--danger);
+}
+
+.btn-menu-item.danger:hover {
+  background-color: #fef2f2;
 }
 
 /* --- Agenda / Calendar Specifics (Divine Level) --- */
@@ -1226,6 +1446,22 @@ a { text-decoration: none; color: inherit; }
     margin: 0;
   }
 
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+  z-index: 45; /* Below sidebar (50) but above header (40) */
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
   .calendar-toolbar {
     flex-direction: column;
     gap: 16px;
@@ -1368,6 +1604,9 @@ a { text-decoration: none; color: inherit; }
   border-right: none;
   border-bottom: 1px solid var(--gray-100);
   height: 70px;
+  width: 70px;
+  flex: 0 0 70px;
+  min-width: 70px;
 }
 
 .calendar-day-name {
@@ -1408,6 +1647,44 @@ a { text-decoration: none; color: inherit; }
   border-right: 1px solid var(--gray-50);
   position: relative;
   background: white;
+}
+
+@media (max-width: 768px) {
+  .calendar-header-cell {
+    min-width: 100px;
+  }
+  .calendar-day-column {
+    min-width: 100px;
+  }
+}
+
+@media (max-width: 640px) {
+  .calendar-header-cell {
+    min-width: auto;
+  }
+  .calendar-day-column {
+    min-width: auto;
+  }
+  .desktop-only {
+    display: none;
+  }
+  /* Ajuste de layout mobile para agenda */
+  .calendar-time-column {
+    width: 45px !important;
+    flex: 0 0 45px !important;
+    min-width: 45px !important;
+  }
+  .calendar-header-cell.empty {
+    width: 45px !important;
+    flex: 0 0 45px !important;
+    min-width: 45px !important;
+  }
+  .calendar-time-slot {
+    font-size: 0.65rem;
+    padding-top: 10px;
+    justify-content: center;
+    padding-left: 0;
+  }
 }
 
 .calendar-grid-cell {
@@ -1492,6 +1769,113 @@ a { text-decoration: none; color: inherit; }
   display: flex;
   overflow: hidden;
   position: relative;
+}
+
+/* Mobile Responsiveness for Booking Page */
+@media (max-width: 768px) {
+  .bookingRefLayout {
+    padding: 0;
+    background: white;
+    align-items: flex-start;
+  }
+
+  .bookingRefCard {
+    flex-direction: column;
+    width: 100%;
+    height: 100vh; /* Full height */
+    max-width: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .bookingRefLeft {
+    width: 100%;
+    height: auto;
+    min-height: 140px; /* Reduced height */
+    padding: 20px 24px;
+    flex: 0 0 auto;
+  }
+
+  .bookingRefBrand {
+    margin-bottom: 12px;
+  }
+
+  .bookingRefLogo {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .bookingRefSummary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding-bottom: 0;
+  }
+
+  .bookingSummaryItem {
+    margin-bottom: 0;
+    background: transparent;
+    padding: 0;
+    width: auto;
+  }
+
+  .bookingSummaryItem:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .bookingSummaryLabel {
+    color: rgba(255,255,255,0.8);
+    font-size: 0.7rem;
+    margin-bottom: 2px;
+  }
+
+  .bookingSummaryValue {
+    font-size: 0.95rem;
+  }
+
+  .bookingRefRight {
+    flex: 1;
+    border-radius: 24px 24px 0 0; /* Rounded top corners */
+    margin-top: -20px; /* Overlap the header */
+    background: white;
+    position: relative;
+    z-index: 10;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+
+  .bookingRefHeader {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--gray-50);
+  }
+
+  .bookingRefTitle {
+    font-size: 1.1rem;
+  }
+
+  .bookingRefStepIndicator {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+  }
+
+  .bookingRefContent {
+    padding: 20px 24px 100px; /* Extra padding bottom for fixed footer */
+  }
+
+  .bookingRefFooter {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 16px 24px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
+    z-index: 20;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
 }
 
 .bookingRefLeft {
@@ -1692,7 +2076,7 @@ a { text-decoration: none; color: inherit; }
   gap: 12px;
   overflow-x: auto;
   scroll-behavior: smooth;
-  padding: 30px 10px; /* Generous padding to fully show shadows/scale */
+  padding: 30px 24px; /* Generous padding to fully show shadows/scale */
   -ms-overflow-style: none;
   scrollbar-width: none;
   width: 100%;
@@ -1853,17 +2237,31 @@ a { text-decoration: none; color: inherit; }
 }
 
 @media (max-width: 768px) {
-  .dateScrollBtn, .dateScrollerBlur { display: none; }
+  /* .dateScrollBtn, .dateScrollerBlur { display: none; } removed to match desktop */
   .dateScrollerWrapper { 
     max-width: 100%; 
-    margin: 0 -20px; 
-    width: auto;
-    padding: 10px 20px;
+    /* margin: 0 -20px;  removed negative margin to keep buttons inside */
+    width: 100%;
+    padding: 10px 0;
   }
-  .dateScrollerContainer { padding: 0; }
-  .dateScrollBtn.left { left: 4px; }
-  .dateScrollBtn.right { right: 4px; }
+  .dateScrollerContainer { 
+    padding: 10px 24px 24px; /* Vertical padding only, horizontal handled by margins */
+  }
+  .dateScrollerContainer .dateCard:first-child {
+    margin-left: 0; /* Spacer for left button */
+  }
+  .dateScrollerContainer .dateCard:last-child {
+    margin-right: 40px; /* Spacer for right button */
+  }
+  .dateScrollBtn.left { left: 0; }
+  .dateScrollBtn.right { right: 0; }
+  
+  .dateScrollerBlur {
+    width: 30px; /* Slightly smaller blur on mobile */
+  }
 }
+
+/* Client Appointment Card removed (using standard data-table and mobile-appointment-card) */
 
 .bookingDateInput {
   width: 100%;
@@ -2735,6 +3133,14 @@ select.input {
   padding-right: 40px;
 }
 
+textarea.input {
+  height: auto;
+  padding: 12px 16px;
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+}
+
 /* Row children expansion */
 .row > .input-group {
   flex: 1;
@@ -2756,7 +3162,7 @@ select.input {
 .custom-select-trigger {
   width: 100%;
   height: 48px;
-  padding: 0 16px 0 44px; /* Space for icon */
+  padding: 0 16px; /* Removed left padding */
   border-radius: 12px;
   border: 1px solid var(--gray-200);
   background: var(--gray-50);
@@ -2814,7 +3220,7 @@ select.input {
   transition: background 0.15s;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
 }
 
 .custom-select-option:hover {
@@ -3091,20 +3497,113 @@ select.input {
   .auth-visual { display: none; }
 
   .authRef {
-    padding: 28px 18px;
+    padding: 0;
+    background: white;
+    align-items: flex-start;
   }
 
   .authRefCard {
     grid-template-columns: 1fr;
-    min-height: auto;
+    min-height: 100vh;
+    width: 100%;
+    border-radius: 0;
+    box-shadow: none;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    background: transparent;
   }
 
   .authRefLeft {
-    display: none;
+    display: flex !important;
+    position: relative;
+    width: 100%;
+    height: 35vh;
+    min-height: 280px;
+    padding: 24px 20px;
+    border-radius: 0;
+    justify-content: space-between;
+  }
+
+  .authRefLeft::after {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.6) 0%,
+      rgba(0, 0, 0, 0.2) 35%,
+      rgba(0, 0, 0, 0.5) 75%,
+      rgba(0, 0, 0, 0.85) 100%
+    );
+    opacity: 1;
+  }
+
+  .authRefBrand {
+    margin-top: 4px;
+  }
+
+  .authRefQuote {
+    margin-bottom: 24px;
+    background: transparent;
+    backdrop-filter: none;
+    border: none;
+    padding: 0;
+  }
+
+  .authRefQuoteText {
+    font-size: 1.05rem;
+    line-height: 1.35;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  }
+
+  .authRefQuoteMeta {
+    margin-top: 10px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
   }
 
   .authRefRight {
-    padding: 40px 22px;
+    padding: 24px 20px 32px;
+    background: white;
+    border-radius: 20px 20px 0 0;
+    margin-top: -24px;
+    position: relative;
+    z-index: 10;
+    flex: 1;
+    align-items: flex-start;
+    display: block;
+  }
+
+  .authRefRightInner {
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  .authRefTitle {
+    font-size: 1.35rem;
+    text-align: left;
+    margin-bottom: 4px;
+  }
+  
+  .authRefSubtitle {
+    text-align: left;
+    font-size: 0.9rem;
+  }
+  
+  .authRefForm {
+    margin-top: 20px;
+    gap: 12px;
+  }
+
+  .authRefLabel {
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+  }
+
+  .authRefInput {
+    height: 42px;
+    font-size: 0.95rem;
+  }
+  
+  .authRefField {
+    gap: 2px;
   }
 }
 
@@ -3629,6 +4128,12 @@ select.input {
 :root[data-mode="dev"][data-dev-theme="dark"] body {
   background-color: var(--bg-app);
   color: var(--text-main);
+}
+
+@media (max-width: 768px) {
+  .backup-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 :root[data-mode="dev"][data-dev-theme="dark"] .app-sidebar {

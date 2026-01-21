@@ -350,4 +350,15 @@ export function migrate() {
       );
     `)
   })
+
+  apply(12, () => {
+    const cols = db.prepare('PRAGMA table_info(tenant_settings)').all() as Array<{ name: string }>
+    const hasRevenueGoal = cols.some((c) => c.name === 'monthly_revenue_goal_cents')
+    if (!hasRevenueGoal) {
+      db.exec(`
+        ALTER TABLE tenant_settings ADD COLUMN monthly_revenue_goal_cents INTEGER DEFAULT 1000000;
+        ALTER TABLE tenant_settings ADD COLUMN monthly_new_clients_goal INTEGER DEFAULT 10;
+      `)
+    }
+  })
 }
