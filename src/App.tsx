@@ -4272,6 +4272,8 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
       )
   }
 
+  const subscriptionInactive = me.subscriptionStatus !== 'ACTIVE' && !isTestMode
+
   return (
     <Shell
         title={tab === 'dashboard' ? 'Visão Geral' : tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -4300,31 +4302,72 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
             </div>
         }
     >
-        {tab === 'dashboard' ? <AdminDashboard me={me} stats={stats} onRefresh={loadStats} /> : null}
-        
-        {tab === 'services' ? <AdminServices /> : null}
+        {subscriptionInactive ? (
+            <div style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+            }}>
+                <div className="card" style={{
+                    maxWidth: 420,
+                    width: '100%',
+                    padding: 24,
+                    borderRadius: 16,
+                    textAlign: 'center'
+                }}>
+                    <div style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '999px',
+                        margin: '0 auto 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'var(--primary-50)',
+                        color: 'var(--primary-600)'
+                    }}>
+                        <Lock size={24} />
+                    </div>
+                    <h2 style={{fontSize: '1.1rem', fontWeight: 700, marginBottom: 8}}>Assinatura necessária</h2>
+                    <p style={{fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 16}}>
+                        Para continuar usando o painel administrativo, finalize ou renove a assinatura do seu espaço.
+                    </p>
+                    <p style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>
+                        Mesmo que esta tela seja ocultada no navegador, as ações do painel continuam bloqueadas no servidor
+                        até que a assinatura esteja ativa.
+                    </p>
+                </div>
+            </div>
+        ) : (
+            <>
+                {tab === 'dashboard' ? <AdminDashboard me={me} stats={stats} onRefresh={loadStats} /> : null}
+                
+                {tab === 'services' ? <AdminServices /> : null}
 
-        {tab === 'clients' ? <AdminClients /> : null}
-        
-        {/* Placeholders for other tabs */}
-        {tab === 'finance' ? <AdminFinance /> : null}
+                {tab === 'clients' ? <AdminClients /> : null}
+                
+                {tab === 'finance' ? <AdminFinance /> : null}
 
-        {tab === 'calendar' ? <AdminCalendar /> : null}
+                {tab === 'calendar' ? <AdminCalendar /> : null}
 
-        {tab === 'evolution' ? <AdminEvolutionAPI /> : null}
+                {tab === 'evolution' ? <AdminEvolutionAPI /> : null}
 
-        {tab === 'settings' ? (
-            <AdminSettings tenant={tenant} onUpdate={() => {
-                if(slug) {
-                    api<{ tenant: TenantPublic }>(`/api/public/tenant/${slug}`).then(res => {
-                        if(res.ok) {
-                            setTenant(res.data.tenant)
-                            applyTenantTheme(res.data.tenant)
+                {tab === 'settings' ? (
+                    <AdminSettings tenant={tenant} onUpdate={() => {
+                        if(slug) {
+                            api<{ tenant: TenantPublic }>(`/api/public/tenant/${slug}`).then(res => {
+                                if(res.ok) {
+                                    setTenant(res.data.tenant)
+                                    applyTenantTheme(res.data.tenant)
+                                }
+                            })
                         }
-                    })
-                }
-            }} />
-        ) : null}
+                    }} />
+                ) : null}
+            </>
+        )}
     </Shell>
   )
 }
@@ -5167,7 +5210,41 @@ function Dev() {
         }
     }
 
-    if (!me) return <div className="authContainer"><div className="text-center">Carregando Console...</div></div>
+    if (!me) return (
+        <div className="app-shell">
+            <aside className="app-sidebar">
+                <div className="sidebar-logo">
+                    <div className="logo-icon">
+                        <Sparkles size={18} />
+                    </div>
+                    <span>Lash Space</span>
+                </div>
+            </aside>
+            <main className="app-main">
+                <header className="app-header">
+                    <div className="header-left">
+                        <div className="header-title">Developer Console</div>
+                        <div className="header-subtitle">Preparando ambiente</div>
+                    </div>
+                </header>
+                <div className="app-content" style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                    <div className="card" style={{padding: 24, borderRadius: 16, maxWidth: 320, width: '100%', textAlign: 'center'}}>
+                        <div style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '999px',
+                            margin: '0 auto 12px',
+                            border: '3px solid var(--primary-200)',
+                            borderTopColor: 'var(--primary-600)',
+                            animation: 'spin 0.8s linear infinite'
+                        }} />
+                        <div style={{fontWeight: 600, fontSize: '0.95rem', marginBottom: 4}}>Carregando console</div>
+                        <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>Buscando suas permissões e espaços cadastrados...</div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    )
 
     return (
         <Shell
