@@ -14,11 +14,20 @@ import { badRequest, handleError, notFound, unauthorized } from './http.js'
 import { migrate } from './migrate.js'
 import { hashPassword, signSession, verifyPassword } from './security.js'
 
-if (env.NODE_ENV !== 'production') {
-  console.log(`[Startup] DATABASE_PATH (Config): ${env.DATABASE_PATH}`)
-  console.log(`[Startup] DATABASE_PATH (Resolved): ${path.resolve(env.DATABASE_PATH)}`)
-  console.log(`[Startup] NODE_ENV: ${env.NODE_ENV}`)
-}
+process.on('uncaughtException', (err) => {
+  console.error('[Fatal] uncaughtException', err)
+  process.exit(1)
+})
+
+process.on('unhandledRejection', (err) => {
+  console.error('[Fatal] unhandledRejection', err)
+  process.exit(1)
+})
+
+console.log(`[Startup] NODE_ENV: ${env.NODE_ENV}`)
+console.log(`[Startup] PORT: ${env.PORT}`)
+console.log(`[Startup] DATABASE_PATH (Config): ${env.DATABASE_PATH}`)
+console.log(`[Startup] DATABASE_PATH (Resolved): ${path.resolve(env.DATABASE_PATH)}`)
 
 migrate()
 const db = getDb()
@@ -3995,6 +4004,6 @@ if (env.NODE_ENV === 'production') {
 
 app.use(handleError)
 
-app.listen(env.PORT, () => {
+app.listen(env.PORT, '0.0.0.0', () => {
   console.log(`server listening on :${env.PORT}`)
 })
