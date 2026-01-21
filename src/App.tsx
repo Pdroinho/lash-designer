@@ -443,16 +443,23 @@ function SubscriptionPopup({ isOpen, user, isTestMode }: { isOpen: boolean; user
     if (!isOpen) return null
 
     const handleCheckout = async () => {
-        // Double check at click time
-        const currentTestMode = effectiveTestMode || (typeof window !== 'undefined' && localStorage.getItem('lash_test_mode') === 'true')
-        
-        if (currentTestMode) {
-            setView('checkout')
-            return
-        }
-
         setLoading(true)
         try {
+            let serverTestMode = effectiveTestMode
+
+            const meRes = await api<{ user: SessionUser | null; isTestMode?: boolean }>('/api/auth/me')
+            if (meRes.ok && typeof meRes.data.isTestMode === 'boolean') {
+                serverTestMode = meRes.data.isTestMode || serverTestMode
+            }
+
+            const localFlag = typeof window !== 'undefined' && localStorage.getItem('lash_test_mode') === 'true'
+            const currentTestMode = serverTestMode || localFlag
+
+            if (currentTestMode) {
+                setView('checkout')
+                return
+            }
+
             const res = await api<{url: string}>('/api/admin/subscription/checkout-url')
             if (res.ok && res.data?.url) {
                 window.open(res.data.url, '_blank')
@@ -4226,14 +4233,10 @@ function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: s
     api<{ user: SessionUser | null; isTestMode?: boolean }>('/api/auth/me').then(res => {
         if(res.ok) {
             setMe(res.data.user)
-            // Fix: Sync with server but prefer 'true' if either source is active
             if (typeof res.data.isTestMode === 'boolean') {
                 const serverMode = res.data.isTestMode
-                const localMode = localStorage.getItem('lash_test_mode') === 'true'
-                const effectiveMode = serverMode || localMode
-                
-                setIsTestMode(effectiveMode)
-                localStorage.setItem('lash_test_mode', String(effectiveMode))
+                setIsTestMode(serverMode)
+                localStorage.setItem('lash_test_mode', String(serverMode))
             }
         }
         else {
@@ -5062,14 +5065,10 @@ function Dev() {
         api<{user: SessionUser | null; isTestMode?: boolean}>('/api/auth/me').then(res => {
             if(res.ok && res.data.user?.role === 'DEV') {
                 setMe(res.data.user)
-                // Fix: Sync with server but prefer 'true' if either source is active
                 if (typeof res.data.isTestMode === 'boolean') {
                     const serverMode = res.data.isTestMode
-                    const localMode = localStorage.getItem('lash_test_mode') === 'true'
-                    const effectiveMode = serverMode || localMode
-
-                    setTestMode(effectiveMode)
-                    localStorage.setItem('lash_test_mode', String(effectiveMode))
+                    setTestMode(serverMode)
+                    localStorage.setItem('lash_test_mode', String(serverMode))
                 }
             }
             else nav('/login')
