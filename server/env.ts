@@ -3,6 +3,8 @@ import { z } from 'zod'
 
 dotenv.config()
 
+const jwtSecretFallback = process.env.JWT_SECRET ?? process.env.SESSION_SECRET
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z
@@ -15,7 +17,7 @@ const envSchema = z.object({
       ? '../db_data/app.db' 
       : './data/app.db'
   ),
-  JWT_SECRET: z.string().min(16).default('change-me-in-production-please'),
+  JWT_SECRET: z.string().min(16).default(jwtSecretFallback ?? 'change-me-in-production-please'),
   APPMAX_WEBHOOK_SECRET: z.string().min(16).optional(),
   EVOLUTION_WEBHOOK_SECRET: z.string().min(16).optional(),
   FRONTEND_ORIGIN: z.string().optional(),
@@ -26,7 +28,11 @@ export type Env = z.infer<typeof envSchema>
 
 export const env: Env = (() => {
   const parsed = envSchema.parse(process.env)
-  if (parsed.NODE_ENV === 'production' && parsed.JWT_SECRET === 'change-me-in-production-please') {
+  if (
+    parsed.NODE_ENV === 'production' &&
+    (parsed.JWT_SECRET === 'change-me-in-production-please' ||
+      parsed.JWT_SECRET === 'coloque-uma-senha-secreta-e-longa-aqui-123')
+  ) {
     throw new Error('JWT_SECRET inseguro em produção')
   }
   return parsed
