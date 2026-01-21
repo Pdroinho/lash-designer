@@ -904,6 +904,18 @@ app.get('/api/dev/settings', requireDevHost, requireRole('DEV'), (req, res, next
   }
 })
 
+app.get('/api/public/dev-theme', requireDevHost, (req, res, next) => {
+  try {
+    const row = db
+      .prepare(`SELECT value FROM platform_settings WHERE key = 'dev_primary_color' LIMIT 1`)
+      .get() as { value: string } | undefined
+
+    res.json({ primaryColor: row?.value ?? null })
+  } catch (err) {
+    next(err)
+  }
+})
+
 app.post('/api/dev/settings', requireDevHost, requireRole('DEV'), (req, res, next) => {
   try {
     const body = z.record(z.string()).parse(req.body)

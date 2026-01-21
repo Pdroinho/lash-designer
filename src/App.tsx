@@ -354,7 +354,13 @@ function NotificationsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
         </div>
         <div style={{maxHeight: 400, overflowY: 'auto'}}>
             {loading ? (
-                <div style={{padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem'}}>Carregando...</div>
+                <div style={{padding: 16}}>
+                    <div style={{display: 'flex', flexDirection: 'column', gap: 12}}>
+                        <div className="skeleton skeleton-card" style={{height: 48, borderRadius: 12}} />
+                        <div className="skeleton skeleton-card" style={{height: 48, borderRadius: 12}} />
+                        <div className="skeleton skeleton-card" style={{height: 48, borderRadius: 12}} />
+                    </div>
+                </div>
             ) : notifications.length === 0 ? (
                 <div style={{padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem'}}>Nenhuma notificação recente.</div>
             ) : (
@@ -1309,7 +1315,11 @@ function AdminServices() {
                     </button>
                 </div>
 
-                {loading ? <div style={{padding: 20}}>Carregando...</div> : (
+                {loading ? (
+                    <div style={{padding: 20}}>
+                        <div className="skeleton skeleton-card" style={{height: 160}} />
+                    </div>
+                ) : (
                     <div className="table-scroll">
                         <table className="data-table">
                             <thead>
@@ -2615,9 +2625,10 @@ function AdminCalendar() {
             {agendaTab === 'hours' && (
                 <div className="animate-entry">
                     {businessHoursLoading && (
-                        <div className="pill" style={{color: 'var(--gray-700)', background: 'var(--gray-100)', justifyContent: 'center', margin: '0 24px 16px'}}>
-                            Carregando horários...
-                        </div>
+                        <div
+                            className="pill skeleton skeleton-pill"
+                            style={{justifyContent: 'center', margin: '0 24px 16px', height: 28}}
+                        />
                     )}
                     {businessHoursError && (
                         <div className="pill" style={{color: 'var(--danger)', background: '#fee2e2', justifyContent: 'center', margin: '0 24px 16px'}}>
@@ -3818,7 +3829,7 @@ function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUp
                     <div className="cardHeader">
                         <h2 className="cardTitle">Assinatura</h2>
                         {billingLoading ? (
-                            <span className="status-badge status-pending">Carregando</span>
+                            <span className="status-badge skeleton skeleton-pill" style={{width: 80}} />
                         ) : subscription?.status?.toUpperCase?.() === 'ACTIVE' ? (
                             <span className="status-badge status-success">Ativa</span>
                         ) : subscription ? (
@@ -4850,7 +4861,11 @@ function DevUsers() {
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan={3} style={{textAlign: 'center', padding: 20}}>Carregando...</td></tr>
+                                    <tr>
+                                        <td colSpan={3} style={{padding: 20}}>
+                                            <div className="skeleton skeleton-text" style={{width: 120, margin: '0 auto'}} />
+                                        </td>
+                                    </tr>
                                 ) : users.map(u => (
                                     <tr key={u.id}>
                                         <td>{u.email}</td>
@@ -4897,7 +4912,13 @@ function DevIntegrations() {
         setSettings(s => ({...s, [key]: val}))
     }
 
-    if(loading) return <div style={{padding: 40, textAlign: 'center', color: 'var(--text-muted)'}}>Carregando integrações...</div>
+    if (loading) {
+        return (
+            <div style={{maxWidth: 800, margin: '0 auto', width: '100%'}}>
+                <div className="card skeleton skeleton-card" style={{height: 220}} />
+            </div>
+        )
+    }
 
     return (
         <div style={{maxWidth: 800, margin: '0 auto', width: '100%'}}>
@@ -4939,19 +4960,6 @@ function DevIntegrations() {
                     </div>
 
                     <div style={{height: 1, background: 'var(--border)', margin: '24px 0'}} />
-
-                    <h4 style={{fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 20}}>Hostinger & IA</h4>
-                    <div className="form-stack">
-                        <div className="input-group">
-                            <label className="label">Hostinger API Token</label>
-                            <input className="input" type="password" value={settings['hostinger_api_token'] || ''} onChange={e => handleChange('hostinger_api_token', e.target.value)} placeholder="Token do hPanel" />
-                            <p style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4}}>Usado para criar subdomínios automaticamente.</p>
-                        </div>
-                        <div className="input-group">
-                            <label className="label">DeepSeek API Key</label>
-                            <input className="input" type="password" value={settings['deepseek_api_key'] || ''} onChange={e => handleChange('deepseek_api_key', e.target.value)} />
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -5823,7 +5831,13 @@ function TenantEditModal({
                 </div>
                 <div style={{padding: '2rem'}}>
                     {loading ? (
-                        <div>Carregando...</div>
+                        <div className="form-stack">
+                            <div className="skeleton skeleton-text" style={{width: '60%', marginBottom: 16}} />
+                            <div className="row">
+                                <div className="skeleton skeleton-card" style={{height: 40, flex: 1}} />
+                                <div className="skeleton skeleton-card" style={{height: 40, flex: 1}} />
+                            </div>
+                        </div>
                     ) : (
                         <div className="form-stack">
                             <div className="row">
@@ -5924,6 +5938,13 @@ function UnifiedLogin(props: { hostTenant?: TenantPublic | null; isDevHost?: boo
   useEffect(() => {
     if (props.isDevHost) {
         setAppMode('dev')
+        api<{ primaryColor: string | null }>('/api/public/dev-theme').then((res) => {
+          if (!res.ok) return
+          const color = res.data.primaryColor
+          if (typeof color === 'string' && color.trim()) {
+            setDevPrimaryColor(color)
+          }
+        })
     } else {
         setAppMode(isTenant ? 'tenant' : 'public')
         if (props.hostTenant) applyTenantTheme(props.hostTenant)
@@ -6702,7 +6723,25 @@ function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string; basePa
   const selectedDateStatus = selectedDate ? dateStatusFor(selectedDate) : null
 
   if (loading) {
-    return <div className="bookingRefLayout"><div className="bookingRefCard" style={{alignItems: 'center', justifyContent: 'center'}}>Carregando...</div></div>
+    return (
+      <div className="bookingRefLayout">
+        <div className="bookingRefCard">
+          <div className="bookingRefLeft">
+            <div className="bookingRefBrand">
+              <div className="skeleton skeleton-card" style={{width: 40, height: 40, borderRadius: '50%'}} />
+              <div className="skeleton skeleton-text" style={{width: 120, marginLeft: 12}} />
+            </div>
+            <div className="bookingRefSummary">
+              <div className="skeleton skeleton-text" style={{width: '80%', marginBottom: 8}} />
+              <div className="skeleton skeleton-text" style={{width: '60%'}} />
+            </div>
+          </div>
+          <div className="bookingRefRight">
+            <div className="skeleton skeleton-card" style={{height: 200, borderRadius: 16}} />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (loadError) {
@@ -6954,10 +6993,12 @@ function ClientPortal(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
         })
     }, [me])
 
-    if (authLoading) {
+  if (authLoading) {
         return (
             <Shell title="Minha Área" subtitle="Carregando..." sidebar={<div className="nav" />}>
-                <div className="container text-center" style={{paddingTop: 50}}>Carregando...</div>
+                <div style={{maxWidth: 640, margin: '40px auto 0'}}>
+                    <div className="card skeleton skeleton-card" style={{height: 180}} />
+                </div>
             </Shell>
         )
     }
@@ -7105,7 +7146,11 @@ function RootEntry(props: {
   }, [])
 
   if (checking) {
-    return <div className="container text-center" style={{ paddingTop: 100 }}>Carregando...</div>
+    return (
+      <div className="authContainer">
+        <div className="authCard skeleton skeleton-card" style={{height: 260}} />
+      </div>
+    )
   }
 
   if (!me) return props.loginElement
@@ -7364,7 +7409,11 @@ function ExtractModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan={4} style={{textAlign: 'center', padding: 20}}>Carregando...</td></tr>
+                            <tr>
+                                <td colSpan={4} style={{padding: 20}}>
+                                    <div className="skeleton skeleton-text" style={{width: '60%', margin: '0 auto'}} />
+                                </td>
+                            </tr>
                         ) : transactions.length === 0 ? (
                             <tr><td colSpan={4} style={{textAlign: 'center', padding: 20, color: 'var(--text-muted)'}}>Nenhum registro encontrado</td></tr>
                         ) : transactions.map(t => (
@@ -7483,7 +7532,11 @@ export default function App() {
   }
 
   if (hostTenant === undefined) {
-    return <div className="container text-center" style={{paddingTop: 100}}>Carregando...</div>
+    return (
+      <div className="container" style={{paddingTop: 80}}>
+        <div className="card skeleton skeleton-card" style={{maxWidth: 480, margin: '0 auto', height: 160}} />
+      </div>
+    )
   }
 
   if (hostTenant === null) {
