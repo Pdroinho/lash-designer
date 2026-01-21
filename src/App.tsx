@@ -5073,6 +5073,15 @@ function Dev() {
             }
             else nav('/login')
         })
+        api<{ settings: Record<string, string> }>('/api/dev/settings').then(res => {
+            if (res.ok) {
+                const color = res.data.settings['dev_primary_color']
+                if (typeof color === 'string' && color.trim()) {
+                    setDevColor(color)
+                    setDevPrimaryColor(color)
+                }
+            }
+        })
         loadTenants()
     }, [])
 
@@ -5522,6 +5531,14 @@ function Dev() {
                                             onChange={(c) => {
                                                 setDevColor(c)
                                                 setDevPrimaryColor(c)
+                                                api<{ ok: boolean }>('/api/dev/settings', {
+                                                    method: 'POST',
+                                                    body: JSON.stringify({ dev_primary_color: c })
+                                                }).then(res => {
+                                                    if (!res.ok) {
+                                                        console.error('Falha ao salvar cor global do painel admin/dev', res.error)
+                                                    }
+                                                })
                                             }}
                                         />
                                     </div>
