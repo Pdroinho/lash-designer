@@ -5428,7 +5428,7 @@ function Dev() {
                                                         e.currentTarget.style.color = 'var(--text-muted)'
                                                         e.currentTarget.style.background = 'var(--bg-subtle)'
                                                         e.currentTarget.style.borderColor = 'transparent'
-                                                    }}
+                                                    }} rel="noreferrer"
                                                 >
                                                     <Globe size={14} />
                                                     {t.slug}.lashspace.com.br
@@ -5479,7 +5479,7 @@ function Dev() {
                                                       return `${protocol}//${t.slug}.${rootHost}${port ? `:${port}` : ''}`
                                                     })()}
                                                     target="_blank"
-                                                    style={{fontSize: '0.8rem', color: 'var(--text-muted)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2}}
+                                                    style={{fontSize: '0.8rem', color: 'var(--text-muted)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2}} rel="noreferrer"
                                                 >
                                                     <Globe size={10} />
                                                     {t.slug}.lashspace.com.br
