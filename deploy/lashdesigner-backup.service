@@ -1,0 +1,28 @@
+[Unit]
+Description=Backup do banco Lash Designer
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=lashdesigner
+Group=lashdesigner
+Environment=DATABASE_PATH=/opt/lashdesigner/db_data/app.db
+Environment=BACKUP_DIR=/opt/lashdesigner/backups
+ExecStart=/opt/lashdesigner/app/deploy/backup.sh
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/opt/lashdesigner/db_data /opt/lashdesigner/backups
+UMask=0077

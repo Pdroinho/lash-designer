@@ -1,0 +1,198 @@
+{
+  "src/agenda-v24.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 1,
+    "radiusValues": 5,
+    "lines": 304
+  },
+  "src/appointment-lifecycle-v371.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 0,
+    "radiusValues": 7,
+    "lines": 293
+  },
+  "src/auth-v24.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 5,
+    "radiusValues": 2,
+    "lines": 68
+  },
+  "src/billing-v24.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 3,
+    "radiusValues": 4,
+    "lines": 61
+  },
+  "src/booking-v30.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 35,
+    "radiusValues": 12,
+    "lines": 376
+  },
+  "src/dashboard-v24.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 7,
+    "radiusValues": 1,
+    "lines": 134
+  },
+  "src/design-system.css": {
+    "important": 346,
+    "viewportWidth": 8,
+    "rawHex": 97,
+    "radiusValues": 22,
+    "lines": 890
+  },
+  "src/finance-v24.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 0,
+    "radiusValues": 1,
+    "lines": 25
+  },
+  "src/finance-v36.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 0,
+    "radiusValues": 18,
+    "lines": 795
+  },
+  "src/forms-v24.css": {
+    "important": 9,
+    "viewportWidth": 0,
+    "rawHex": 4,
+    "radiusValues": 7,
+    "lines": 237
+  },
+  "src/foundation-v24.css": {
+    "important": 1,
+    "viewportWidth": 0,
+    "rawHex": 0,
+    "radiusValues": 1,
+    "lines": 116
+  },
+  "src/legal-v56.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 16,
+    "radiusValues": 2,
+    "lines": 2
+  },
+  "src/luma-v32.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 35,
+    "radiusValues": 21,
+    "lines": 663
+  },
+  "src/luma-v35.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 0,
+    "radiusValues": 14,
+    "lines": 1473
+  },
+  "src/mobile-app-v510-part3.css": {
+    "important": 5,
+    "viewportWidth": 0,
+    "rawHex": 1,
+    "radiusValues": 11,
+    "lines": 382
+  },
+  "src/mobile-app-v510-part4.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 0,
+    "radiusValues": 11,
+    "lines": 470
+  },
+  "src/mobile-app-v510.css": {
+    "important": 55,
+    "viewportWidth": 0,
+    "rawHex": 1,
+    "radiusValues": 12,
+    "lines": 892
+  },
+  "src/overlays-v24.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 0,
+    "radiusValues": 3,
+    "lines": 175
+  },
+  "src/product-controls-v40.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 0,
+    "radiusValues": 3,
+    "lines": 206
+  },
+  "src/product-system-v33.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 44,
+    "radiusValues": 4,
+    "lines": 249
+  },
+  "src/responsive.css": {
+    "important": 50,
+    "viewportWidth": 8,
+    "rawHex": 0,
+    "radiusValues": 6,
+    "lines": 1354
+  },
+  "src/services-v24.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 0,
+    "radiusValues": 2,
+    "lines": 28
+  },
+  "src/setup.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 15,
+    "radiusValues": 13,
+    "lines": 269
+  },
+  "src/shell-v24.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 2,
+    "radiusValues": 2,
+    "lines": 503
+  },
+  "src/styles.css": {
+    "important": 53,
+    "viewportWidth": 3,
+    "rawHex": 168,
+    "radiusValues": 30,
+    "lines": 5557
+  },
+  "src/tour-v24.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 0,
+    "radiusValues": 6,
+    "lines": 36
+  },
+  "src/whatsapp-v24.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 1,
+    "radiusValues": 3,
+    "lines": 42
+  },
+  "src/whatsapp-v39.css": {
+    "important": 0,
+    "viewportWidth": 0,
+    "rawHex": 2,
+    "radiusValues": 21,
+    "lines": 335
+  }
+}

@@ -1,0 +1,248 @@
+/*
+ * Lash Designer 3.3 — Product Design System foundation.
+ * Scope: product surfaces only. Marketing landing page is deliberately excluded.
+ *
+ * This file is intentionally conservative: it defines the canonical contract and
+ * prefixed primitives without silently restyling legacy screens. Existing modules
+ * are migrated to this contract incrementally.
+ */
+
+:root {
+  /* Typography */
+  --ld-font-ui: 'Manrope', 'Segoe UI Variable', 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+  --ld-font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+  --ld-type-display-xl-size: clamp(2.75rem, 5vw, 4.5rem);
+  --ld-type-display-xl-line: .96;
+  --ld-type-display-lg-size: clamp(2.15rem, 4vw, 3.45rem);
+  --ld-type-display-lg-line: 1;
+  --ld-type-page-size: clamp(1.55rem, 2.4vw, 2rem);
+  --ld-type-page-line: 1.08;
+  --ld-type-section-size: 1.15rem;
+  --ld-type-section-line: 1.25;
+  --ld-type-subsection-size: .95rem;
+  --ld-type-subsection-line: 1.35;
+  --ld-type-body-size: .875rem;
+  --ld-type-body-line: 1.55;
+  --ld-type-small-size: .78rem;
+  --ld-type-small-line: 1.5;
+  --ld-type-caption-size: .69rem;
+  --ld-type-caption-line: 1.4;
+  --ld-type-micro-size: .61rem;
+  --ld-type-micro-line: 1.25;
+
+  /* Neutral product palette — warm, tactile and beauty-oriented. */
+  --ld-color-canvas: #f7f4f5;
+  --ld-color-canvas-warm: #f3eeeb;
+  --ld-color-panel: #fffefe;
+  --ld-color-paper: #fffdf9;
+  --ld-color-raised: #ffffff;
+  --ld-color-soft: #f2edef;
+  --ld-color-soft-warm: #f8f2ee;
+  --ld-color-muted: #e9e2e5;
+
+  --ld-color-ink-strong: #2a1e23;
+  --ld-color-ink-body: #5f5258;
+  --ld-color-ink-soft: #7b6e74;
+  --ld-color-ink-faint: #9b8e94;
+
+  --ld-color-line-soft: rgba(59, 36, 45, .11);
+  --ld-color-line-strong: rgba(59, 36, 45, .19);
+
+  /* Brand family. Tenant customization replaces the accent and may softly tint neutral surfaces through theme.ts. */
+  --ld-color-wine-900: #4d172d;
+  --ld-color-wine-800: #651d3c;
+  --ld-color-wine-700: #7d2449;
+  --ld-color-wine-600: #972d57;
+  --ld-color-rose-500: #b43a68;
+  --ld-color-rose-300: #eca6c0;
+  --ld-color-blush-100: #fdebf2;
+  --ld-color-blush-50: #fff7fa;
+
+  --ld-color-accent: var(--primary-600, var(--ld-color-wine-600));
+  --ld-color-accent-hover: var(--primary-700, var(--ld-color-wine-700));
+  --ld-color-accent-deep: var(--primary-800, var(--ld-color-wine-800));
+  --ld-color-accent-soft: var(--primary-50, var(--ld-color-blush-50));
+  --ld-color-accent-soft-strong: var(--primary-100, var(--ld-color-blush-100));
+  --ld-color-on-accent: #ffffff;
+
+  /* Semantic colors remain stable and never inherit tenant accent. */
+  --ld-color-success: #287457;
+  --ld-color-success-soft: #eaf6f0;
+  --ld-color-warning: #8b5f18;
+  --ld-color-warning-soft: #fff7df;
+  --ld-color-danger: #a4253e;
+  --ld-color-danger-soft: #fff0f3;
+  --ld-color-info: #245c9e;
+  --ld-color-info-soft: #edf4ff;
+
+  /* Spacing: 4px base, with a deliberate product scale. */
+  --ld-space-0: 0;
+  --ld-space-1: 4px;
+  --ld-space-2: 8px;
+  --ld-space-3: 12px;
+  --ld-space-4: 16px;
+  --ld-space-5: 20px;
+  --ld-space-6: 24px;
+  --ld-space-8: 32px;
+  --ld-space-10: 40px;
+  --ld-space-12: 48px;
+  --ld-space-16: 64px;
+  --ld-space-20: 80px;
+
+  /* Geometry: one family, not arbitrary per-screen rounding. */
+  --ld-radius-xs: 8px;
+  --ld-radius-control: 12px;
+  --ld-radius-card: 18px;
+  --ld-radius-panel: 24px;
+  --ld-radius-hero: 28px;
+  --ld-radius-pill: 999px;
+
+  /* Elevation. Borders do most of the work; shadows are quiet. */
+  --ld-shadow-none: none;
+  --ld-shadow-xs: 0 1px 2px rgba(42, 28, 36, .04);
+  --ld-shadow-sm: 0 8px 24px rgba(42, 28, 36, .06);
+  --ld-shadow-md: 0 18px 48px rgba(42, 28, 36, .10);
+  --ld-shadow-overlay: 0 32px 90px rgba(28, 18, 24, .22), 0 4px 18px rgba(28, 18, 24, .09);
+
+  /* Controls and layout. */
+  --ld-control-height-sm: 36px;
+  --ld-control-height: 44px;
+  --ld-control-height-lg: 48px;
+  --ld-touch-target: 44px;
+  --ld-sidebar-width: 268px;
+  --ld-sidebar-collapsed-width: 76px;
+  --ld-topbar-height: 78px;
+  --ld-page-max-width: 1680px;
+  --ld-content-reading-width: 720px;
+  --ld-content-form-width: 640px;
+  --ld-content-settings-width: 980px;
+  --ld-page-gutter: clamp(16px, 2.1vw, 34px);
+
+  /* Motion. Product motion is quick, intentional and never decorative by default. */
+  --ld-motion-fast: 120ms;
+  --ld-motion-base: 170ms;
+  --ld-motion-slow: 240ms;
+  --ld-ease-standard: cubic-bezier(.2, .75, .25, 1);
+  --ld-ease-emphasized: cubic-bezier(.16, 1, .3, 1);
+
+  --ld-focus-ring-color: color-mix(in srgb, var(--ld-color-accent) 28%, transparent);
+  --ld-focus-ring: 0 0 0 3px var(--ld-focus-ring-color);
+
+}
+
+
+:root[data-theme='dark']:not([data-mode='dev']),
+:root[data-mode='dev'][data-dev-theme='dark'] {
+  --ld-color-canvas: #151216;
+  --ld-color-canvas-warm: #171317;
+  --ld-color-panel: #1b171c;
+  --ld-color-paper: #1d181d;
+  --ld-color-raised: #211c22;
+  --ld-color-soft: #292229;
+  --ld-color-soft-warm: #2c242a;
+  --ld-color-muted: #342b33;
+  --ld-color-ink-strong: #f5eff2;
+  --ld-color-ink-body: #d0c5cb;
+  --ld-color-ink-soft: #a99ca4;
+  --ld-color-ink-faint: #82767d;
+  --ld-color-line-soft: rgba(255, 239, 247, .095);
+  --ld-color-line-strong: rgba(255, 239, 247, .17);
+  --ld-color-accent: var(--primary-on-dark-soft, #c96f94);
+  --ld-color-accent-hover: var(--primary-on-dark, #e597b6);
+  --ld-color-accent-deep: var(--primary-on-dark, #e597b6);
+  --ld-color-accent-soft: color-mix(in srgb, var(--ld-color-accent) 13%, var(--ld-color-raised));
+  --ld-color-accent-soft-strong: color-mix(in srgb, var(--ld-color-accent) 21%, var(--ld-color-raised));
+  --ld-shadow-xs: 0 1px 2px rgba(0, 0, 0, .24);
+  --ld-shadow-sm: 0 10px 28px rgba(0, 0, 0, .22);
+  --ld-shadow-md: 0 24px 60px rgba(0, 0, 0, .34);
+  --ld-shadow-overlay: 0 36px 100px rgba(0, 0, 0, .55), 0 4px 18px rgba(0, 0, 0, .30);
+}
+
+/* Canonical primitives for newly migrated components. */
+.ld-ds-page-title {
+  margin: 0;
+  color: var(--ld-color-ink-strong);
+  font: 760 var(--ld-type-page-size)/var(--ld-type-page-line) var(--ld-font-ui);
+  letter-spacing: -.04em;
+  text-wrap: balance;
+}
+
+.ld-ds-display-title {
+  margin: 0;
+  color: var(--ld-color-ink-strong);
+  font: 560 var(--ld-type-display-lg-size)/var(--ld-type-display-lg-line) var(--ld-font-display);
+  letter-spacing: -.05em;
+  text-wrap: balance;
+}
+
+.ld-ds-card {
+  min-width: 0;
+  border: 1px solid var(--ld-color-line-soft);
+  border-radius: var(--ld-radius-card);
+  background: var(--ld-color-raised);
+  box-shadow: var(--ld-shadow-xs);
+}
+
+.ld-ds-panel {
+  min-width: 0;
+  border: 1px solid var(--ld-color-line-soft);
+  border-radius: var(--ld-radius-panel);
+  background: var(--ld-color-raised);
+  box-shadow: var(--ld-shadow-sm);
+}
+
+.ld-ds-button {
+  min-height: var(--ld-control-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ld-space-2);
+  padding: 0 var(--ld-space-4);
+  border: 1px solid var(--ld-color-line-strong);
+  border-radius: var(--ld-radius-control);
+  background: var(--ld-color-raised);
+  color: var(--ld-color-ink-body);
+  font: 700 .84rem/1 var(--ld-font-ui);
+  cursor: pointer;
+  transition: background-color var(--ld-motion-base) var(--ld-ease-standard), border-color var(--ld-motion-base) var(--ld-ease-standard), color var(--ld-motion-base) var(--ld-ease-standard), transform var(--ld-motion-fast) var(--ld-ease-standard);
+}
+.ld-ds-button:hover { background: var(--ld-color-soft); color: var(--ld-color-ink-strong); }
+.ld-ds-button:focus-visible { outline: none; box-shadow: var(--ld-focus-ring); }
+.ld-ds-button--primary { border-color: var(--ld-color-accent); background: var(--ld-color-accent); color: var(--ld-color-on-accent); }
+.ld-ds-button--primary:hover { border-color: var(--ld-color-accent-hover); background: var(--ld-color-accent-hover); color: var(--ld-color-on-accent); transform: translateY(-1px); }
+.ld-ds-button--quiet { border-color: transparent; background: transparent; }
+.ld-ds-button--danger { border-color: color-mix(in srgb, var(--ld-color-danger) 28%, var(--ld-color-line-soft)); background: var(--ld-color-danger-soft); color: var(--ld-color-danger); }
+
+.ld-ds-input {
+  width: 100%;
+  min-height: var(--ld-control-height);
+  padding: 0 var(--ld-space-3);
+  border: 1px solid var(--ld-color-line-strong);
+  border-radius: var(--ld-radius-control);
+  background: var(--ld-color-raised);
+  color: var(--ld-color-ink-strong);
+  font: 500 var(--ld-type-body-size)/1 var(--ld-font-ui);
+  outline: none;
+  transition: border-color var(--ld-motion-base) var(--ld-ease-standard), box-shadow var(--ld-motion-base) var(--ld-ease-standard);
+}
+.ld-ds-input::placeholder { color: var(--ld-color-ink-faint); }
+.ld-ds-input:focus { border-color: var(--ld-color-accent); box-shadow: var(--ld-focus-ring); }
+
+.ld-ds-badge {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--ld-color-line-soft);
+  border-radius: var(--ld-radius-pill);
+  background: var(--ld-color-soft);
+  color: var(--ld-color-ink-body);
+  font: 700 var(--ld-type-caption-size)/1 var(--ld-font-ui);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ld-ds-button,
+  .ld-ds-input { transition: none; }
+}

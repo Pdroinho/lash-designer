@@ -1,0 +1,149 @@
+{
+  "generated_at": "2026-08-06",
+  "assets": [
+    {
+      "file": "community-1672.webp",
+      "width": 1672,
+      "height": 941,
+      "bytes": 84820
+    },
+    {
+      "file": "community-960.webp",
+      "width": 960,
+      "height": 540,
+      "bytes": 42888
+    },
+    {
+      "file": "hero-1672.webp",
+      "width": 1672,
+      "height": 941,
+      "bytes": 60618
+    },
+    {
+      "file": "hero-960.webp",
+      "width": 960,
+      "height": 540,
+      "bytes": 30244
+    },
+    {
+      "file": "mobile-booking-1440.webp",
+      "width": 1440,
+      "height": 960,
+      "bytes": 34096
+    },
+    {
+      "file": "mobile-booking-720.webp",
+      "width": 720,
+      "height": 480,
+      "bytes": 15070
+    },
+    {
+      "file": "owner-1100.webp",
+      "width": 1100,
+      "height": 1375,
+      "bytes": 75634
+    },
+    {
+      "file": "owner-640.webp",
+      "width": 640,
+      "height": 800,
+      "bytes": 36910
+    },
+    {
+      "file": "planning-1440.webp",
+      "width": 1440,
+      "height": 960,
+      "bytes": 64198
+    },
+    {
+      "file": "planning-720.webp",
+      "width": 720,
+      "height": 480,
+      "bytes": 26934
+    },
+    {
+      "file": "result-1100.webp",
+      "width": 1100,
+      "height": 688,
+      "bytes": 46740
+    },
+    {
+      "file": "result-640.webp",
+      "width": 640,
+      "height": 400,
+      "bytes": 15424
+    },
+    {
+      "file": "result-alt-1100.webp",
+      "width": 1100,
+      "height": 688,
+      "bytes": 61074
+    },
+    {
+      "file": "result-alt-640.webp",
+      "width": 640,
+      "height": 400,
+      "bytes": 21546
+    },
+    {
+      "file": "reveal-1440.webp",
+      "width": 1440,
+      "height": 960,
+      "bytes": 57080
+    },
+    {
+      "file": "reveal-720.webp",
+      "width": 720,
+      "height": 480,
+      "bytes": 23614
+    },
+    {
+      "file": "studio-1672.webp",
+      "width": 1672,
+      "height": 941,
+      "bytes": 83948
+    },
+    {
+      "file": "studio-960.webp",
+      "width": 960,
+      "height": 540,
+      "bytes": 43124
+    },
+    {
+      "file": "treatment-1440.webp",
+      "width": 1440,
+      "height": 960,
+      "bytes": 55000
+    },
+    {
+      "file": "treatment-720.webp",
+      "width": 720,
+      "height": 480,
+      "bytes": 23534
+    },
+    {
+      "file": "proof-mariana.webp",
+      "width": 720,
+      "height": 1279,
+      "bytes": 43404
+    },
+    {
+      "file": "proof-camila.webp",
+      "width": 720,
+      "height": 1279,
+      "bytes": 50246
+    },
+    {
+      "file": "proof-fernanda.webp",
+      "width": 720,
+      "height": 1279,
+      "bytes": 41050
+    },
+    {
+      "file": "proof-juliana.webp",
+      "width": 720,
+      "height": 1279,
+      "bytes": 33036
+    }
+  ]
+}

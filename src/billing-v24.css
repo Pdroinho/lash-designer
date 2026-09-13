@@ -1,0 +1,60 @@
+/* Billing 2.4 — same commercial rules, denser product-scale presentation. */
+.billing-shell { width:100%; max-width:1240px; min-width:0; gap:18px; }
+.billing-intro {
+  position:relative;
+  min-height:164px;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:24px;
+  padding:26px 30px;
+  border-radius:22px;
+  overflow:hidden;
+  isolation:isolate;
+  background:
+    radial-gradient(circle at 84% 12%, rgba(255,255,255,.11), transparent 26%),
+    linear-gradient(104deg,
+      color-mix(in srgb, var(--primary-900) 96%, #141615 4%) 0%,
+      color-mix(in srgb, var(--primary-800) 93%, #182019 7%) 57%,
+      color-mix(in srgb, var(--primary-600) 92%, #ffffff 8%) 100%);
+}
+.billing-intro::before { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg, transparent 0%, transparent 60%, color-mix(in srgb, var(--primary-600) 12%, transparent) 100%); }
+.billing-intro > * { position:relative; z-index:1; }
+.billing-intro h1 { max-width:680px; margin:6px 0 8px; font:600 clamp(1.75rem,3vw,2.55rem)/1.02 var(--font-display); letter-spacing:-.045em; text-wrap:balance; }
+.billing-intro p { max-width:620px; margin:0; font-size:.91rem; line-height:1.58; }
+.billing-trust { align-self:end; max-width:380px; justify-content:flex-end; flex-wrap:wrap; gap:7px; }
+.billing-trust span { min-height:30px; display:inline-flex; align-items:center; padding:5px 9px; font-size:.67rem; }
+.billing-layout { min-width:0; gap:16px; grid-template-columns:minmax(0,1fr) minmax(300px,350px); }
+.billing-plan-grid { min-width:0; gap:11px; }
+.billing-plan { min-width:0; min-height:154px; padding:18px; }
+.billing-plan__monthly b { font-size:clamp(1.6rem,3vw,2.15rem); }
+.billing-summary { min-width:0; position:sticky; top:14px; padding:22px; border-radius:19px; }
+.billing-summary__price { gap:12px; }
+.billing-history { min-width:0; }
+@media(max-width:960px){
+ .billing-intro{grid-template-columns:1fr;align-items:start;min-height:0;padding:24px}
+ .billing-trust{align-self:auto;justify-content:flex-start;max-width:none}
+ .billing-layout{grid-template-columns:1fr}
+ .billing-summary{position:static}
+}
+@media(max-width:640px){
+ .billing-shell{gap:13px;padding-bottom:18px}
+ .billing-intro{padding:20px 18px;border-radius:18px}
+ .billing-intro h1{font-size:clamp(1.7rem,9vw,2.25rem)}
+ .billing-intro p{font-size:.84rem}
+ .billing-trust{display:flex;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;scrollbar-width:none}
+ .billing-trust::-webkit-scrollbar{display:none}
+ .billing-trust span{flex:0 0 auto}
+ .billing-plan-grid{grid-template-columns:1fr}
+ .billing-plan{min-height:0;padding:16px}
+ .billing-summary{padding:18px;border-radius:17px}
+ .billing-summary__price{align-items:flex-end;flex-wrap:wrap}
+ .billing-history__list>div{grid-template-columns:minmax(0,1fr) auto;row-gap:5px}
+ .billing-history__list em{grid-column:1/-1;justify-self:start}
+}
+@media(max-width:420px){
+ .billing-intro{padding:17px 16px;gap:12px}
+ .billing-intro h1{margin:4px 0 6px;font-size:clamp(1.55rem,8.2vw,1.9rem);line-height:1.04}
+ .billing-intro p{font-size:.79rem;line-height:1.48}
+ .billing-trust span{min-height:27px;padding:4px 8px;font-size:.62rem}
+ .billing-plan__monthly b{font-size:1.65rem}
+}

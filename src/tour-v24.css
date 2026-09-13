@@ -1,0 +1,35 @@
+/* Product tour 2.4 — independent portalled overlay, no legacy tour selectors. */
+.ld-tour-layer { position:fixed; inset:0; z-index:900; pointer-events:none; }
+.ld-tour-backdrop { position:absolute; inset:0; background:rgba(22,18,22,.64); backdrop-filter:blur(2px); }
+.ld-tour-spotlight { position:absolute; z-index:1; pointer-events:none; border-radius:16px; box-shadow:0 0 0 9999px rgba(22,18,22,.66),0 0 0 2px rgba(255,255,255,.82),0 18px 55px rgba(0,0,0,.24); transition:top .18s ease,left .18s ease,width .18s ease,height .18s ease; }
+.ld-tour-card { position:fixed; z-index:2; left:50%; top:50%; width:min(420px,calc(100% - 32px)); max-height:min(620px,calc(100dvh - 32px)); overflow-y:auto; transform:translate(-50%,-50%); padding:24px; border:1px solid var(--line-strong); border-radius:22px; background:var(--surface-raised); color:var(--ink-strong); box-shadow:0 32px 80px rgba(25,16,21,.28); pointer-events:auto; outline:none; }
+.ld-tour-card[style] { transform:none; }
+.ld-tour-topline,.ld-tour-footer,.ld-tour-actions,.ld-tour-counter { display:flex; align-items:center; }
+.ld-tour-topline,.ld-tour-footer { justify-content:space-between; gap:14px; }
+.ld-tour-kicker { display:inline-flex; align-items:center; gap:8px; color:var(--brand-action); font-size:.7rem; font-weight:820; letter-spacing:.09em; text-transform:uppercase; }
+.ld-tour-brand-mark { flex:none; color:var(--brand-action); }
+.ld-tour-close { width:38px; height:38px; flex:none; display:grid; place-items:center; border:0; border-radius:12px; background:var(--surface-soft); color:var(--ink-soft); cursor:pointer; }
+.ld-tour-progress { display:grid; grid-template-columns:repeat(auto-fit,minmax(12px,1fr)); gap:5px; margin:16px 0 20px; }
+.ld-tour-progress span { height:4px; border-radius:999px; background:var(--surface-muted); }
+.ld-tour-progress span.active { background:var(--brand-action); }
+.ld-tour-card h2 { margin:0 0 10px; font-size:clamp(1.18rem,2vw,1.36rem); line-height:1.2; letter-spacing:-.03em; text-wrap:balance; }
+.ld-tour-card p { margin:0 0 22px; color:var(--ink-soft); font-size:.9rem; line-height:1.62; }
+.ld-tour-footer { padding-top:16px; border-top:1px solid var(--line-soft); }
+.ld-tour-counter { gap:10px; color:var(--ink-faint); font-size:.76rem; font-weight:700; }
+.ld-tour-skip { padding:4px; border:0; background:transparent; color:var(--ink-soft); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.ld-tour-actions { justify-content:flex-end; gap:8px; }
+.ld-tour-actions .btn { min-width:96px; white-space:nowrap; }
+@media(max-width:899px){
+ .ld-tour-card,.ld-tour-card[style]{left:12px;right:12px;top:auto;bottom:max(12px,env(safe-area-inset-bottom));width:auto;max-height:min(72dvh,560px);transform:none}
+ .ld-tour-spotlight{border-radius:13px}
+}
+@media(max-width:420px){
+ .ld-tour-card,.ld-tour-card[style]{left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));padding:18px;border-radius:19px}
+ .ld-tour-footer{display:grid;grid-template-columns:1fr;gap:12px}
+ .ld-tour-counter{justify-content:space-between}
+ .ld-tour-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+ .ld-tour-actions .btn{width:100%;min-width:0}
+ .ld-tour-actions .btn:only-child{grid-column:2}
+}
+@media(max-width:340px){.ld-tour-actions{grid-template-columns:1fr}.ld-tour-actions .btn:only-child{grid-column:1}}
+@media(prefers-reduced-motion:reduce){.ld-tour-spotlight{transition:none}}

@@ -1,0 +1,381 @@
+/* Lash Designer 5.10.2 — mobile app foundation, phase 3.
+   Financeiro, Luma e Assinatura receive true mobile-app composition.
+   Desktop remains owned by the existing product CSS. */
+
+.billing-mobile-cta { display: none; }
+
+@media (max-width: 640px) {
+  /* Financeiro ------------------------------------------------------- */
+  .finance36 {
+    gap: 11px;
+    padding-bottom: 8px;
+  }
+
+  .finance36-hero {
+    display: grid;
+    gap: 12px;
+    padding: 4px 1px 6px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .finance36-hero::after { display: none; }
+  .finance36-hero-copy { max-width: none; }
+  .finance36-eyebrow { font-size: .59rem; }
+  .finance36-hero h2 {
+    max-width: 18ch;
+    margin: 5px 0 0;
+    font-size: clamp(1.38rem, 7vw, 1.72rem);
+    line-height: 1.04;
+    letter-spacing: -.045em;
+  }
+  .finance36-hero p { display: none; }
+
+  .finance36-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .finance36-btn {
+    min-width: 0;
+    min-height: 44px;
+    justify-content: center;
+    padding: 0 10px;
+    border-radius: 14px;
+    font-size: .64rem;
+  }
+  .finance36-btn.is-primary { grid-column: 1 / -1; }
+  .finance36-btn.is-luma { grid-column: auto; }
+
+  .finance36-kpis,
+  .finance36-kpis:is(:where(*)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .finance36-kpi {
+    min-height: 112px;
+    gap: 6px;
+    padding: 13px 12px 12px;
+    border-radius: 17px;
+    box-shadow: 0 4px 14px rgba(39, 29, 34, .035);
+  }
+  .finance36-kpi::before { width: 2px; }
+  .finance36-kpi > span { font-size: .58rem; line-height: 1.2; }
+  .finance36-kpi > strong {
+    font-size: clamp(1.1rem, 5.6vw, 1.46rem);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .finance36-kpi > small { font-size: .56rem; line-height: 1.35; }
+
+  .finance36-primary-grid,
+  .finance36-secondary-grid { gap: 10px; }
+  .finance36-panel {
+    border-radius: 18px;
+    box-shadow: 0 5px 17px rgba(39, 29, 34, .035);
+  }
+  .finance36-panel-head {
+    min-height: 58px;
+    gap: 9px;
+    padding: 12px 13px;
+  }
+  .finance36-panel-head h3 { font-size: .86rem; }
+  .finance36-panel-kicker { font-size: .54rem; }
+  .finance36-legend {
+    max-width: 48%;
+    gap: 5px 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    font-size: .53rem;
+  }
+
+  .finance40-chart-shell { padding: 8px 8px 11px; }
+  .finance40-chart-canvas,
+  .finance40-chart-empty { height: 210px; min-height: 210px; }
+  .finance40-chart-caption { padding-inline: 4px; }
+  .finance40-chart-caption > span { font-size: .58rem; }
+  .finance40-chart-caption > small { font-size: .54rem; }
+
+  .finance36-reading-list { padding: 8px 13px; }
+  .finance36-reading-list > div { min-height: 43px; }
+  .finance36-reading-list span,
+  .finance36-reading-list strong { font-size: .64rem; }
+  .finance36-luma-card {
+    min-height: 44px;
+    margin: 5px 10px 10px;
+    padding: 0 11px;
+    border-radius: 13px;
+  }
+  .finance36-definition { padding: 0 13px 13px; font-size: .56rem; }
+
+  .finance36-transactions-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .finance36-filter-group {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 3px;
+    border-radius: 13px;
+    background: var(--f36-soft);
+  }
+  .finance36-filter-group button {
+    min-height: 36px;
+    border-radius: 10px;
+    font-size: .58rem;
+  }
+  .finance36-transaction-list { padding: 3px 12px 8px; }
+  .finance36-transaction {
+    grid-template-columns: 32px minmax(0, 1fr) auto 30px;
+    gap: 8px;
+    min-height: 62px;
+    padding: 9px 0;
+  }
+  .finance36-transaction-copy strong { font-size: .68rem; }
+  .finance36-transaction-copy span,
+  .finance36-transaction time { font-size: .53rem; }
+  .finance36-transaction-value { font-size: .65rem; }
+  .finance36-inline-action { min-height: 42px; margin: 7px 13px 12px; }
+
+  .finance36-side-stack { gap: 10px; }
+  .finance36-goal { padding: 13px 13px 4px; }
+  .finance36-expense-list { padding: 13px; }
+
+  .finance36-dialog {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 88dvh;
+    margin: 0 !important;
+    overflow-y: auto;
+    border-radius: 24px 24px 0 0 !important;
+    border-bottom: 0 !important;
+  }
+
+  /* Luma ------------------------------------------------------------- */
+  .ld-shell.has-mobile-tabbar .luma34-page {
+    width: calc(100% + 24px);
+    margin: -12px -12px 0;
+  }
+  .ld-shell.has-mobile-tabbar .luma34--page {
+    width: 100%;
+    height: calc(100dvh - var(--ld-mobile-topbar-height) - var(--ld-mobile-tabbar-height) - env(safe-area-inset-bottom));
+    min-height: 520px;
+    grid-template-rows: auto minmax(0, 1fr);
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--surface-canvas);
+  }
+  .ld-shell.has-mobile-tabbar .luma34--page:has(> .luma34-disabled) { grid-template-rows: auto auto minmax(0, 1fr); }
+  .ld-shell.has-mobile-tabbar .luma34--page > .luma34-disabled,
+  .ld-shell.has-mobile-tabbar .luma34--page > .luma34-workspace { grid-row: auto; }
+  .ld-shell.has-mobile-tabbar .luma34-header {
+    min-height: 58px;
+    padding: 8px 11px 8px 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--line-soft) 82%, transparent);
+    background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
+    backdrop-filter: blur(18px);
+  }
+  .ld-shell.has-mobile-tabbar .luma34-brand-mark { width: 32px; height: 32px; border-radius: 10px; }
+  .ld-shell.has-mobile-tabbar .luma34-brand-row { font-size: .78rem; }
+  .ld-shell.has-mobile-tabbar .luma34-usage strong { font-size: .67rem; }
+  .ld-shell.has-mobile-tabbar .luma34-new,
+  .ld-shell.has-mobile-tabbar .luma34-history-toggle,
+  .ld-shell.has-mobile-tabbar .luma34-close {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    border-radius: 12px;
+  }
+
+  .ld-shell.has-mobile-tabbar .luma34-empty {
+    align-content: start;
+    gap: 13px;
+    padding: 18px 12px 12px;
+  }
+  .ld-shell.has-mobile-tabbar .luma34-hero h3 {
+    max-width: 13ch;
+    font-size: clamp(1.55rem, 7.5vw, 2rem);
+  }
+  .ld-shell.has-mobile-tabbar .luma34-hero p { max-width: 34ch; font-size: .76rem; }
+  .ld-shell.has-mobile-tabbar .luma34-starters {
+    width: calc(100% + 12px);
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    margin-right: -12px;
+    padding: 1px 12px 6px 0;
+    scrollbar-width: none;
+  }
+  .ld-shell.has-mobile-tabbar .luma34-starters::-webkit-scrollbar { display: none; }
+  .ld-shell.has-mobile-tabbar .luma34-starters button,
+  .ld-shell.has-mobile-tabbar .luma34-starters button:last-child {
+    width: min(78vw, 286px);
+    min-width: min(78vw, 286px);
+    min-height: 88px;
+    align-content: space-between;
+    scroll-snap-align: start;
+    padding: 13px;
+    border-radius: 17px;
+    white-space: normal;
+  }
+
+  .ld-shell.has-mobile-tabbar .luma34-thread-flow { padding: 10px 10px 12px; }
+  .ld-shell.has-mobile-tabbar .luma34-message { max-width: 94%; }
+  .ld-shell.has-mobile-tabbar .luma34-message.is-user { max-width: 88%; }
+  .ld-shell.has-mobile-tabbar .luma34-answer { border-radius: 16px; }
+  .ld-shell.has-mobile-tabbar .luma34-followups { padding: 10px; border-radius: 15px; }
+  .ld-shell.has-mobile-tabbar .luma34-followups button { min-height: 42px; }
+  .ld-shell.has-mobile-tabbar .luma34-composer {
+    bottom: 0;
+    padding: 0 9px max(9px, env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, transparent, var(--surface-canvas) 30%);
+  }
+  .ld-shell.has-mobile-tabbar .luma34-composer-shell {
+    padding: 9px;
+    border-radius: 17px;
+    background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+    box-shadow: 0 10px 28px rgba(33, 22, 30, .09);
+  }
+  .ld-shell.has-mobile-tabbar .luma34-composer textarea {
+    min-height: 42px;
+    max-height: 96px;
+    font-size: .77rem;
+  }
+  .ld-shell.has-mobile-tabbar .luma35-attach,
+  .ld-shell.has-mobile-tabbar .luma34-send { width: 40px; height: 40px; min-width: 40px; border-radius: 12px; }
+
+  .ld-shell.has-mobile-tabbar .luma34-conversations { padding: 10px; }
+  .ld-shell.has-mobile-tabbar .luma34-history-search { min-height: 44px; border-radius: 14px; }
+  .ld-shell.has-mobile-tabbar .luma34-conversation-item { min-height: 50px; border-radius: 14px; }
+  .ld-shell.has-mobile-tabbar .luma35-credit-upsell { border-radius: 17px; }
+
+  /* Assinatura ------------------------------------------------------- */
+  .billing-shell {
+    gap: 11px;
+    padding-bottom: 82px;
+  }
+  .billing-intro {
+    min-height: 0;
+    display: block;
+    padding: 17px 15px;
+    border-radius: 19px;
+  }
+  .billing-intro h1 {
+    max-width: 17ch;
+    margin: 5px 0 7px;
+    font-size: clamp(1.45rem, 7.2vw, 1.85rem);
+    line-height: 1.03;
+  }
+  .billing-intro p { max-width: 34ch; font-size: .73rem; line-height: 1.45; }
+  .billing-promo-copy { display: block; margin-top: 8px; font-size: .6rem; line-height: 1.4; }
+  .billing-trust {
+    width: calc(100% + 6px);
+    margin: 12px -3px -3px;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .billing-trust::-webkit-scrollbar { display: none; }
+  .billing-trust span { flex: 0 0 auto; min-height: 28px; padding: 5px 8px; font-size: .57rem; }
+
+  .billing-layout { gap: 10px; }
+  .billing-plan-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+  .billing-plan {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'top monthly'
+      'total saving';
+    align-items: center;
+    gap: 7px 12px;
+    padding: 13px 14px;
+    border-radius: 16px;
+    text-align: left;
+  }
+  .billing-plan__top { grid-area: top; align-items: center; }
+  .billing-plan__top strong { font-size: .78rem; }
+  .billing-plan__top em { padding: 4px 6px; font-size: .51rem; }
+  .billing-plan__monthly {
+    grid-area: monthly;
+    justify-self: end;
+    margin: 0;
+  }
+  .billing-plan__monthly b { font-size: 1rem; }
+  .billing-plan__monthly small { font-size: .55rem; }
+  .billing-plan__total { grid-area: total; margin: 0; font-size: .56rem; }
+  .billing-plan__saving { grid-area: saving; justify-self: end; margin: 0; font-size: .56rem; }
+  .billing-plan.is-featured::after { inset: 8px 8px auto auto; width: 6px; height: 6px; }
+
+  .billing-summary {
+    position: static;
+    padding: 16px;
+    border-radius: 18px;
+  }
+  .billing-summary h2 { margin-bottom: 8px; font-size: 1.15rem; }
+  .billing-summary__price strong { font-size: 1.65rem; }
+  .billing-summary ul { margin: 14px 0; gap: 7px; }
+  .billing-summary li { font-size: .68rem; line-height: 1.35; }
+  .billing-summary .billing-checkout { display: none; }
+  .billing-legal { font-size: .56rem; line-height: 1.4; }
+
+  .billing-history { padding: 15px; border-radius: 18px; }
+  .billing-history__list > div { min-height: 48px; gap: 8px; }
+
+  .billing-mobile-cta {
+    position: fixed;
+    z-index: 23;
+    left: 10px;
+    right: 10px;
+    bottom: calc(var(--ld-mobile-tabbar-height) + 9px + env(safe-area-inset-bottom));
+    min-height: 62px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 9px 8px 13px;
+    border: 1px solid color-mix(in srgb, var(--line-soft) 86%, transparent);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+    box-shadow: 0 14px 38px rgba(34, 26, 30, .16);
+    backdrop-filter: blur(20px) saturate(1.12);
+  }
+  .billing-mobile-cta > div { min-width: 0; display: grid; gap: 2px; }
+  .billing-mobile-cta small { color: var(--ink-faint); font: 700 .54rem/1.1 var(--font-ui); }
+  .billing-mobile-cta strong { color: var(--ink-strong); font: 820 .9rem/1.1 var(--font-ui); }
+  .billing-mobile-cta button {
+    min-height: 44px;
+    min-width: 128px;
+    padding: 0 13px;
+    border: 0;
+    border-radius: 13px;
+    background: var(--brand-action);
+    color: #fff;
+    font: 760 .65rem/1 var(--font-ui);
+  }
+  .billing-mobile-cta button:disabled { opacity: .58; }
+}
+
+@media (max-width: 380px) {
+  .finance36-btn { font-size: .59rem; padding-inline: 7px; }
+  .finance36-kpi { min-height: 108px; padding-inline: 10px; }
+  .billing-mobile-cta { left: 7px; right: 7px; }
+  .billing-mobile-cta button { min-width: 116px; padding-inline: 10px; }
+}

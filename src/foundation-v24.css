@@ -1,0 +1,115 @@
+/* Lash Designer 2.4 — structural foundation
+   This file owns viewport sizing and scroll behavior for migrated surfaces. */
+:root {
+  --ld-sidebar-expanded: 268px;
+  --ld-sidebar-collapsed: 76px;
+  --ld-topbar-height: 78px;
+  --ld-page-max: 1680px;
+  --ld-page-gutter: clamp(16px, 2.1vw, 34px);
+  --ld-mobile-gutter: clamp(12px, 4vw, 18px);
+  --ld-scrollbar-size: 10px;
+  --ld-scrollbar-size-compact: 7px;
+  --ld-scrollbar-track: transparent;
+  --ld-scrollbar-thumb: color-mix(in srgb, var(--brand-action) 24%, transparent);
+  --ld-scrollbar-thumb-hover: color-mix(in srgb, var(--brand-action) 42%, transparent);
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+html { scrollbar-gutter: auto; }
+
+body { min-height: 100dvh; }
+
+#root { min-height: 100dvh; }
+
+body:has(.ld-shell),
+body:has(.ld-shell) #root {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* A single brand scrollbar contract. It stays visible, but quiet. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ld-scrollbar-thumb) var(--ld-scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: var(--ld-scrollbar-size);
+  height: var(--ld-scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--ld-scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 38px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--ld-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ld-scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+.ld-scroll-compact,
+.ld-sidebar-nav,
+.ld-dialog-body,
+.ld-tour-card,
+.luma-unified-messages,
+textarea {
+  scrollbar-width: thin;
+}
+
+.ld-scroll-compact::-webkit-scrollbar,
+.ld-sidebar-nav::-webkit-scrollbar,
+.ld-dialog__body::-webkit-scrollbar,
+.ld-tour-card::-webkit-scrollbar,
+.luma-unified-messages::-webkit-scrollbar,
+textarea::-webkit-scrollbar {
+  width: var(--ld-scrollbar-size-compact);
+  height: var(--ld-scrollbar-size-compact);
+}
+
+.table-scroll,
+.calendar-grid-wrapper,
+.agenda-tabs-container,
+.finance-filter-group,
+.ld-calendar-scroll[data-view='month'] {
+  overscroll-behavior-inline: contain;
+  box-shadow: inset -18px 0 18px -24px color-mix(in srgb, var(--ink-strong) 28%, transparent);
+}
+
+@media (forced-colors: active) {
+  * {
+    scrollbar-color: auto;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Scroll lock is coordinated once. App screens already scroll inside .ld-page;
+   document-scrolling surfaces (landing/access) receive exactly one gutter compensation. */
+body.has-blocking-overlay:not(:has(.ld-shell)) {
+  padding-inline-end: var(--ld-scroll-lock-gap, 0px);
+}

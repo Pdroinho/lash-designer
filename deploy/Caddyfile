@@ -1,0 +1,34 @@
+{
+    email {$ACME_EMAIL}
+    on_demand_tls {
+        ask http://127.0.0.1:3000/api/internal/domains/authorize/{$DOMAIN_AUTH_SECRET}
+    }
+}
+
+# Domínio principal da plataforma. O Caddy obtém este certificado normalmente.
+{$APP_DOMAIN} {
+    @internal path /api/internal/*
+    respond @internal 404
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3000
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+    }
+}
+
+# Subdomínios de tenants, host DEV e domínios personalizados.
+# A emissão só é autorizada quando o endpoint local "ask" encontra um host válido no banco.
+https:// {
+    @internal path /api/internal/*
+    respond @internal 404
+    tls {
+        on_demand
+    }
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3000
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+    }
+}

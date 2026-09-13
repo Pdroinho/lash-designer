@@ -1,0 +1,167 @@
+{
+  "project": "LashDesigner Creative Suite",
+  "version": "1.0",
+  "inspiration": "Studio Ana Freitas (Behance Editorial Luxury)",
+  "aesthetic": {
+    "name": "Quiet Beauty Luxury",
+    "primaryFont": "Fraunces, serif",
+    "secondaryFont": "Manrope, sans-serif",
+    "palette": {
+      "espresso": "#1A1412",
+      "espressoSoft": "#241C19",
+      "espressoCard": "#2C2320",
+      "ivory": "#FBF8F5",
+      "ivorySoft": "#F4EFEA",
+      "sand": "#EAE3DA",
+      "marsala": "#6B1728",
+      "marsalaSoft": "#8C2337",
+      "champagne": "#DFBEAC",
+      "champagneGold": "#C99F72",
+      "goldAccent": "#D4AF37"
+    }
+  },
+  "creatives": [
+    {
+      "id": "carousel-1",
+      "type": "carousel",
+      "format": "4:5 (1080x1350)",
+      "target": "Lash Designers e Donas de Estúdio",
+      "hookCategory": "Dor Operacional & Desejo de Liberdade",
+      "title": "A Rotina Invisível de uma Lash Designer de Sucesso",
+      "caption": "Quantas clientes você perde por semana simplesmente porque está com a pinça na mão e não pode responder o WhatsApp na hora?\n\nO procedimento leva 2 horas. Você está 100% concentrada em entregar o olhar mais perfeito da vida da sua cliente. Mas enquanto suas mãos trabalham, o telefone vibra no carrinho auxiliar.\n\n3 mensagens acumuladas.\n2 queriam agendar para amanhã.\n1 já desistiu e chamou outra profissional.\n\nA verdade é dura: na internet de hoje, quem demora 1 hora para responder perde a reserva. Mas você NÃO PODE parar o atendimento para ficar mandando mensagem.\n\nÉ por isso que as lash designers mais valorizadas do Brasil automatizaram sua operação com o LashDesigner.\n\n✨ Sua cliente clica no link da sua bio.\n✨ Escolhe a técnica (Clássico, Híbrido, Volume Brasileiro, Mega).\n✨ Seleciona o dia e o horário disponível em 40 segundos.\n✨ Seu WhatsApp envia a confirmação automática com lembrete inteligente.\n\nSem você encostar no celular. Sem estresse. Sem agenda furada.\n\n📲 Teste o LashDesigner gratuitamente e transforme a gestão do seu estúdio hoje. Link na bio.",
+      "slides": [
+        {
+          "step": "01",
+          "tag": "ROTINA & LIBERDADE",
+          "headline": "Você passa 2 horas concentrada em um olhar impecável...",
+          "subheadline": "...e perde 3 clientes que queriam agendar no WhatsApp.",
+          "image": "macro-lash-editorial.png",
+          "detail": "O dilema diário de quem é artista no procedimento, mas refém do celular."
+        },
+        {
+          "step": "02",
+          "tag": "A DOR DA ROTINA",
+          "headline": "Enquanto suas mãos trabalham com a pinça, o telefone não para de vibrar.",
+          "subheadline": "A cliente quer resposta em 10 minutos. Quando você termina o atendimento, ela já agendou com a concorrência.",
+          "image": "lash-artist-hands.png",
+          "detail": "Você atende 5 clientes no dia e sai exausta para ainda responder 40 mensagens à noite."
+        },
+        {
+          "step": "03",
+          "tag": "O IMPACTO FINANCEIRO",
+          "headline": "O custo oculto de não ter uma agenda inteligente e automática:",
+          "points": [
+            "Buracos vazios na grade por clientes que desmarcam sem aviso",
+            "Horas de sono perdidas mandando chave Pix e combinando horário",
+            "Falta de controle real do faturamento líquido no fim do mês",
+            "Sensação de trabalhar sem parar, sem tempo para você mesma"
+          ],
+          "highlight": "Você fatura pelo atendimento, mas perde dinheiro na desorganização."
+        },
+        {
+          "step": "04",
+          "tag": "A TRANSFORMAÇÃO",
+          "headline": "Imagine sua cliente agendando em 40 segundos, sozinha, no seu link exclusivo.",
+          "subheadline": "Com a identidade visual do seu estúdio, seus serviços, fotos reais e confirmação automática no WhatsApp.",
+          "badgeFeature": "CONFIRMAÇÃO AUTOMÁTICA VIA WHATSAPP",
+          "featureBox": {
+            "title": "A automação trabalha enquanto você atende",
+            "desc": "A cliente recebe um lembrete 24h antes e confirma com '1' ou '2'. Se liberar a vaga, outra cliente da fila é avisada."
+          }
+        },
+        {
+          "step": "05",
+          "tag": "NOVO POSICIONAMENTO",
+          "headline": "Sua técnica já é de alto padrão. Sua gestão também precisa ser.",
+          "subheadline": "Tenha a tecnologia dos estúdios mais lucrativos do país por menos de um valor de manutenção por mês.",
+          "cta": "COMEÇAR TESTE GRATUITO",
+          "domain": "app.lashdesigner.space"
+        }
+      ]
+    },
+    {
+      "id": "single-post-1",
+      "type": "single",
+      "format": "4:5 (1080x1350)",
+      "target": "Lash Designers Autônomas e Donas de Studio",
+      "hookCategory": "Posicionamento & Autoridade",
+      "title": "Agenda de Papel Não Combina com Procedimentos de R$ 250",
+      "tag": "POSICIONAMENTO DE MARCA",
+      "headline": "Seu trabalho é puro luxo. Sua forma de agendar também deveria ser.",
+      "subheadline": "A percepção de valor da sua cliente começa antes dela deitar na sua maca. Começa no primeiro clique para agendar.",
+      "image": "lash-artist-hands.png",
+      "floatingCard": {
+        "status": "HORÁRIO CONFIRMADO",
+        "client": "Dra. Marcella Vasconcellos",
+        "service": "Volume Brasileiro · R$ 240,00",
+        "time": "Quinta-feira, 14:30 · Confirmado via WhatsApp"
+      },
+      "footerCta": "LashDesigner · Gestão & Agendamento de Alto Padrão",
+      "caption": "Você investe nos melhores fios, nos melhores adesivos certificados pela Anvisa, em pinças de titânio, maca ergonômica com capa de linho e cafezinho expresso aromatizado...\n\n...e quando a cliente pede horário, você manda uma foto de uma folha de caderno rabiscada com caneta esferográfica e pede 'manda o pix no meu CPF'.\n\nEssa contradição destrói o valor percebido do seu estúdio.\n\nClientes que pagam R$ 200, R$ 300 em uma aplicação querem exclusividade desde o primeiro contato. Quando você envia um link com a sua marca própria, foto do serviço, regras claras de tolerância e confirmação via WhatsApp, você deixa de ser vista como 'a menina que faz cílios' e passa a ser reconhecida como dona de uma clínica de estética.\n\nEleve o nível do seu negócio hoje.\n🔗 Link para testar no perfil."
+    },
+    {
+      "id": "carousel-2",
+      "type": "carousel",
+      "format": "4:5 (1080x1350)",
+      "target": "Lash Designers em Crescimento",
+      "hookCategory": "Praticidade & Lucratividade",
+      "title": "3 Coisas que Mudam no Seu Estúdio na Primeira Semana",
+      "caption": "Mudar a forma como você gerencia seus agendamentos não é sobre tecnologia complexa. É sobre recuperar 15 horas da sua semana e parar de perder dinheiro com furos.\n\nArrasta para o lado para ver o que acontece na prática quando você implanta o LashDesigner no seu estúdio 👉\n\nSalve este post para não esquecer e clique no link da bio para ativar seu teste.",
+      "slides": [
+        {
+          "step": "01",
+          "tag": "PRIMEIRA SEMANA",
+          "headline": "3 coisas que mudam no seu estúdio na primeira semana de LashDesigner:",
+          "subheadline": "O que acontece na prática quando você para de agendar pelo chat do WhatsApp e automatiza seu negócio.",
+          "image": "luxury-studio-interior.png"
+        },
+        {
+          "step": "02",
+          "tag": "MUDANÇA #01",
+          "headline": "Clientes agendando sozinhas, inclusive de madrugada e domingo.",
+          "subheadline": "Você acorda na segunda-feira com a semana praticamente preenchida, sem ter trocado 30 mensagens para achar um horário em comum.",
+          "metric": "+35% de reservas",
+          "metricLabel": "feitas fora do horário comercial"
+        },
+        {
+          "step": "03",
+          "tag": "MUDANÇA #02",
+          "headline": "Quase zero furos e cancelamentos de última hora.",
+          "subheadline": "O sistema dispara o lembrete de confirmação com 24h de antecedência no WhatsApp da cliente. Ela confirma apertando '1' ou remarca apertando '2'.",
+          "metric": "-82% de faltas",
+          "metricLabel": "com lembrete ativo"
+        },
+        {
+          "step": "04",
+          "tag": "MUDANÇA #03",
+          "headline": "Clareza absoluta de quanto dinheiro realmente entra.",
+          "subheadline": "Chega de misturar dinheiro da padaria com o faturamento do estúdio. Saiba seu ticket médio, faturamento por técnica e clientes fiéis.",
+          "cta": "COMEÇAR AGORA",
+          "domain": "lashdesigner.space"
+        }
+      ]
+    },
+    {
+      "id": "stories-1",
+      "type": "story",
+      "format": "9:16 (1080x1920)",
+      "target": "Instagram Stories / Reels Ads",
+      "hookCategory": "Storytelling Visual & Direct Response",
+      "title": "A Pergunta que Toda Lash Designer Odeia Responder",
+      "tag": "PERGUNTA DO DIA",
+      "headline": "Quantas vezes por dia você ouve isso?",
+      "chatMockup": [
+        { "sender": "client", "text": "Oiii flor! Tem horário pra hoje ou amanhã à tarde???" },
+        { "sender": "lash", "text": "Oi amor! Deixa eu olhar minha agenda aqui, só um segundinho que tô atendendo... 🥺" }
+      ],
+      "contrastText": "Aí você demora 40 minutos para responder e a cliente já marcou com outra pessoa.",
+      "solutionHeadline": "Como as profissionais de elite resolvem isso:",
+      "solutionCard": {
+        "title": "Link oficial de agendamento 24h",
+        "desc": "A cliente clica, escolhe a técnica e o horário sozinha em 40s. Você só recebe a notificação no seu painel."
+      },
+      "ctaText": "Clique aqui e teste grátis",
+      "swipeUp": "Arraste para cima ou toque no link"
+    }
+  ]
+}

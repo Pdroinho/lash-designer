@@ -2,38 +2,32 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <title>Lash Designer Space</title>
-    <script>
-      window.onerror = function(msg, url, line, col, error) {
-        // Ignora erros de redimensionamento comuns e inofensivos
-        if (msg === 'ResizeObserver loop limit exceeded') return;
-        
-        var div = document.createElement('div');
-        div.style.position = 'fixed';
-        div.style.top = '0';
-        div.style.left = '0';
-        div.style.width = '100%';
-        div.style.backgroundColor = '#fee2e2';
-        div.style.color = '#991b1b';
-        div.style.padding = '20px';
-        div.style.zIndex = '999999';
-        div.style.fontFamily = 'monospace';
-        div.style.whiteSpace = 'pre-wrap';
-        div.style.boxSizing = 'border-box';
-        div.innerHTML = '<strong>Erro de Carregamento:</strong><br>' + 
-          (msg || 'Erro desconhecido') + '<br>' +
-          '<small>' + (url || '') + ':' + (line || '?') + '</small>';
-        document.body.appendChild(div);
-      };
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Agenda online, clientes, serviços, financeiro e domínio próprio para lash designers que querem profissionalizar o negócio." />
+    <meta name="theme-color" content="#75103f" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Lash Designer — Agenda e gestão para profissionais de cílios" />
+    <meta property="og:description" content="Agenda, clientes, serviços, financeiro e domínio próprio em uma experiência profissional." />
+    <meta property="og:image" content="/og-cover.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="/og-cover.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <title>Lash Designer — Agenda e gestão para profissionais de cílios</title>
   </head>
   <body>
-    <div id="root"></div>
+    <a class="skip-link" href="#root">Pular para a aplicação</a>
+    <noscript>Ative o JavaScript para usar o Lash Designer.</noscript>
+    <div id="root" tabindex="-1"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

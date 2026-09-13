@@ -5,12 +5,12 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'debug_*.ts', 'debug_*.tsx'],
+    ignores: ['dist/**', 'node_modules/**', 'debug_*.ts', 'debug_*.tsx', 'LashDesigner-*/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['**/*.js'],
+    files: ['**/*.{js,mjs}'],
     languageOptions: {
       globals: {
         ...globals.node,

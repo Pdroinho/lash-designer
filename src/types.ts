@@ -1,11 +1,21 @@
 export type Role = 'DEV' | 'ADMIN' | 'CLIENT'
 
+export type AppointmentConfirmationStatus =
+  | 'NOT_REQUESTED'
+  | 'AWAITING_CONFIRMATION'
+  | 'CONFIRMED'
+  | 'DECLINED'
+  | 'NO_RESPONSE'
+  | 'DELIVERY_FAILED'
+  | 'MANUALLY_CONFIRMED'
+
 export type TenantPublic = {
   id: string
   slug: string
   name: string
   primaryColor: string
   logoUrl: string | null
+  publicBaseUrl?: string | null
 }
 
 export type TenantDev = TenantPublic & {
@@ -36,4 +46,9 @@ export type CalendarEvent = {
   color?: string
   textColor?: string
   status: 'confirmed' | 'pending' | 'cancelled'
+  confirmationStatus?: AppointmentConfirmationStatus
+  confirmationSentAt?: string | null
+  confirmationRespondedAt?: string | null
+  appointmentReminderSentAt?: string | null
+  clientPhone?: string | null
 }

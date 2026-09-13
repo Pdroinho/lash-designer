@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Lash Designer">
+<defs><linearGradient id="bg" x1="8" y1="8" x2="58" y2="58" gradientUnits="userSpaceOnUse"><stop stop-color="#8f0f4d"/><stop offset="1" stop-color="#5f0b35"/></linearGradient></defs>
+<rect width="64" height="64" rx="15" fill="url(#bg)"/>
+<g fill="none" stroke="#fff5eb" stroke-linecap="round" stroke-linejoin="round">
+<path stroke-width="4" d="M13 16v27m0-24h27v19"/><path stroke-width="4" d="M20 12v8m13-8v8"/>
+<path stroke-width="3" d="M20 28h.1m8 0h.1m8 0h.1M20 35h.1m8 0h.1"/>
+<path stroke-width="4" d="M11 50c13-16 28-13 41-28-4 14-15 23-33 27"/>
+<path stroke-width="2.5" d="M24 47c12-1 21-7 29-17M29 49c10-2 17-7 23-13"/>
+</g><path fill="#fff5eb" d="M53 13l1.6 4.2L59 19l-4.4 1.8L53 25l-1.7-4.2L47 19l4.3-1.8z"/>
+</svg>

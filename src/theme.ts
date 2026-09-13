@@ -6,22 +6,24 @@ export type ThemeMode = 'light' | 'dark'
 
 export type DevThemeMode = ThemeMode
 
+function syncBrowserTheme(theme: ThemeMode, primaryColor?: string) {
+  const root = document.documentElement
+  root.style.colorScheme = theme
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+  if (meta) meta.content = theme === 'dark' ? '#171318' : (primaryColor ?? '#7f1743')
+}
+
 export function initTheme() {
   const root = document.documentElement
-  const fromStorage = (() => {
-    try {
-      const v = window.localStorage.getItem('theme')
-      if (v === 'light' || v === 'dark') return v
-      return null
-    } catch {
-      return null
-    }
-  })()
-
-  const preferred: ThemeMode =
-    fromStorage ?? 'light'
-
-  root.dataset.theme = preferred
+  // A aplicação pública e os painéis de tenant usam tema claro. O único
+  // dark mode exposto pelo produto pertence ao console DEV e usa devTheme.
+  root.dataset.theme = 'light'
+  syncBrowserTheme('light')
+  try {
+    window.localStorage.removeItem('theme')
+  } catch {
+    void 0
+  }
 }
 
 export function getTheme(): ThemeMode {
@@ -30,7 +32,10 @@ export function getTheme(): ThemeMode {
 }
 
 export function setTheme(theme: ThemeMode) {
-  document.documentElement.dataset.theme = theme
+  const root = document.documentElement
+  root.dataset.theme = theme
+  const currentPrimary = root.style.getPropertyValue('--primary').trim() || undefined
+  syncBrowserTheme(theme, currentPrimary)
   try {
     window.localStorage.setItem('theme', theme)
   } catch {
@@ -44,7 +49,7 @@ export function toggleTheme(): ThemeMode {
   return next
 }
 
-export function initDevTheme(defaultTheme: DevThemeMode = 'dark') {
+export function initDevTheme(defaultTheme: DevThemeMode = 'light') {
   const root = document.documentElement
   const fromStorage = (() => {
     try {
@@ -57,6 +62,7 @@ export function initDevTheme(defaultTheme: DevThemeMode = 'dark') {
   })()
 
   root.dataset.devTheme = fromStorage ?? defaultTheme
+  syncBrowserTheme(root.dataset.devTheme === 'dark' ? 'dark' : 'light', getDevPrimaryColor() ?? undefined)
 
   const color = getDevPrimaryColor()
   if (color) applyPrimaryColor(color)
@@ -64,7 +70,7 @@ export function initDevTheme(defaultTheme: DevThemeMode = 'dark') {
 
 export function getDevTheme(): DevThemeMode {
   const v = document.documentElement.dataset.devTheme
-  return v === 'light' ? 'light' : 'dark'
+  return v === 'dark' ? 'dark' : 'light'
 }
 
 export function getDevPrimaryColor(): string | null {
@@ -86,6 +92,7 @@ export function setDevPrimaryColor(color: string) {
 
 export function setDevTheme(theme: DevThemeMode) {
   document.documentElement.dataset.devTheme = theme
+  syncBrowserTheme(theme, getDevPrimaryColor() ?? undefined)
   try {
     window.localStorage.setItem('devTheme', theme)
   } catch {
@@ -99,8 +106,58 @@ export function toggleDevTheme(): DevThemeMode {
   return next
 }
 
+const TENANT_SURFACE_KEYS = [
+  '--gray-50',
+  '--surface-canvas',
+  '--surface-panel',
+  '--surface-raised',
+  '--surface-soft',
+  '--surface-muted',
+  '--line-soft',
+  '--line-strong',
+  '--ld-color-canvas',
+  '--ld-color-canvas-warm',
+  '--ld-color-panel',
+  '--ld-color-paper',
+  '--ld-color-raised',
+  '--ld-color-soft',
+  '--ld-color-soft-warm',
+  '--ld-color-muted',
+  '--ld-color-line-soft',
+  '--ld-color-line-strong',
+] as const
+
+function applyTenantSurfaces() {
+  const root = document.documentElement
+  const values: Record<(typeof TENANT_SURFACE_KEYS)[number], string> = {
+    '--gray-50': 'var(--surface-canvas)',
+    '--surface-canvas': 'color-mix(in srgb, var(--primary) 4.5%, #f8f9f8 95.5%)',
+    '--surface-panel': 'color-mix(in srgb, var(--primary) 1.4%, #ffffff 98.6%)',
+    '--surface-raised': 'color-mix(in srgb, var(--primary) .7%, #ffffff 99.3%)',
+    '--surface-soft': 'color-mix(in srgb, var(--primary) 7.5%, #f8f9f8 92.5%)',
+    '--surface-muted': 'color-mix(in srgb, var(--primary) 12%, #f1f3f1 88%)',
+    '--line-soft': 'color-mix(in srgb, var(--primary-900) 11%, transparent)',
+    '--line-strong': 'color-mix(in srgb, var(--primary-900) 20%, transparent)',
+    '--ld-color-canvas': 'var(--surface-canvas)',
+    '--ld-color-canvas-warm': 'color-mix(in srgb, var(--primary) 5%, #f8f6f3 95%)',
+    '--ld-color-panel': 'var(--surface-panel)',
+    '--ld-color-paper': 'color-mix(in srgb, var(--primary) 1.8%, #fffdfb 98.2%)',
+    '--ld-color-raised': 'var(--surface-raised)',
+    '--ld-color-soft': 'var(--surface-soft)',
+    '--ld-color-soft-warm': 'color-mix(in srgb, var(--primary) 6.5%, #f8f5f2 93.5%)',
+    '--ld-color-muted': 'var(--surface-muted)',
+    '--ld-color-line-soft': 'var(--line-soft)',
+    '--ld-color-line-strong': 'var(--line-strong)',
+  }
+  for (const [key, value] of Object.entries(values)) root.style.setProperty(key, value)
+}
+
 export function clearTenantTheme() {
   const root = document.documentElement
+  const activeTheme: ThemeMode = root.dataset.mode === 'dev'
+    ? (root.dataset.devTheme === 'dark' ? 'dark' : 'light')
+    : getTheme()
+  syncBrowserTheme(activeTheme)
   for (const key of [
     '--primary',
     '--primary-rgb',
@@ -119,7 +176,10 @@ export function clearTenantTheme() {
     '--primary-900-rgb',
     '--accent2',
     '--accent3',
+    '--primary-on-dark',
+    '--primary-on-dark-soft',
     '--ring',
+    ...TENANT_SURFACE_KEYS,
   ]) {
     root.style.removeProperty(key)
   }
@@ -143,7 +203,7 @@ export function applyPrimaryColor(hexColor: string) {
     const h = hex.trim().replace('#', '')
     if (h.length === 3) return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`
     if (h.length === 6) return `#${h}`
-    return '#ff6fb1'
+    return '#b43a68'
   }
 
   const hexToRgb = (hex: string) => {
@@ -196,6 +256,10 @@ export function applyPrimaryColor(hexColor: string) {
   const primary900RgbStr = `${primary900Rgb.r}, ${primary900Rgb.g}, ${primary900Rgb.b}`
 
   root.style.setProperty('--primary', primary)
+  const activeTheme: ThemeMode = root.dataset.mode === 'dev'
+    ? (root.dataset.devTheme === 'dark' ? 'dark' : 'light')
+    : getTheme()
+  syncBrowserTheme(activeTheme, primary)
   root.style.setProperty('--primary-rgb', primaryRgbStr)
   root.style.setProperty('--primary-fg', primaryText)
   root.style.setProperty('--primaryText', primaryText)
@@ -212,10 +276,13 @@ export function applyPrimaryColor(hexColor: string) {
   root.style.setProperty('--primary-900-rgb', primary900RgbStr)
   root.style.setProperty('--accent2', mix(primary, '#c7b2ff', 0.55))
   root.style.setProperty('--accent3', mix(primary, '#ffd1e8', 0.55))
+  root.style.setProperty('--primary-on-dark', mix(primary, '#ffffff', 0.48))
+  root.style.setProperty('--primary-on-dark-soft', mix(primary, '#ffffff', 0.24))
   root.style.setProperty('--ring', mix(primary, '#ffffff', 0.25))
 }
 
 export function applyTenantTheme(tenant: TenantPublic | null) {
   if (!tenant) return
   applyPrimaryColor(tenant.primaryColor)
+  applyTenantSurfaces()
 }

@@ -1,0 +1,11 @@
+[Unit]
+Description=Backup diário do Lash Designer
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+Persistent=true
+RandomizedDelaySec=900
+Unit=lashdesigner-backup.service
+
+[Install]
+WantedBy=timers.target

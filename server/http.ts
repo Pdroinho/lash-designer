@@ -28,7 +28,7 @@ export function notFound(message = 'Não encontrado', code?: string) {
   return new HttpError(404, message, code)
 }
 
-export function handleError(err: unknown, _req: Request, res: Response, _next: NextFunction) {
+export function handleError(err: unknown, req: Request, res: Response, _next: NextFunction) {
   if (err instanceof HttpError) {
     res.status(err.status).json({ message: err.message, code: err.code })
     return
@@ -39,9 +39,13 @@ export function handleError(err: unknown, _req: Request, res: Response, _next: N
     return
   }
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.error(err)
-  }
+  const requestId = res.getHeader('X-Request-Id')
+  console.error('[HTTP] erro interno', {
+    requestId,
+    method: req.method,
+    path: req.originalUrl,
+    error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : String(err),
+  })
 
-  res.status(500).json({ message: 'Erro interno', code: 'INTERNAL_ERROR' })
+  res.status(500).json({ message: 'Erro interno', code: 'INTERNAL_ERROR', requestId })
 }

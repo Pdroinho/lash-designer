@@ -1,0 +1,135 @@
+/* Lash Designer 2.4 — compact, human dashboard surfaces. */
+.ld-dashboard-hero {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 164px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 22px;
+  background: linear-gradient(112deg,
+    var(--primary-900) 0%,
+    color-mix(in srgb, var(--primary-800) 94%, #16201a 6%) 54%,
+    color-mix(in srgb, var(--primary-600) 94%, #ffffff 6%) 100%);
+  box-shadow: 0 16px 38px color-mix(in srgb, var(--primary-900) 18%, transparent);
+  color: #fff;
+  isolation: isolate;
+}
+.ld-dashboard-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 62% 50%, rgba(255,255,255,.04), transparent 34%),
+    linear-gradient(90deg, transparent 0%, transparent 55%, color-mix(in srgb, var(--primary-700) 10%, transparent) 100%);
+  opacity: 1;
+}
+.ld-dashboard-hero-copy {
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  padding: clamp(22px, 3vw, 32px);
+}
+.ld-dashboard-hero .eyebrow {
+  color: rgba(255,255,255,.68);
+  font-size: .67rem;
+  letter-spacing: .13em;
+}
+.ld-dashboard-hero h2 {
+  max-width: 760px;
+  margin: 7px 0 8px;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: clamp(1.55rem, 3vw, 2.35rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -.05em;
+  text-wrap: balance;
+}
+.ld-dashboard-hero p {
+  max-width: 590px;
+  margin: 0;
+  color: rgba(255,255,255,.76);
+  font-size: .9rem;
+  line-height: 1.55;
+}
+.ld-dashboard-hero p strong { color: #fff; font-weight: 720; }
+.ld-dashboard-hero-visual {
+  position: relative;
+  min-width: 0;
+  min-height: 164px;
+  margin-left: -80px;
+  overflow: hidden;
+  isolation: isolate;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.04) 15%, rgba(0, 0, 0, 0.35) 38%, rgba(0, 0, 0, 0.82) 68%, black 92%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.04) 15%, rgba(0, 0, 0, 0.35) 38%, rgba(0, 0, 0, 0.82) 68%, black 92%);
+}
+.ld-dashboard-hero-visual::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--primary-900) 75%, transparent) 0%,
+    color-mix(in srgb, var(--primary-800) 48%, transparent) 28%,
+    color-mix(in srgb, var(--primary-700) 22%, transparent) 58%,
+    transparent 88%);
+  pointer-events: none;
+}
+.ld-dashboard-hero-visual::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(17, 19, 18, .04), rgba(17, 19, 18, .14));
+  pointer-events: none;
+}
+.ld-dashboard-hero-visual img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 32%;
+  filter: saturate(.86) contrast(.96);
+  transform: scale(1.015);
+}
+
+.ld-page-inner .stats-grid { margin-top: 18px; }
+.ld-page-inner .stat-card { min-width: 0; }
+
+@media (max-width: 760px) {
+  .ld-dashboard-hero {
+    min-height: 170px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ld-dashboard-hero-copy {
+    min-height: 170px;
+    padding: 20px;
+    padding-right: 26%;
+    background: linear-gradient(90deg,
+      color-mix(in srgb, var(--primary-900) 98%, transparent) 0%,
+      color-mix(in srgb, var(--primary-800) 94%, transparent) 58%,
+      color-mix(in srgb, var(--primary-700) 66%, transparent) 78%,
+      color-mix(in srgb, var(--primary-700) 30%, transparent) 100%);
+  }
+  .ld-dashboard-hero h2 { font-size: clamp(1.4rem, 8vw, 1.85rem); }
+  .ld-dashboard-hero p { font-size: .82rem; line-height: 1.45; }
+  .ld-dashboard-hero-visual {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: 52%;
+    min-height: 0;
+    opacity: .62;
+  }
+}
+
+@media (max-width: 390px) {
+  .ld-dashboard-hero-copy { padding-right: 18px; background: linear-gradient(90deg, color-mix(in srgb, var(--primary-900) 97%, transparent), color-mix(in srgb, var(--primary-700) 82%, transparent)); }
+  .ld-dashboard-hero-visual { opacity: .26; width: 64%; }
+}

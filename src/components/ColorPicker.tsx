@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Check, Palette } from 'lucide-react'
+import { Check } from './Icons'
 
 interface ColorPickerProps {
   value: string
@@ -15,7 +15,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
     setError(null)
   }, [value])
 
-  const presets = ['#ec4899', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#111827']
+  const presets = ['#b43a68', '#7d2449', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#111827']
 
   function isValidHexColor(s: string) {
     const v = s.trim().toLowerCase()
@@ -43,15 +43,18 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
   return (
     <div style={{display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center'}}>
       {presets.map(c => (
-        <div 
+        <button
+          type="button"
           key={c}
           onClick={() => onChange(c)}
+          aria-label={`Usar a cor ${c}`}
+          aria-pressed={value === c}
+          className="color-preset"
           style={{
             width: 32, 
             height: 32, 
             borderRadius: '50%', 
             background: c, 
-            cursor: 'pointer',
             border: value === c ? '2px solid var(--text-main)' : '2px solid transparent',
             display: 'flex',
             alignItems: 'center',
@@ -59,8 +62,8 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
             transition: 'transform 0.2s'
           }}
         >
-          {value === c && <Check size={16} color="white" style={{filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}/>}
-        </div>
+          {value === c && <Check size={15} color="white" strokeWidth={2.2} />}
+        </button>
       ))}
       <div style={{width: '100%', height: 0}} />
       <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
@@ -76,7 +79,6 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                 boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.2)'
               }} />
               <span style={{color: 'var(--text-main)'}}>Outra cor</span>
-              <Palette size={14} style={{color: 'var(--text-muted)'}} />
             </button>
             <input
               aria-label="Escolher cor"
@@ -106,7 +108,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
               }}
               onBlur={() => applyHexColor(text)}
               inputMode="text"
-              placeholder="#ec4899"
+              placeholder="#b43a68"
             />
           </div>
         </div>

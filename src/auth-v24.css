@@ -1,0 +1,67 @@
+/* Authentication 2.4 — one robust split-screen contract. */
+.authRef { min-height:100dvh; width:100%; display:grid; place-items:center; padding:clamp(16px,3vw,36px); background:var(--surface-canvas); }
+.authRefCard { width:min(1100px,100%); min-width:0; min-height:min(680px,calc(100dvh - 40px)); display:grid; grid-template-columns:minmax(300px,.92fr) minmax(0,1.08fr); overflow:hidden; border:1px solid var(--line-soft); border-radius:28px; background:var(--surface-raised); box-shadow:0 28px 70px rgba(49,27,36,.11); }
+.authRefLeft,.authRefRight,.authRefRightInner,.authRefForm,.authRefField,.authRefInputWrapper{min-width:0}
+.authRefRight { display:grid; place-items:center; padding:clamp(24px,4vw,54px); overflow-y:auto; }
+.authRefRightInner { width:min(100%,460px); }
+.authRefTitle { font-size:clamp(1.85rem,3vw,2.5rem); text-wrap:balance; word-break:normal; overflow-wrap:normal; }
+.authRefSubtitle { max-width:48ch; line-height:1.55; }
+.authRefInput { width:100%; min-width:0; font-size:16px; }
+.authRefInputWrapper { position:relative; }
+.authRefPrimary { width:100%; min-height:48px; }
+.authRefLegal { flex-wrap:wrap; }
+@media(max-width:780px){
+ .authRef{padding:0;place-items:stretch;background:var(--surface-raised)}
+ .authRefCard{width:100%;min-height:100dvh;grid-template-columns:1fr;border:0;border-radius:0;box-shadow:none}
+ .authRefLeft{min-height:210px;padding:max(20px,env(safe-area-inset-top)) 20px 26px}
+ .authRefQuote{margin-top:34px}
+ .authRefRight{padding:28px 20px max(26px,env(safe-area-inset-bottom));place-items:start center;overflow:visible}
+ .authRefRightInner{width:100%}
+}
+@media(max-width:420px){
+ .authRefLeft{min-height:170px;padding-inline:16px}
+ .authRefQuoteText{font-size:1.05rem}
+ .authRefRight{padding-inline:16px}
+ .authRefTitle{font-size:1.8rem}
+}
+@media(max-height:650px) and (min-width:781px){
+ .authRef{padding:12px}
+ .authRefCard{min-height:calc(100dvh - 24px)}
+ .authRefLeft{padding-block:28px}
+ .authRefRight{padding-block:26px}
+}
+
+/* Brand action treatment overrides the legacy authentication gradient. */
+.authRefPrimary {
+  border: 1px solid color-mix(in srgb, var(--brand-action) 88%, #000 12%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand-action) 88%, #2c111d 12%), var(--brand-action));
+  color: #fff;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--brand-action) 22%, transparent);
+}
+.authRefPrimary:hover:not(:disabled) {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand-action) 82%, #1d0b13 18%), color-mix(in srgb, var(--brand-action) 90%, #fff 10%));
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--brand-action) 28%, transparent);
+}
+.authRefPrimary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-action) 28%, transparent);
+  outline-offset: 3px;
+}
+.authRefCheckbox input { accent-color: var(--brand-action); }
+.authRefCheckbox input:checked {
+  background: var(--brand-action);
+  border-color: var(--brand-action);
+}
+.authRefCheckbox input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-action) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.authSecurityPanel{display:grid;gap:1rem;width:min(100%,28rem)}
+.authEnrollmentKey{display:grid;gap:.45rem;padding:.9rem 1rem;border:1px solid var(--border);border-radius:28px;background:var(--bg-subtle)}
+.authEnrollmentKey span{font-size:.78rem;font-weight:700;color:var(--text-muted)}
+.authEnrollmentKey code{font:700 .9rem/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;overflow-wrap:anywhere;color:var(--gray-900)}
+.authRecoveryCodes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;padding:1rem;border:1px solid var(--border);border-radius:28px;background:var(--bg-subtle)}
+.authRecoveryCodes code{font:700 .82rem/1.4 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;text-align:center;padding:.55rem;border-radius:28px;background:var(--surface);border:1px solid var(--border)}
+.authRefSecondaryAction{appearance:none;border:0;background:transparent;color:var(--primary-700);font:inherit;font-weight:700;cursor:pointer;padding:.35rem .5rem}
+.authRefSecondaryAction:hover{text-decoration:underline}
+@media (max-width:560px){.authRecoveryCodes{grid-template-columns:1fr}}

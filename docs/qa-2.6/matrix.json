@@ -1,0 +1,312 @@
+[
+  {
+    "screen": "booking1",
+    "viewport": "320x568",
+    "fail": false,
+    "sw": 320,
+    "cw": 320,
+    "body": 320,
+    "text": [],
+    "shot": "booking1-320x568.png"
+  },
+  {
+    "screen": "booking2",
+    "viewport": "320x568",
+    "fail": false,
+    "sw": 320,
+    "cw": 320,
+    "body": 320,
+    "text": [],
+    "shot": "booking2-320x568.png"
+  },
+  {
+    "screen": "booking3",
+    "viewport": "320x568",
+    "fail": false,
+    "sw": 320,
+    "cw": 320,
+    "body": 320,
+    "text": [],
+    "shot": "booking3-320x568.png"
+  },
+  {
+    "screen": "booking4",
+    "viewport": "320x568",
+    "fail": false,
+    "sw": 320,
+    "cw": 320,
+    "body": 320,
+    "text": [],
+    "shot": "booking4-320x568.png"
+  },
+  {
+    "screen": "client",
+    "viewport": "320x568",
+    "fail": false,
+    "sw": 320,
+    "cw": 320,
+    "body": 320,
+    "text": [],
+    "shot": "client-320x568.png"
+  },
+  {
+    "screen": "booking1",
+    "viewport": "360x800",
+    "fail": false,
+    "sw": 360,
+    "cw": 360,
+    "body": 360,
+    "text": [],
+    "shot": "booking1-360x800.png"
+  },
+  {
+    "screen": "booking2",
+    "viewport": "360x800",
+    "fail": false,
+    "sw": 360,
+    "cw": 360,
+    "body": 360,
+    "text": [],
+    "shot": "booking2-360x800.png"
+  },
+  {
+    "screen": "booking3",
+    "viewport": "360x800",
+    "fail": false,
+    "sw": 360,
+    "cw": 360,
+    "body": 360,
+    "text": [],
+    "shot": "booking3-360x800.png"
+  },
+  {
+    "screen": "booking4",
+    "viewport": "360x800",
+    "fail": false,
+    "sw": 360,
+    "cw": 360,
+    "body": 360,
+    "text": [],
+    "shot": "booking4-360x800.png"
+  },
+  {
+    "screen": "client",
+    "viewport": "360x800",
+    "fail": false,
+    "sw": 360,
+    "cw": 360,
+    "body": 360,
+    "text": [],
+    "shot": "client-360x800.png"
+  },
+  {
+    "screen": "booking1",
+    "viewport": "390x844",
+    "fail": false,
+    "sw": 390,
+    "cw": 390,
+    "body": 390,
+    "text": [],
+    "shot": "booking1-390x844.png"
+  },
+  {
+    "screen": "booking2",
+    "viewport": "390x844",
+    "fail": false,
+    "sw": 390,
+    "cw": 390,
+    "body": 390,
+    "text": [],
+    "shot": "booking2-390x844.png"
+  },
+  {
+    "screen": "booking3",
+    "viewport": "390x844",
+    "fail": false,
+    "sw": 390,
+    "cw": 390,
+    "body": 390,
+    "text": [],
+    "shot": "booking3-390x844.png"
+  },
+  {
+    "screen": "booking4",
+    "viewport": "390x844",
+    "fail": false,
+    "sw": 390,
+    "cw": 390,
+    "body": 390,
+    "text": [],
+    "shot": "booking4-390x844.png"
+  },
+  {
+    "screen": "client",
+    "viewport": "390x844",
+    "fail": false,
+    "sw": 390,
+    "cw": 390,
+    "body": 390,
+    "text": [],
+    "shot": "client-390x844.png"
+  },
+  {
+    "screen": "booking1",
+    "viewport": "412x915",
+    "fail": false,
+    "sw": 412,
+    "cw": 412,
+    "body": 412,
+    "text": [],
+    "shot": "booking1-412x915.png"
+  },
+  {
+    "screen": "booking2",
+    "viewport": "412x915",
+    "fail": false,
+    "sw": 412,
+    "cw": 412,
+    "body": 412,
+    "text": [],
+    "shot": "booking2-412x915.png"
+  },
+  {
+    "screen": "booking3",
+    "viewport": "412x915",
+    "fail": false,
+    "sw": 412,
+    "cw": 412,
+    "body": 412,
+    "text": [],
+    "shot": "booking3-412x915.png"
+  },
+  {
+    "screen": "booking4",
+    "viewport": "412x915",
+    "fail": false,
+    "sw": 412,
+    "cw": 412,
+    "body": 412,
+    "text": [],
+    "shot": "booking4-412x915.png"
+  },
+  {
+    "screen": "client",
+    "viewport": "412x915",
+    "fail": false,
+    "sw": 412,
+    "cw": 412,
+    "body": 412,
+    "text": [],
+    "shot": "client-412x915.png"
+  },
+  {
+    "screen": "booking1",
+    "viewport": "768x900",
+    "fail": false,
+    "sw": 768,
+    "cw": 768,
+    "body": 768,
+    "text": [],
+    "shot": "booking1-768x900.png"
+  },
+  {
+    "screen": "booking4",
+    "viewport": "768x900",
+    "fail": false,
+    "sw": 768,
+    "cw": 768,
+    "body": 768,
+    "text": [],
+    "shot": "booking4-768x900.png"
+  },
+  {
+    "screen": "booking1",
+    "viewport": "1024x768",
+    "fail": false,
+    "sw": 1024,
+    "cw": 1024,
+    "body": 1024,
+    "text": [],
+    "shot": "booking1-1024x768.png"
+  },
+  {
+    "screen": "booking4",
+    "viewport": "1024x768",
+    "fail": false,
+    "sw": 1024,
+    "cw": 1024,
+    "body": 1024,
+    "text": [],
+    "shot": "booking4-1024x768.png"
+  },
+  {
+    "screen": "booking1",
+    "viewport": "1440x900",
+    "fail": false,
+    "sw": 1440,
+    "cw": 1440,
+    "body": 1440,
+    "text": [],
+    "shot": "booking1-1440x900.png"
+  },
+  {
+    "screen": "booking4",
+    "viewport": "1440x900",
+    "fail": false,
+    "sw": 1440,
+    "cw": 1440,
+    "body": 1440,
+    "text": [],
+    "shot": "booking4-1440x900.png"
+  },
+  {
+    "screen": "client",
+    "viewport": "1024x768",
+    "fail": false,
+    "sw": 1024,
+    "cw": 1024,
+    "body": 1024,
+    "text": [],
+    "shot": "client-1024x768.png"
+  },
+  {
+    "screen": "landing",
+    "viewport": "390x844",
+    "fail": false,
+    "sw": 390,
+    "cw": 390,
+    "body": 390,
+    "text": [],
+    "shot": "landing-390x844.png"
+  },
+  {
+    "screen": "landing",
+    "viewport": "768x900",
+    "fail": false,
+    "sw": 768,
+    "cw": 768,
+    "body": 768,
+    "text": [],
+    "shot": "landing-768x900.png"
+  },
+  {
+    "screen": "landing",
+    "viewport": "1366x900",
+    "fail": false,
+    "sw": 1366,
+    "cw": 1366,
+    "body": 1366,
+    "text": [],
+    "shot": "landing-1366x900.png"
+  },
+  {
+    "screen": "landing",
+    "viewport": "1920x1080",
+    "fail": false,
+    "sw": 1920,
+    "cw": 1920,
+    "body": 1920,
+    "text": [],
+    "shot": "landing-1920x1080.png"
+  }
+]

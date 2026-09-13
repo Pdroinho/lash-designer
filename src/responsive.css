@@ -1,0 +1,1353 @@
+/* ========================================================================
+   Lash Designer — Responsive system 1.6
+   Loaded after the legacy styles so every product area shares one fluid
+   layout contract. Breakpoints are content-driven, not device-specific.
+   ======================================================================== */
+
+:root {
+  --responsive-nav-breakpoint: 900px;
+  --page-gutter: clamp(10px, 2.2vw, 32px);
+  --compact-gutter: clamp(10px, 3.2vw, 18px);
+  --mobile-header-height: 64px;
+  --sheet-radius: 24px;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 320px;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+/* Text may wrap at spaces, never letter-by-letter. Long technical values are
+   handled by their own selectors below. */
+h1,
+h2,
+h3,
+h4,
+p,
+span,
+label,
+button,
+a {
+  word-break: normal;
+}
+
+button,
+.btn,
+.btnPrimary,
+.btn-primary,
+.btn-ghost,
+.icon-btn,
+.calendar-nav-btn,
+.view-btn,
+.agenda-tab,
+.finance-filter-btn,
+.product-tour-skip {
+  overflow-wrap: normal;
+}
+
+.btn,
+.btnPrimary,
+.btn-primary,
+.btn-ghost,
+.icon-btn,
+.calendar-nav-btn,
+.view-btn,
+.agenda-tab,
+.finance-filter-btn {
+  min-height: 44px;
+}
+
+.btn:not(.w-full),
+.btnPrimary:not(.w-full),
+.btn-primary:not(.w-full),
+.icon-btn,
+.calendar-nav-btn,
+.view-btn {
+  white-space: nowrap;
+}
+
+.app-shell,
+.app-main,
+.app-content,
+.app-content > *,
+.card,
+.cardHeader,
+.cardBody,
+.grid,
+.column,
+.row,
+.form-stack,
+.input-group,
+.input-wrapper,
+.table-scroll,
+.calendar-layout,
+.calendar-grid-wrapper,
+.finance-grid,
+.bookingRefLayout,
+.authRef,
+.custom-domains-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.app-sidebar {
+  flex: 0 0 260px;
+  max-width: min(88vw, 320px);
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.sidebar-logo,
+.sidebar-footer,
+.nav-item {
+  min-width: 0;
+}
+
+.sidebar-logo span,
+.nav-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-footer {
+  flex: 0 0 auto;
+}
+
+.app-header {
+  width: 100%;
+  min-width: 0;
+}
+
+.header-left,
+.header-copy,
+.header-actions {
+  min-width: 0;
+}
+
+.header-actions {
+  max-width: 100%;
+}
+
+.app-content {
+  padding: var(--page-gutter);
+}
+
+.app-content > * {
+  max-width: var(--content-max, 1680px);
+}
+
+/* Fluid grids ----------------------------------------------------------- */
+.grid-1-1,
+.grid-2-1,
+.grid-1-400,
+.finance-grid,
+.backup-grid,
+.password-fields-grid {
+  min-width: 0;
+}
+
+.grid-1-1 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-1-400 {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 400px);
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stats-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: clamp(12px, 1.6vw, 24px);
+}
+
+.schedule-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
+.cardHeader {
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+
+.cardHeader > * {
+  min-width: 0;
+}
+
+.cardTitle,
+.cardDesc {
+  max-width: 100%;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.row {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.row > .input-group,
+.row > .input-wrapper {
+  min-width: min(100%, 210px);
+  flex: 1 1 210px;
+}
+
+.input,
+.authRefInput,
+textarea {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Tables keep their information instead of disappearing on small screens. */
+.table-scroll {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.table-scroll .data-table {
+  display: table;
+  width: max(100%, 680px);
+  min-width: 680px;
+}
+
+.data-table th,
+.data-table td {
+  max-width: 320px;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+
+/* A component that already supplies a dedicated mobile card list may hide its
+   desktop table. Other screens retain a horizontally scrollable table. */
+@media (max-width: 768px) {
+  .table-scroll:has(+ .mobile-appointment-list) .data-table {
+    display: none;
+  }
+}
+
+/* Menus and floating surfaces ------------------------------------------ */
+.portal-menu-content {
+  width: max-content;
+  min-width: 190px;
+  max-width: min(320px, calc(100vw - 24px));
+  max-height: min(70dvh, 440px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.notifications-popover {
+  max-width: calc(100vw - 24px);
+}
+
+
+/* Product tour ---------------------------------------------------------- */
+.product-tour-layer {
+  isolation: isolate;
+}
+
+.product-tour-card {
+  container-type: inline-size;
+  width: min(420px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: clamp(18px, 4vw, 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.product-tour-topline {
+  min-width: 0;
+}
+
+.product-tour-kicker {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-tour-card h2,
+.product-tour-card p {
+  overflow-wrap: anywhere;
+}
+
+.product-tour-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.product-tour-counter {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.product-tour-counter > span,
+.product-tour-skip,
+.product-tour-actions .btn {
+  white-space: nowrap;
+  word-break: keep-all;
+  flex: 0 0 auto;
+}
+
+.product-tour-actions {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.product-tour-actions .btn {
+  min-width: max-content;
+  padding-inline: 14px;
+}
+
+@container (max-width: 365px) {
+  .product-tour-footer {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .product-tour-counter {
+    justify-content: space-between;
+  }
+
+  .product-tour-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .product-tour-actions .btn:only-child {
+    grid-column: 1 / -1;
+  }
+
+  .product-tour-actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* Calendar and schedule ------------------------------------------------- */
+.agenda-tabs-container {
+  max-width: calc(100% - 32px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.agenda-tabs-container::-webkit-scrollbar {
+  display: none;
+}
+
+.agenda-tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.calendar-toolbar {
+  gap: 12px 18px;
+  flex-wrap: wrap;
+}
+
+.calendar-toolbar > div {
+  min-width: 0;
+}
+
+.calendar-view-toggle {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.calendar-grid-wrapper {
+  max-width: 100%;
+  overscroll-behavior-inline: contain;
+}
+
+.calendar-days-header,
+.calendar-body {
+  width: max-content;
+  min-width: 100%;
+}
+
+.calendar-header-cell,
+.calendar-day-column {
+  flex: 1 0 140px;
+}
+
+.calendar-month-grid {
+  min-width: 720px;
+}
+
+.calendar-event,
+.calendar-month-event {
+  overflow-wrap: normal;
+}
+
+.schedule-day-header,
+.schedule-lunch-times,
+.block-card,
+.block-meta {
+  min-width: 0;
+}
+
+.schedule-lunch-times {
+  flex-wrap: wrap;
+}
+
+.blocks-list {
+  max-width: 900px;
+}
+
+/* Finance --------------------------------------------------------------- */
+.finance-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.finance-filter-group {
+  max-width: 100%;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+}
+
+.finance-filter-group::-webkit-scrollbar {
+  display: none;
+}
+
+.finance-filter-btn {
+  flex: 0 0 auto;
+}
+
+.finance-chart-container {
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.finance-chart-col {
+  min-width: 42px;
+}
+
+.finance-cashflow-card,
+.finance-stat-card {
+  min-width: 0;
+}
+
+.finance-stat-value {
+  overflow-wrap: anywhere;
+}
+
+/* Integrations / phone preview ----------------------------------------- */
+.phone-mockup {
+  width: min(320px, 100%);
+  height: min(640px, 72dvh);
+  max-height: 640px;
+}
+
+.phone-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.variable-pill {
+  min-height: 36px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* Domains --------------------------------------------------------------- */
+.domain-title-row,
+.domain-name-line,
+.domain-actions,
+.domain-verify-row,
+.domain-add-row,
+.domain-input-wrap,
+.domain-dns-step,
+.domain-copy {
+  min-width: 0;
+}
+
+.domain-name-line > strong,
+.domain-meta,
+.domain-message {
+  overflow-wrap: anywhere;
+}
+
+.domain-copy code {
+  direction: ltr;
+}
+
+/* Authentication, booking and client portal ---------------------------- */
+.authRef,
+.bookingRefLayout {
+  min-height: 100dvh;
+}
+
+.authRefCard,
+.bookingRefCard {
+  width: min(100%, 1120px);
+  max-width: 100%;
+}
+
+.authRefRight,
+.authRefRightInner,
+.bookingRefContent,
+.bookingRefRight,
+.bookingRefLeft {
+  min-width: 0;
+}
+
+.authRefTitle,
+.bookingRefTitle {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.authRefLegal,
+.authRefAccountHelp {
+  flex-wrap: wrap;
+}
+
+.bookingServicesGrid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+}
+
+.bookingServiceInfo,
+.bookingServiceMeta,
+.bookingServiceName {
+  min-width: 0;
+}
+
+.bookingServiceName {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.bookingTimeGrid {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+
+.dateScrollerWrapper,
+.dateScrollerContainer {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dateScrollerContainer {
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.dateScrollerContainer::-webkit-scrollbar {
+  display: none;
+}
+
+/* ----------------------------------------------------------------------
+   Tablet / compact desktop: switch to the drawer before the content area
+   becomes cramped. This matches the JS breakpoint used by ProductTour.
+   ---------------------------------------------------------------------- */
+@media (max-width: 1100px) {
+  .grid-2-1,
+  .grid-1-400 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sticky-panel {
+    position: static;
+  }
+
+  .finance-col-main,
+  .finance-col-side,
+  .finance-col-full {
+    grid-column: 1 / -1;
+  }
+
+  .calendar-toolbar {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    min-height: 100dvh;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(88vw, 340px);
+    max-width: 340px;
+    z-index: 100;
+    transform: translate3d(-105%, 0, 0);
+    transition: transform 220ms ease, box-shadow 220ms ease;
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .app-sidebar.open {
+    left: 0;
+    transform: translate3d(0, 0, 0);
+    box-shadow: 18px 0 60px rgba(17, 24, 39, 0.24);
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgba(12, 10, 18, 0.52);
+    backdrop-filter: blur(3px);
+  }
+
+  .mobile-toggle {
+    display: inline-flex;
+    margin-right: 0;
+  }
+
+  .app-header {
+    min-height: var(--mobile-header-height);
+    height: var(--mobile-header-height);
+    padding-inline: max(12px, env(safe-area-inset-left));
+    gap: 8px;
+  }
+
+  .header-left {
+    gap: 8px !important;
+    overflow: hidden;
+  }
+
+  .header-breadcrumb,
+  .header-page-subtitle,
+  .header-divider,
+  .header-actions .search-trigger {
+    display: none !important;
+  }
+
+  .header-page-title {
+    max-width: min(44vw, 300px);
+    font-size: 1rem;
+  }
+
+  .header-actions {
+    margin-left: auto;
+    gap: 2px;
+  }
+
+  .mobile-toggle,
+  .header-actions .icon-btn,
+  .header-avatar {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    flex: 0 0 44px;
+  }
+
+  .notifications-popover {
+    position: fixed;
+    inset: calc(var(--mobile-header-height) + max(8px, env(safe-area-inset-top))) max(12px, env(safe-area-inset-right)) auto max(12px, env(safe-area-inset-left));
+    width: auto;
+    max-height: calc(100dvh - var(--mobile-header-height) - 28px - env(safe-area-inset-bottom));
+  }
+
+  .app-content {
+    padding: var(--compact-gutter);
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+
+  .product-tour-card {
+    left: 50% !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    width: min(520px, calc(100vw - 24px)) !important;
+    transform: translateX(-50%) !important;
+  }
+
+  .product-tour-card[style] {
+    transform: translateX(-50%) !important;
+  }
+
+  .product-tour-spotlight {
+    border-radius: 14px;
+  }
+
+  .grid-1-1,
+  .grid-3,
+  .backup-grid,
+  .password-fields-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calendar-header-cell,
+  .calendar-day-column {
+    flex-basis: clamp(112px, 30vw, 150px);
+    min-width: clamp(112px, 30vw, 150px) !important;
+  }
+
+  .calendar-month-grid {
+    min-width: 680px;
+  }
+
+  .authRefCard,
+  .bookingRefCard {
+    width: min(100%, 760px);
+  }
+}
+
+/* Phone layouts -------------------------------------------------------- */
+@media (max-width: 640px) {
+  :root {
+    --sheet-radius: 22px;
+  }
+
+  .app-content {
+    padding-inline: 10px;
+  }
+
+  .header-page-title {
+    max-width: 36vw;
+  }
+
+  .test-mode-label {
+    display: none !important;
+  }
+
+  .sidebar-logo {
+    padding-bottom: 1.25rem;
+  }
+
+  .card,
+  .data-table-container,
+  .calendar-layout,
+  .welcome-banner {
+    border-radius: 16px;
+  }
+
+  .cardHeader,
+  .cardBody {
+    padding: 14px;
+  }
+
+  .cardHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cardHeader > div {
+    width: 100%;
+  }
+
+  .cardHeader .btn,
+  .cardHeader .btnPrimary {
+    align-self: stretch;
+  }
+
+  .cardTitle {
+    text-align: left;
+    font-size: 1rem;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .welcome-banner {
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .welcome-banner h1 {
+    font-size: clamp(1.35rem, 7vw, 1.8rem);
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .welcome-banner p {
+    font-size: 0.92rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .stat-card,
+  .finance-stat-card {
+    padding: 14px;
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .row > *,
+  .row > .input-group,
+  .row > .input-wrapper {
+    width: 100% !important;
+    min-width: 0;
+    flex-basis: auto;
+  }
+
+  .form-stack .btnPrimary,
+  .form-stack > .btn,
+  .modal-footer .btn,
+  .confirm-actions .btn {
+    width: 100%;
+  }
+
+  .table-scroll {
+    margin-inline: -2px;
+    width: calc(100% + 4px);
+  }
+
+  .table-scroll .data-table {
+    width: max(100%, 620px);
+    min-width: 620px;
+    font-size: 0.82rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 11px 12px;
+  }
+
+  .mobile-appointment-list,
+  .mobile-tenant-list {
+    gap: 10px;
+    padding: 12px !important;
+  }
+
+  .mobile-appointment-card,
+  .mobile-tenant-card {
+    min-width: 0;
+  }
+
+  .mobile-appointment-header,
+  .mobile-tenant-card {
+    align-items: flex-start;
+  }
+
+  .mobile-appointment-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Modal bottom sheets with independently scrolling content and sticky
+     actions. Inline max-width/padding from legacy screens cannot escape. */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0 !important;
+  }
+
+  .modal-content {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: min(94dvh, 900px) !important;
+    margin: 0 !important;
+    border-radius: var(--sheet-radius) var(--sheet-radius) 0 0 !important;
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow: hidden;
+  }
+
+  .modal-content::before {
+    content: '';
+    display: block;
+    width: 42px;
+    height: 4px;
+    margin: 9px auto 0;
+    flex: 0 0 auto;
+    border-radius: 99px;
+    background: var(--gray-300);
+  }
+
+  .modal-header,
+  .modal-content > .cardHeader {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    flex: 0 0 auto;
+    background: var(--bg-card);
+  }
+
+  .modal-body,
+  .modal-content > .cardBody {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100%;
+    max-width: 100%;
+    gap: 8px !important;
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+    background: var(--bg-card);
+  }
+
+  .modal-footer > * {
+    min-width: 0;
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0 !important;
+  }
+
+  .confirm-layer {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .confirm-card {
+    width: 100%;
+    max-width: none;
+    grid-template-columns: auto minmax(0, 1fr);
+    border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+    padding: 20px 16px max(16px, env(safe-area-inset-bottom));
+  }
+
+  .confirm-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .toast-region {
+    inset: auto 10px max(10px, env(safe-area-inset-bottom));
+    width: auto;
+  }
+
+  .product-tour-card {
+    width: calc(100vw - 20px) !important;
+    max-height: min(82dvh, 620px);
+    border-radius: 20px;
+    padding: 18px;
+  }
+
+  .product-tour-card h2 {
+    font-size: clamp(1.15rem, 5.6vw, 1.35rem);
+  }
+
+  .product-tour-card p {
+    margin-bottom: 18px;
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  .product-tour-footer {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .product-tour-counter {
+    justify-content: space-between;
+  }
+
+  .product-tour-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .product-tour-actions .btn:only-child {
+    grid-column: 1 / -1;
+  }
+
+  .product-tour-actions .btn {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 10px;
+  }
+
+  .agenda-tabs-container {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 0 12px;
+    padding: 4px;
+  }
+
+  .agenda-tab {
+    min-width: max-content;
+    padding-inline: 14px;
+  }
+
+  .schedule-grid,
+  .blocks-list {
+    padding-inline: 0;
+  }
+
+  .schedule-day-card {
+    padding: 16px 14px;
+  }
+
+  .schedule-day-header {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .calendar-toolbar {
+    padding: 14px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .calendar-toolbar > div {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .calendar-view-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .view-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Week view: one comfortable day at a time with scroll snapping. */
+  .calendar-header-cell,
+  .calendar-day-column {
+    flex: 1 1 0;
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+
+  .calendar-grid-wrapper {
+    scroll-snap-type: x proximity;
+  }
+
+  .calendar-time-column,
+  .calendar-header-cell.empty {
+    width: 50px !important;
+    min-width: 50px !important;
+    flex: 0 0 50px !important;
+  }
+
+  .calendar-month-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .calendar-month-cell {
+    min-height: 84px !important;
+    border-right: 0 !important;
+    padding: 12px !important;
+  }
+
+  .calendar-grid-wrapper > .calendar-days-header:has(+ .calendar-month-grid) {
+    display: none !important;
+  }
+
+  .block-card {
+    padding: 14px;
+  }
+
+  .block-info {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .block-meta {
+    flex-wrap: wrap;
+  }
+
+  .finance-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .finance-col-main,
+  .finance-col-side,
+  .finance-col-full {
+    grid-column: 1;
+  }
+
+  .finance-filter-group {
+    justify-content: flex-start !important;
+    padding-bottom: 3px;
+  }
+
+  .finance-chart-container {
+    height: 240px;
+    gap: 8px;
+  }
+
+  .finance-cashflow-card {
+    padding: 20px 16px;
+  }
+
+  .phone-mockup {
+    width: min(100%, 330px);
+    height: min(620px, 76dvh);
+    margin-inline: auto;
+  }
+
+  .domain-add-row,
+  .domain-dns-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .domain-item-head,
+  .domain-verify-row,
+  .custom-domains-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .domain-actions {
+    justify-content: flex-start;
+  }
+
+  .domain-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .domain-copy {
+    min-height: 44px;
+  }
+
+  .domain-copy code {
+    font-size: 0.7rem;
+  }
+
+  .authRef,
+  .bookingRefLayout {
+    padding: 0;
+    min-height: 100dvh;
+  }
+
+  .authRefCard,
+  .bookingRefCard {
+    width: 100%;
+    min-height: 100dvh;
+    border-radius: 0;
+  }
+
+  .authRefLeft,
+  .bookingRefLeft {
+    display: none;
+  }
+
+  .authRefRight,
+  .bookingRefRight,
+  .bookingRefContent {
+    width: 100%;
+    max-width: 100%;
+    padding-inline: clamp(16px, 5vw, 28px);
+  }
+
+  .authRefRightInner {
+    width: 100%;
+    max-width: 480px;
+    margin-inline: auto;
+  }
+
+  .authRefBrand,
+  .bookingRefBrand {
+    max-width: 100%;
+  }
+
+  .bookingServicesGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bookingTimeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bookingRefSummary {
+    position: static;
+    width: 100%;
+  }
+
+  .dateScrollBtn,
+  .dateScrollerBlur {
+    display: none;
+  }
+
+  .dateScrollerContainer {
+    padding-inline: 2px;
+  }
+
+  .dateCardDay {
+    min-width: 64px;
+    scroll-snap-align: start;
+  }
+
+  .landing-page img {
+    height: auto;
+  }
+}
+
+@media (max-width: 380px) {
+  .app-content {
+    padding-inline: 8px;
+  }
+
+  .header-page-title {
+    max-width: 30vw;
+  }
+
+  .header-actions .tour-launcher {
+    display: none;
+  }
+
+  .product-tour-card {
+    width: calc(100vw - 12px) !important;
+    padding: 15px;
+  }
+
+  .product-tour-progress {
+    margin-block: 12px 14px;
+  }
+
+  .product-tour-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .product-tour-actions .btn {
+    grid-column: 1;
+  }
+
+  .bookingTimeGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .table-scroll .data-table {
+    min-width: 560px;
+  }
+}
+
+/* Short viewports (landscape phones / split-screen windows). */
+@media (max-height: 620px) {
+  .product-tour-card {
+    top: max(8px, env(safe-area-inset-top)) !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    max-height: calc(100dvh - 16px);
+  }
+
+  .app-sidebar {
+    padding-block: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-bottom));
+  }
+
+  .sidebar-logo {
+    padding-bottom: 12px;
+  }
+
+  .nav-group {
+    margin-bottom: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar,
+  .product-tour-spotlight {
+    transition: none !important;
+  }
+}
+
+/* Legacy inline-layout hardening. A few older screens still express small
+   layout groups inline; these selectors stop them from overriding the shared
+   mobile contract while they are progressively migrated to named classes. */
+@media (max-width: 640px) {
+  .cardBody > [style*='display: flex'],
+  .modal-content > [style*='display: flex'],
+  .modal-content > [style*='justify-content: space-between'] {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .modal-content > [style*='padding'] {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .modal-content[style*='padding: 40px'] {
+    padding: 24px 18px max(20px, env(safe-area-inset-bottom)) !important;
+    overflow-y: auto;
+  }
+
+  .cardBody input[style*='width'],
+  .modal-content input[style*='width'],
+  .modal-content textarea[style*='width'] {
+    width: 100% !important;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal-content > [style*='display: flex'][style*='justify-content: space-between'] > .btn,
+  .modal-content > [style*='display: flex'][style*='justify-content: space-between'] > [style*='display: flex'] {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .modal-content > [style*='display: flex'][style*='justify-content: space-between'] > [style*='display: flex'] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px !important;
+  }
+
+  .modal-content > [style*='display: flex'][style*='justify-content: space-between'] > [style*='display: flex'] > .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .cardBody > [style*='display:flex'],
+  .modal-content > [style*='display:flex'],
+  .modal-content > [style*='justify-content:space-between'] {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .modal-content > [style*='justify-content:space-between'] > .btn,
+  .modal-content > [style*='justify-content:space-between'] > [style*='display:flex'] {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .modal-content > [style*='justify-content:space-between'] > [style*='display:flex'] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px !important;
+  }
+
+  .modal-content > [style*='justify-content:space-between'] > [style*='display:flex'] > .btn {
+    width: 100%;
+  }
+}
+
+@media (min-width: 901px) {
+  .mobile-toggle {
+    display: none !important;
+  }
+}

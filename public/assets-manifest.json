@@ -1,0 +1,73 @@
+{
+  "generated_at": "2026-08-14",
+  "brand": [
+    "brand/logo-horizontal-dark.png",
+    "brand/logo-horizontal-light.png",
+    "brand/logo-horizontal.svg",
+    "brand/logo-symbol.png",
+    "brand/logo-symbol-light.png",
+    "brand/app-icon-master.png"
+  ],
+  "core": [
+    "login-bg.webp",
+    "imagemagenda.webp",
+    "og-cover.jpg"
+  ],
+  "ai": [
+    "ai/luma-editorial.webp"
+  ],
+  "dashboard": [
+    "dashboard/data-rhythm.webp",
+    "dashboard/human-studio.webp"
+  ],
+  "services": [
+    "services/service-classico.webp",
+    "services/service-hibrido.webp",
+    "services/service-volume-brasileiro.webp",
+    "services/service-mega-volume.webp",
+    "services/service-lash-lifting.webp",
+    "services/service-manutencao.webp"
+  ],
+  "placeholders": [
+    "placeholders/tenant-placeholder.png",
+    "placeholders/avatar-placeholder.png",
+    "placeholders/service-placeholder.webp"
+  ],
+  "empty_states": [
+    "empty-states/empty-calendar.png",
+    "empty-states/empty-clients.png",
+    "empty-states/empty-finance.png",
+    "empty-states/empty-domain.png"
+  ],
+  "pwa": [
+    "favicon.svg",
+    "favicon-32.png",
+    "apple-touch-icon.png",
+    "icon-192.png",
+    "icon-512.png",
+    "icon-maskable-512.png"
+  ],
+  "landing": [
+    "landing/mobile-booking-1440.webp",
+    "landing/mobile-booking-720.webp",
+    "landing/planning-1440.webp",
+    "landing/planning-720.webp",
+    "landing/result-640.webp",
+    "landing/studio-1672.webp",
+    "landing/studio-960.webp",
+    "landing/treatment-1440.webp",
+    "landing/treatment-720.webp"
+  ],
+  "booking": [],
+  "landing_product": [
+    "landing/product/agenda.webp",
+    "landing/product/booking.webp",
+    "landing/product/dashboard.webp",
+    "landing/product/finance.webp",
+    "landing/product/luma.webp",
+    "landing/product/mobile-dashboard.webp",
+    "landing/product/product-flow.mp4",
+    "landing/product/product-flow.webm",
+    "landing/product/whatsapp.webp"
+  ]
+}

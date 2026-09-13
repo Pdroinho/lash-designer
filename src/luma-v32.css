@@ -1,0 +1,662 @@
+/* Lash Designer 3.2 — Luma Native Intelligence
+   One product language for page + drawer: soft geometry, beauty-tech restraint, no rigid ledger UI. */
+
+.luma32-page {
+  width: min(1180px, 100%);
+  margin-inline: auto;
+}
+
+.luma32 {
+  --l32-surface: var(--surface-raised, #fff);
+  --l32-canvas: var(--surface-canvas, #f7f4f5);
+  --l32-soft: color-mix(in srgb, var(--surface-soft, #f2edef) 72%, #fff 28%);
+  --l32-blush: color-mix(in srgb, var(--brand-action, #8f214d) 7%, #fff 93%);
+  --l32-blush-strong: color-mix(in srgb, var(--brand-action, #8f214d) 13%, #fff 87%);
+  --l32-ink: var(--ink-strong, #2b1d24);
+  --l32-body: var(--ink-body, #65565d);
+  --l32-muted: var(--ink-soft, #807078);
+  --l32-faint: var(--ink-faint, #9c8e94);
+  --l32-line: var(--line-soft, #e6dfe2);
+  --l32-line-strong: var(--line-strong, #d8ccd1);
+  --l32-wine: var(--brand-action, #8f214d);
+  --l32-wine-deep: color-mix(in srgb, var(--brand-action, #8f214d) 78%, #2a101d 22%);
+  min-width: 0;
+  color: var(--l32-ink);
+  font-family: var(--font-ui);
+}
+
+.luma32--page {
+  height: clamp(590px, calc(100dvh - 124px), 790px);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--l32-line);
+  border-radius: 24px;
+  background: var(--l32-surface);
+  box-shadow: var(--shadow-sm, 0 10px 30px rgba(42, 28, 36, .07));
+}
+
+.luma32--drawer {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--l32-surface);
+}
+
+.luma32-header {
+  min-width: 0;
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 18px 13px 20px;
+  border-bottom: 1px solid var(--l32-line);
+  background: color-mix(in srgb, var(--l32-surface) 94%, var(--l32-blush));
+}
+
+.luma32-identity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.luma32-monogram,
+.luma32-mini-mark,
+.luma32-composer-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--l32-wine);
+  background: var(--l32-blush);
+  border: 1px solid color-mix(in srgb, var(--l32-wine) 16%, var(--l32-line));
+  font-family: var(--font-display);
+  font-weight: 620;
+  letter-spacing: -.045em;
+}
+
+.luma32-monogram {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  font-size: 1.17rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+.luma32-identity h2 {
+  margin: 0;
+  color: var(--l32-ink);
+  font: 780 .9rem/1.15 var(--font-ui);
+  letter-spacing: -.028em;
+}
+
+.luma32-identity div > span {
+  display: block;
+  margin-top: 3px;
+  color: var(--l32-faint);
+  font-size: .59rem;
+  font-weight: 650;
+}
+
+.luma32-header-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.luma32-usage {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0 10px;
+  color: var(--l32-faint);
+  white-space: nowrap;
+}
+.luma32-usage strong { color: var(--l32-ink); font: 800 .75rem/1 var(--font-ui); }
+.luma32-usage span { font-size: .55rem; font-weight: 650; }
+
+.luma32-new,
+.luma32-close {
+  min-height: 36px;
+  border: 1px solid var(--l32-line);
+  border-radius: 11px;
+  background: var(--l32-surface);
+  color: var(--l32-body);
+  cursor: pointer;
+  transition: border-color .16s ease, background-color .16s ease, color .16s ease, transform .16s ease;
+}
+
+.luma32-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  font: 740 .61rem var(--font-ui);
+}
+.luma32-new:hover:not(:disabled),
+.luma32-close:hover { border-color: color-mix(in srgb, var(--l32-wine) 28%, var(--l32-line)); background: var(--l32-blush); color: var(--l32-wine); }
+.luma32-new:disabled { opacity: .45; cursor: default; }
+
+.luma32-close {
+  width: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.luma32-disabled {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 9px 20px;
+  border-bottom: 1px solid #e9cbd4;
+  background: #fff4f6;
+  color: #7e2942;
+  font-size: .65rem;
+}
+.luma32-disabled strong { font-weight: 800; }
+.luma32-disabled span { color: #936071; }
+
+.luma32-workspace {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  background: var(--l32-surface);
+}
+
+.luma32-thread {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--l32-wine) 18%, transparent) transparent;
+}
+.luma32-thread::-webkit-scrollbar { width: 8px; }
+.luma32-thread::-webkit-scrollbar-track { background: transparent; }
+.luma32-thread::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--l32-wine) 22%, transparent); background-clip: padding-box; }
+
+/* Start state: generous, asymmetrical and unmistakably within the Lash Designer system. */
+.luma32-opening {
+  position: relative;
+  isolation: isolate;
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, .88fr) minmax(320px, 1.12fr);
+  align-items: center;
+  gap: clamp(38px, 6vw, 84px);
+  padding: clamp(38px, 6vh, 68px) clamp(34px, 5vw, 70px);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 98% 30%, color-mix(in srgb, var(--l32-wine) 8%, transparent) 0 12%, transparent 40%),
+    radial-gradient(ellipse at 88% 88%, color-mix(in srgb, var(--l32-wine) 5%, transparent) 0 16%, transparent 44%),
+    var(--l32-surface);
+}
+
+.luma32-opening::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  right: -52px;
+  bottom: -84px;
+  width: 360px;
+  height: 360px;
+  border: 1px solid color-mix(in srgb, var(--l32-wine) 9%, transparent);
+  border-radius: 48% 52% 42% 58% / 62% 44% 56% 38%;
+  transform: rotate(-18deg);
+  opacity: .72;
+}
+
+.luma32-opening-copy { min-width: 0; }
+.luma32-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--l32-wine);
+  font-size: .57rem;
+  font-weight: 820;
+  letter-spacing: .095em;
+  text-transform: uppercase;
+}
+.luma32-kicker::before { content: ''; width: 22px; height: 1px; background: currentColor; opacity: .62; }
+
+.luma32-opening h3 {
+  max-width: 9.4ch;
+  margin: 14px 0 18px;
+  color: var(--l32-ink);
+  font: 520 clamp(3rem, 5vw, 4.8rem)/.93 var(--font-display);
+  letter-spacing: -.058em;
+  text-wrap: balance;
+}
+
+.luma32-opening-copy p {
+  max-width: 48ch;
+  margin: 0;
+  color: var(--l32-body);
+  font-size: .8rem;
+  line-height: 1.68;
+}
+
+.luma32-starters {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.luma32-starters-label {
+  margin: 0 0 3px 2px;
+  color: var(--l32-faint);
+  font-size: .55rem;
+  font-weight: 780;
+  letter-spacing: .085em;
+  text-transform: uppercase;
+}
+
+.luma32-starters button {
+  width: 100%;
+  min-width: 0;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: 31px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 11px 11px 15px;
+  border: 1px solid var(--l32-line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--l32-surface) 92%, var(--l32-blush));
+  color: var(--l32-ink);
+  text-align: left;
+  box-shadow: 0 5px 18px rgba(42, 28, 36, .025);
+  cursor: pointer;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+.luma32-starters button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--l32-wine) 22%, var(--l32-line));
+  background: var(--l32-surface);
+  box-shadow: 0 12px 30px rgba(42, 28, 36, .07);
+}
+.luma32-starters button:disabled { opacity: .5; cursor: default; }
+
+.luma32-starter-mark {
+  color: var(--l32-wine);
+  font: 820 .57rem/1 var(--font-ui);
+  letter-spacing: .05em;
+}
+.luma32-starter-copy { min-width: 0; }
+.luma32-starter-copy small { display: block; margin-bottom: 4px; color: var(--l32-faint); font-size: .51rem; font-weight: 760; letter-spacing: .055em; text-transform: uppercase; }
+.luma32-starter-copy strong { display: block; color: var(--l32-ink); font: 690 .77rem/1.38 var(--font-ui); letter-spacing: -.018em; }
+.luma32-starter-arrow { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: var(--l32-soft); color: var(--l32-wine); }
+
+/* Conversation: rounded analysis surfaces, not chat bubbles. */
+.luma32.has-thread .luma32-thread {
+  padding: 26px clamp(24px, 4.5vw, 58px) 32px;
+  background: color-mix(in srgb, var(--l32-canvas) 34%, var(--l32-surface));
+}
+
+.luma32-session-title {
+  width: min(900px, 100%);
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--l32-faint);
+  font-size: .54rem;
+  font-weight: 760;
+  letter-spacing: .075em;
+  text-transform: uppercase;
+}
+.luma32-session-title i { height: 1px; flex: 1; background: var(--l32-line); }
+
+.luma32-message {
+  width: min(900px, 100%);
+  min-width: 0;
+  margin: 0 auto 12px;
+  animation: l32-message-in .22s ease-out both;
+}
+
+.luma32-message.is-user {
+  width: min(760px, 88%);
+  margin-left: auto;
+  margin-right: 0;
+  padding: 13px 15px 14px;
+  border: 1px solid color-mix(in srgb, var(--l32-wine) 10%, var(--l32-line));
+  border-radius: 17px 17px 6px 17px;
+  background: var(--l32-blush);
+}
+
+.luma32-message.is-assistant {
+  padding: 17px 18px 18px;
+  border: 1px solid var(--l32-line);
+  border-radius: 19px 19px 19px 7px;
+  background: var(--l32-surface);
+  box-shadow: 0 7px 20px rgba(42, 28, 36, .035);
+}
+
+.luma32-message-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--l32-faint);
+  font-size: .53rem;
+  font-weight: 760;
+  letter-spacing: .03em;
+}
+.luma32-message-head strong { color: var(--l32-wine); font-weight: 780; }
+
+.luma32-mini-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  font-size: .72rem;
+}
+
+.luma32-question {
+  color: var(--l32-ink);
+  font: 690 .84rem/1.55 var(--font-ui);
+  letter-spacing: -.012em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.luma32-answer p {
+  max-width: 74ch;
+  margin: 0;
+  color: var(--l32-body);
+  font-size: .83rem;
+  line-height: 1.72;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.luma32-thinking {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--l32-faint);
+}
+.luma32-thinking span { width: 5px; height: 5px; border-radius: 999px; background: var(--l32-wine); opacity: .24; animation: l32-reading 1.05s infinite ease-in-out; }
+.luma32-thinking span:nth-child(2) { animation-delay: .12s; }
+.luma32-thinking span:nth-child(3) { animation-delay: .24s; }
+.luma32-thinking em { margin-left: 6px; font-size: .61rem; font-style: normal; }
+
+.luma32-error {
+  width: min(900px, 100%);
+  margin: 12px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid #e5bcc8;
+  border-radius: 13px;
+  background: #fff4f6;
+  color: #7b263f;
+  font-size: .67rem;
+}
+.luma32-error button { padding: 4px 0; border: 0; border-bottom: 1px solid currentColor; background: transparent; color: inherit; font: 800 .6rem var(--font-ui); cursor: pointer; }
+
+/* Composer is a native platform control with a quiet Luma signature. */
+.luma32-composer {
+  min-width: 0;
+  padding: 0 clamp(24px, 4.5vw, 58px) clamp(18px, 2.5vw, 26px);
+  background: color-mix(in srgb, var(--l32-surface) 94%, var(--l32-canvas));
+}
+
+.luma32-composer-shell {
+  width: min(900px, 100%);
+  min-width: 0;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 42px;
+  align-items: end;
+  gap: 9px;
+  padding: 8px 9px 8px 11px;
+  border: 1px solid var(--l32-line-strong);
+  border-radius: 17px;
+  background: var(--l32-surface);
+  box-shadow: 0 8px 24px rgba(42, 28, 36, .06);
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.luma32-composer-shell:focus-within { border-color: color-mix(in srgb, var(--l32-wine) 34%, var(--l32-line)); box-shadow: 0 10px 28px rgba(42, 28, 36, .08), 0 0 0 3px color-mix(in srgb, var(--l32-wine) 6%, transparent); }
+
+.luma32-composer-mark {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 3px;
+  border-radius: 9px;
+  font-size: .76rem;
+}
+
+.luma32-composer textarea {
+  width: 100%;
+  min-height: 38px;
+  max-height: 124px;
+  resize: none;
+  overflow-y: auto;
+  padding: 8px 2px 6px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--l32-ink);
+  font: 560 .81rem/1.55 var(--font-ui);
+}
+.luma32-composer textarea::placeholder { color: var(--l32-faint); }
+
+.luma32-send {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: var(--l32-wine);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 7px 17px color-mix(in srgb, var(--l32-wine) 22%, transparent);
+  transition: transform .16s ease, background-color .16s ease, opacity .16s ease;
+}
+.luma32-send:hover:not(:disabled) { transform: translateY(-1px); background: var(--l32-wine-deep); }
+.luma32-send:disabled { opacity: .28; cursor: default; transform: none; box-shadow: none; }
+.luma32-send.is-stop { background: var(--l32-ink); }
+
+.luma32-composer-foot {
+  width: min(900px, 100%);
+  margin: 6px auto 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  color: var(--l32-faint);
+  font-size: .5rem;
+}
+.luma32-composer-foot span + span::before { content: '·'; margin-right: 9px; }
+
+/* Launcher: compact product control, not a chatbot orb. */
+.luma32-launcher {
+  position: fixed;
+  z-index: 80;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 13px 5px 5px;
+  border: 1px solid color-mix(in srgb, var(--brand-action, #8f214d) 32%, var(--line-soft, #e6dfe2));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-raised, #fff) 93%, var(--brand-soft, #f7eaf0));
+  color: var(--ink-strong, #2b1d24);
+  box-shadow: 0 14px 36px rgba(42, 28, 36, .13);
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.luma32-launcher > span { width: 37px; height: 37px; display: grid; place-items: center; border-radius: 12px; background: var(--brand-action, #8f214d); color: #fff; font: 620 1.02rem/1 var(--font-display); }
+.luma32-launcher strong { font: 760 .62rem/1 var(--font-ui); }
+.luma32-launcher:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--brand-action, #8f214d) 48%, var(--line-soft, #e6dfe2)); box-shadow: 0 18px 42px rgba(42, 28, 36, .17); }
+
+/* Drawer: inset sheet with the same card geometry used across the platform. */
+.luma32-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 980;
+  background: rgba(34, 25, 30, .26);
+  backdrop-filter: blur(5px);
+  animation: l32-layer-in .16s ease-out both;
+}
+
+.luma32-drawer {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: clamp(390px, 35vw, 470px);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-soft, #e6dfe2);
+  border-radius: 24px;
+  background: var(--surface-raised, #fff);
+  box-shadow: var(--shadow-dialog, -24px 20px 70px rgba(34, 23, 29, .22));
+  animation: l32-drawer-in .22s cubic-bezier(.2,.75,.2,1) both;
+}
+
+.luma32--drawer .luma32-header { min-height: 64px; padding: 11px 12px 11px 14px; }
+.luma32--drawer .luma32-monogram { width: 36px; height: 36px; border-radius: 11px; font-size: 1rem; }
+.luma32--drawer .luma32-identity div > span { display: none; }
+.luma32--drawer .luma32-usage { padding-inline: 4px; }
+.luma32--drawer .luma32-usage span { display: none; }
+.luma32--drawer .luma32-new { width: 36px; padding: 0; justify-content: center; }
+.luma32--drawer .luma32-new span { display: none; }
+
+.luma32--drawer .luma32-opening {
+  display: block;
+  padding: 22px 17px 24px;
+  background:
+    radial-gradient(ellipse at 112% 14%, color-mix(in srgb, var(--l32-wine) 9%, transparent) 0 12%, transparent 42%),
+    var(--l32-surface);
+}
+.luma32--drawer .luma32-opening::after { width: 240px; height: 240px; right: -108px; bottom: -82px; opacity: .5; }
+.luma32--drawer .luma32-kicker { font-size: .5rem; }
+.luma32--drawer .luma32-opening h3 { max-width: 9.7ch; margin: 11px 0 11px; font-size: clamp(2.2rem, 7.3vw, 3rem); line-height: .96; }
+.luma32--drawer .luma32-opening-copy p { max-width: 38ch; font-size: .7rem; line-height: 1.55; }
+.luma32--drawer .luma32-starters { margin-top: 23px; gap: 8px; }
+.luma32--drawer .luma32-starters-label { font-size: .49rem; }
+.luma32--drawer .luma32-starters button { min-height: 61px; grid-template-columns: 26px minmax(0,1fr) 30px; gap: 8px; padding: 8px 8px 8px 12px; border-radius: 14px; }
+.luma32--drawer .luma32-starter-copy small { display: none; }
+.luma32--drawer .luma32-starter-copy strong { font-size: .69rem; }
+.luma32--drawer .luma32-starter-arrow { width: 28px; height: 28px; border-radius: 9px; }
+
+.luma32--drawer.has-thread .luma32-thread { padding: 16px 12px 20px; }
+.luma32--drawer .luma32-session-title { margin-bottom: 9px; }
+.luma32--drawer .luma32-message { margin-bottom: 9px; }
+.luma32--drawer .luma32-message.is-user { width: 92%; padding: 10px 11px 11px; border-radius: 14px 14px 5px 14px; }
+.luma32--drawer .luma32-message.is-assistant { padding: 13px 13px 14px; border-radius: 15px 15px 15px 5px; }
+.luma32--drawer .luma32-message-head { margin-bottom: 6px; font-size: .49rem; }
+.luma32--drawer .luma32-mini-mark { width: 19px; height: 19px; border-radius: 7px; font-size: .64rem; }
+.luma32--drawer .luma32-question { font-size: .72rem; line-height: 1.48; }
+.luma32--drawer .luma32-answer p { font-size: .73rem; line-height: 1.6; }
+.luma32--drawer .luma32-thinking em { font-size: .56rem; }
+.luma32--drawer .luma32-composer { padding: 0 11px max(11px, env(safe-area-inset-bottom)); }
+.luma32--drawer .luma32-composer-shell { grid-template-columns: 27px minmax(0,1fr) 38px; gap: 7px; padding: 6px 7px 6px 8px; border-radius: 15px; }
+.luma32--drawer .luma32-composer-mark { width: 25px; height: 25px; border-radius: 8px; font-size: .69rem; }
+.luma32--drawer .luma32-composer textarea { min-height: 34px; max-height: 108px; padding-block: 6px 4px; font-size: .73rem; }
+.luma32--drawer .luma32-send { width: 38px; height: 38px; border-radius: 12px; }
+.luma32--drawer .luma32-composer-foot { display: none; }
+
+@keyframes l32-layer-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes l32-drawer-in { from { opacity: .72; transform: translateX(22px) scale(.995); } to { opacity: 1; transform: translateX(0) scale(1); } }
+@keyframes l32-message-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes l32-reading { 0%,100% { opacity:.22; transform:translateY(0) } 48% { opacity:.9; transform:translateY(-2px) } }
+
+@media (max-width: 900px) {
+  .luma32--page { height: calc(100dvh - 112px); min-height: 560px; }
+  .luma32-opening { grid-template-columns: minmax(0, .9fr) minmax(290px, 1.1fr); gap: 30px; padding: 34px 30px; }
+  .luma32-opening h3 { font-size: clamp(2.65rem, 5.8vw, 3.8rem); }
+  .luma32-starters button { min-height: 66px; }
+}
+
+@media (max-width: 760px) {
+  .luma32-page { width: 100%; }
+  .luma32--page {
+    height: calc(100dvh - 88px);
+    min-height: 560px;
+    border-inline: 0;
+    border-bottom: 0;
+    border-radius: 20px 20px 0 0;
+    box-shadow: none;
+  }
+
+  .luma32-header { min-height: 60px; gap: 8px; padding: 10px 10px 10px 12px; }
+  .luma32-monogram { width: 35px; height: 35px; border-radius: 11px; font-size: 1rem; }
+  .luma32-identity div > span { display: none; }
+  .luma32-usage { padding: 0 3px; }
+  .luma32-usage span { display: none; }
+  .luma32-new { width: 35px; padding: 0; justify-content: center; }
+  .luma32-new span { display: none; }
+  .luma32-close { width: 35px; min-height: 35px; }
+
+  .luma32-opening { display: block; padding: 27px 16px 22px; }
+  .luma32-opening::after { width: 230px; height: 230px; right: -112px; bottom: -90px; opacity: .45; }
+  .luma32-kicker { font-size: .49rem; }
+  .luma32-opening h3 { max-width: 9.3ch; margin: 10px 0 12px; font-size: clamp(2.35rem, 11.2vw, 3.2rem); }
+  .luma32-opening-copy p { max-width: 39ch; font-size: .71rem; line-height: 1.55; }
+  .luma32-starters { margin-top: 24px; gap: 8px; }
+  .luma32-starters-label { font-size: .49rem; }
+  .luma32-starters button { min-height: 61px; grid-template-columns: 27px minmax(0,1fr) 30px; gap: 8px; padding: 8px 8px 8px 12px; border-radius: 14px; }
+  .luma32-starter-copy small { display: none; }
+  .luma32-starter-copy strong { font-size: .69rem; }
+  .luma32-starter-arrow { width: 28px; height: 28px; border-radius: 9px; }
+
+  .luma32.has-thread .luma32-thread { padding: 15px 11px 19px; }
+  .luma32-session-title { margin-bottom: 8px; font-size: .48rem; }
+  .luma32-message { margin-bottom: 8px; }
+  .luma32-message.is-user { width: 94%; padding: 10px 11px 11px; border-radius: 14px 14px 5px 14px; }
+  .luma32-message.is-assistant { padding: 12px 12px 13px; border-radius: 15px 15px 15px 5px; }
+  .luma32-message-head { margin-bottom: 6px; font-size: .48rem; }
+  .luma32-mini-mark { width: 19px; height: 19px; border-radius: 7px; font-size: .64rem; }
+  .luma32-question { font-size: .72rem; line-height: 1.48; }
+  .luma32-answer p { font-size: .73rem; line-height: 1.6; }
+
+  .luma32-composer { padding: 0 10px max(10px, env(safe-area-inset-bottom)); }
+  .luma32-composer-shell { grid-template-columns: 27px minmax(0,1fr) 38px; gap: 7px; padding: 6px 7px 6px 8px; border-radius: 15px; }
+  .luma32-composer-mark { width: 25px; height: 25px; border-radius: 8px; font-size: .69rem; }
+  .luma32-composer textarea { min-height: 34px; max-height: 102px; padding-block: 6px 4px; font-size: .73rem; }
+  .luma32-send { width: 38px; height: 38px; border-radius: 12px; }
+  .luma32-composer-foot { display: none; }
+
+  .luma32-launcher { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); width: 48px; padding: 5px; border-radius: 15px; }
+  .luma32-launcher > span { width: 36px; height: 36px; border-radius: 11px; }
+  .luma32-launcher strong { display: none; }
+
+  .luma32-drawer { inset: 0; width: 100%; border: 0; border-radius: 0; box-shadow: none; }
+  .luma32--drawer .luma32-header { padding-top: max(10px, env(safe-area-inset-top)); }
+  .luma32--drawer .luma32-opening { padding: 27px 16px 22px; }
+  .luma32--drawer.has-thread .luma32-thread { padding: 15px 11px 19px; }
+  .luma32--drawer .luma32-composer { padding-inline: 10px; }
+}
+
+@media (max-width: 360px) {
+  .luma32-opening h3 { font-size: clamp(2.15rem, 10.9vw, 2.7rem); }
+  .luma32-opening-copy p { font-size: .68rem; }
+  .luma32-starters button { min-height: 58px; }
+  .luma32-starter-copy strong { font-size: .66rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .luma32-thinking span,
+  .luma32-layer,
+  .luma32-drawer,
+  .luma32-message,
+  .luma32-starters button,
+  .luma32-launcher,
+  .luma32-send,
+  .luma32-new,
+  .luma32-close { animation: none; transition: none; }
+}

@@ -1,0 +1,39 @@
+[Unit]
+Description=Lash Designer SaaS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lashdesigner
+Group=lashdesigner
+WorkingDirectory=/opt/lashdesigner/app
+EnvironmentFile=/opt/lashdesigner/app/.env
+ExecStartPre=/usr/bin/env node scripts/preflight.mjs
+ExecStart=/usr/bin/env node dist/server/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/lashdesigner/db_data /opt/lashdesigner/backups /opt/lashdesigner/media
+UMask=0027
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

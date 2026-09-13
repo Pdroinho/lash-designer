@@ -1,0 +1,174 @@
+/* Lash Designer 2.4 — one overlay contract, always portalled to body. */
+.ld-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100dvh;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: rgba(26, 21, 25, .62);
+  backdrop-filter: blur(4px) saturate(.9);
+}
+
+.ld-dialog {
+  position: relative;
+  width: min(620px, 100%);
+  max-width: 100%;
+  max-height: calc(100dvh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 70%, transparent);
+  border-radius: var(--radius-dialog, 22px);
+  background: var(--surface-raised);
+  color: var(--ink-strong);
+  box-shadow: var(--shadow-dialog);
+  isolation: isolate;
+}
+
+.ld-dialog--tenant { width: min(650px, 100%); }
+.ld-dialog--destructive { width: min(560px, 100%); }
+
+.ld-dialog > .cardHeader,
+.ld-dialog > .modal-header,
+.ld-dialog > div:first-child:not(.modal-body):not(.cardBody) {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--surface-soft) 62%, var(--surface-raised));
+}
+
+.ld-dialog > .ld-dialog-body,
+.ld-dialog > .cardBody,
+.ld-dialog > .modal-body,
+.ld-dialog > form.modal-body,
+.ld-dialog > div:nth-child(2):not(.modal-footer) {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  padding: 22px 24px;
+}
+
+.ld-dialog > .ld-dialog-footer,
+.ld-dialog > .modal-footer,
+.ld-dialog > div:last-child:not(:first-child):has(> .btn),
+.ld-dialog > form > .modal-footer {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 16px 24px max(16px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--surface-soft) 48%, var(--surface-raised));
+}
+
+.ld-dialog .cardHeader,
+.ld-dialog .modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ld-dialog .cardTitle,
+.ld-dialog .modal-title,
+.ld-dialog h2,
+.ld-dialog h3 {
+  min-width: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.ld-dialog input,
+.ld-dialog textarea,
+.ld-dialog .input-wrapper,
+.ld-dialog .input-group,
+.ld-dialog .form-stack,
+.ld-dialog .row {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ld-dialog input,
+.ld-dialog textarea { width: 100%; }
+
+.ld-dialog .modal-close,
+.ld-dialog .cardHeader > .icon-btn,
+.ld-dialog .modal-header > .icon-btn {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+}
+
+body.has-blocking-overlay .ld-page,
+body.has-blocking-overlay .ld-sidebar-nav {
+  overscroll-behavior: none;
+}
+
+@media (max-width: 640px) {
+  .ld-overlay {
+    place-items: end center;
+    padding: max(8px, env(safe-area-inset-top)) 0 0;
+    background: rgba(26, 21, 25, .58);
+  }
+
+  .ld-dialog,
+  .ld-dialog--tenant,
+  .ld-dialog--destructive {
+    width: 100%;
+    max-width: none;
+    max-height: min(94dvh, calc(100dvh - max(8px, env(safe-area-inset-top))));
+    margin: 0;
+    border-width: 1px 0 0;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .ld-dialog::before {
+    content: '';
+    flex: 0 0 auto;
+    width: 42px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink-faint) 36%, transparent);
+  }
+
+  .ld-dialog > .cardHeader,
+  .ld-dialog > .modal-header,
+  .ld-dialog > div:first-child:not(.modal-body):not(.cardBody) { padding: 16px 16px 14px; }
+
+  .ld-dialog > .ld-dialog-body,
+  .ld-dialog > .cardBody,
+  .ld-dialog > .modal-body,
+  .ld-dialog > form.modal-body,
+  .ld-dialog > div:nth-child(2):not(.modal-footer) { padding: 18px 16px; }
+
+  .ld-dialog > .ld-dialog-footer,
+  .ld-dialog > .modal-footer,
+  .ld-dialog > div:last-child:not(:first-child):has(> .btn),
+  .ld-dialog > form > .modal-footer {
+    padding: 12px 16px max(14px, env(safe-area-inset-bottom));
+  }
+
+  .ld-dialog .ld-dialog-footer,
+  .ld-dialog .modal-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .ld-dialog .ld-dialog-footer > *,
+  .ld-dialog .modal-footer > * { min-width: 0; width: 100%; margin: 0; }
+}
+
+@media (max-width: 360px) {
+  .ld-dialog .ld-dialog-footer,
+  .ld-dialog .ld-dialog-footer,
+  .ld-dialog .modal-footer { grid-template-columns: 1fr; }
+}

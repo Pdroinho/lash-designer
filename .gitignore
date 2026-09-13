@@ -1,9 +1,31 @@
 node_modules/
 dist/
-data/
 .env
 .env.*
+!.env.example
+
+# Dados e artefatos locais
+/data/*
+!/data/.gitkeep
+/backups/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite.gz
+*.sqlite.gz.sha256
+*.log
+coverage/
 
 .DS_Store
 Thumbs.db
 
+# Claude Code
+.claude/
+
+# Caches e temporários locais
+__pycache__/
+*.py[cod]
+.asset-refresh-v57/
+.temp_behance/
+LashDesigner- lp antiga melhor/

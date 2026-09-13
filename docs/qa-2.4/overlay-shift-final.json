@@ -1,0 +1,20 @@
+[
+  {
+    "zoom": 1,
+    "cssViewport": "1024x768",
+    "maxShellShiftPx": 0,
+    "overlayCoversViewport": true
+  },
+  {
+    "zoom": 1.25,
+    "cssViewport": "819x614",
+    "maxShellShiftPx": 0,
+    "overlayCoversViewport": true
+  },
+  {
+    "zoom": 1.5,
+    "cssViewport": "683x512",
+    "maxShellShiftPx": 0,
+    "overlayCoversViewport": true
+  }
+]
