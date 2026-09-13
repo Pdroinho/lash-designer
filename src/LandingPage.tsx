@@ -1,11 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { api } from './api'
 import {
+  AlertCircle,
   ArrowRight,
   BarChart3,
   Calendar,
   Check,
+  ChevronLeft,
+  CircleHelp,
   Globe,
+  Lock,
   Menu,
   MessageSquare,
   ShieldCheck,
@@ -510,8 +514,20 @@ export function LandingPage() {
 }
 
 export function WorkspaceAccessPage() {
-  const [slug, setSlug] = useState('')
+  const [slug, setSlug] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    try {
+      const fromQuery = new URLSearchParams(window.location.search).get('workspace')?.trim().toLowerCase()
+      if (fromQuery && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(fromQuery)) {
+        return fromQuery
+      }
+    } catch {
+      // Ignora parâmetros mal formatados
+    }
+    return ''
+  })
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const supportUrl = String(import.meta.env.VITE_SUPPORT_URL ?? import.meta.env.VITE_SALES_URL ?? '').trim()
   const workspaceDomain = (() => {
     const configured = String(import.meta.env.VITE_APP_BASE_URL ?? '').trim()
@@ -519,43 +535,170 @@ export function WorkspaceAccessPage() {
     catch { return 'lashdesigner.space' }
   })()
 
+  const recentWorkspace = useMemo(() => {
+    if (typeof window === 'undefined') return ''
+    try {
+      const stored = localStorage.getItem('lashdesigner:last_workspace')?.trim().toLowerCase()
+      if (stored && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(stored)) {
+        return stored
+      }
+    } catch {
+      // Ignora restrições de armazenamento local
+    }
+    return ''
+  }, [])
+
   useEffect(() => {
     document.body.classList.add('landing-body')
     document.title = 'Acessar meu espaço — Lash Designer'
     return () => document.body.classList.remove('landing-body')
   }, [])
 
+  function normalizeSlug(value: string) {
+    return value.trim().toLowerCase().replace(/^https?:\/\//, '').split(/[./]/)[0]
+  }
+
+  const normalized = normalizeSlug(slug)
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    const normalized = slug.trim().toLowerCase().replace(/^https?:\/\//, '').split(/[./]/)[0]
-    if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(normalized)) {
-      setError('Digite somente o endereço curto do seu espaço, por exemplo: studio-aurora.')
+    if (!normalized || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(normalized)) {
+      setError('Digite somente o identificador curto do seu estúdio (ex: studio-aurora).')
       return
+    }
+    setIsSubmitting(true)
+    try {
+      localStorage.setItem('lashdesigner:last_workspace', normalized)
+    } catch {
+      // Ignora erro em modo anônimo
     }
     window.location.assign(workspaceLoginUrl(normalized))
   }
 
+  function handleUseRecent(targetSlug: string) {
+    setSlug(targetSlug)
+    setError('')
+    setIsSubmitting(true)
+    try {
+      localStorage.setItem('lashdesigner:last_workspace', targetSlug)
+    } catch {
+      // Ignora erro em modo anônimo
+    }
+    window.location.assign(workspaceLoginUrl(targetSlug))
+  }
+
   return <main className="landing-access-page">
-    <div className="landing-access-background" />
+    <div className="landing-access-background" aria-hidden="true" />
     <section className="landing-access-card">
       <aside className="landing-access-aside">
-        <a href="/" aria-label="Voltar para Lash Designer"><BrandWordmark inverse /></a>
-        <div><span>Seu negócio continua aqui</span><h2>Agenda, clientes e financeiro no mesmo espaço.</h2><p>Entre no endereço exclusivo da sua marca para continuar.</p></div>
-        <img src="/landing/product/dashboard.webp" alt="Visão do painel Lash Designer" />
+        <div className="landing-access-aside-top">
+          <a href="/" className="landing-access-aside-brand" aria-label="Voltar para Lash Designer"><BrandWordmark inverse /></a>
+          <div className="landing-access-aside-pill"><Sparkles size={13} /><span>Ambiente Dedicado</span></div>
+        </div>
+
+        <div className="landing-access-aside-body">
+          <span className="landing-access-aside-kicker">PORTAL EXCLUSIVO</span>
+          <h2>O ambiente de alta performance do seu estúdio.</h2>
+          <p>Agenda online personalizada, confirmações por WhatsApp, histórico de clientes e gestão financeira em um endereço privativo para a sua marca.</p>
+        </div>
+
+        <div className="landing-access-glass-card">
+          <div className="landing-access-glass-header">
+            <div className="landing-access-glass-icon"><Sparkles size={15} /></div>
+            <div className="landing-access-glass-meta">
+              <span className="landing-access-glass-title">Endereço Próprio da sua Marca</span>
+              <span className="landing-access-glass-url">https://seu-estudio.{workspaceDomain}</span>
+            </div>
+            <span className="landing-access-glass-badge">Ativo</span>
+          </div>
+          <div className="landing-access-glass-pills">
+            <span><Check size={12} /> Agenda Online</span>
+            <span><Check size={12} /> WhatsApp Integrado</span>
+            <span><Check size={12} /> Dados Isolados</span>
+          </div>
+        </div>
       </aside>
+
       <div className="landing-access-content">
-        <a href="/" className="landing-access-mobile-brand"><BrandWordmark /></a>
-        <span className="landing-kicker">Área da profissional</span>
-        <h1>Entre no seu espaço.</h1>
-        <p>Informe o endereço curto que você escolheu ao criar sua conta.</p>
-        <form onSubmit={handleSubmit}>
-          <label htmlFor="workspace-slug">Seu endereço</label>
-          <div className="landing-access-slug"><input id="workspace-slug" value={slug} onChange={(event) => { setSlug(event.target.value); setError('') }} placeholder="studio-aurora" autoComplete="organization" autoFocus /><span>.{workspaceDomain}</span></div>
-          {error ? <div className="landing-access-error">{error}</div> : null}
-          <button className="landing-access-submit" type="submit">Acessar meu espaço <ArrowRight size={16} /></button>
+        <div className="landing-access-content-nav">
+          <a href="/" className="landing-access-mobile-logo" aria-label="Voltar para Lash Designer"><BrandWordmark /></a>
+          <a href="/" className="landing-access-back-link"><ChevronLeft size={14} /> Voltar ao site</a>
+        </div>
+
+        <div className="landing-access-header">
+          <span className="landing-kicker"><span className="landing-kicker-dot" /> ÁREA DA PROFISSIONAL</span>
+          <h1>Entre no seu espaço</h1>
+          <p>Informe o endereço exclusivo que você configurou ao criar sua conta.</p>
+        </div>
+
+        {recentWorkspace && recentWorkspace !== normalized ? (
+          <div className="landing-access-recent-banner">
+            <span>Espaço recente:</span>
+            <button type="button" onClick={() => handleUseRecent(recentWorkspace)}>
+              <strong>{recentWorkspace}</strong>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        ) : null}
+
+        <form className="landing-access-form" onSubmit={handleSubmit}>
+          <label htmlFor="workspace-slug" className="landing-access-label">Endereço do estúdio</label>
+          <div className={`landing-access-slug-shell ${error ? 'has-error' : ''}`}>
+            <span className="landing-access-protocol">https://</span>
+            <input
+              id="workspace-slug"
+              value={slug}
+              onChange={(event) => {
+                setSlug(event.target.value.toLowerCase().replace(/\s+/g, '-'))
+                setError('')
+              }}
+              placeholder="studio-aurora"
+              autoComplete="organization"
+              autoCapitalize="none"
+              spellCheck={false}
+              autoFocus
+            />
+            <span className="landing-access-domain">.{workspaceDomain}</span>
+          </div>
+
+          <div className={`landing-access-url-chip ${normalized ? 'is-valid' : ''}`}>
+            <Lock size={12} />
+            <span>https://<strong>{normalized || 'seu-estudio'}</strong>.{workspaceDomain}/login</span>
+          </div>
+
+          {error ? (
+            <div className="landing-access-error-box" role="alert">
+              <AlertCircle size={15} />
+              <span>{error}</span>
+            </div>
+          ) : null}
+
+          <button className="landing-access-submit" type="submit" disabled={isSubmitting}>
+            <span>{isSubmitting ? 'Redirecionando...' : 'Acessar meu espaço'}</span>
+            <ArrowRight size={16} />
+          </button>
         </form>
-        <div className="landing-access-help"><ShieldCheck size={18} /><span><strong>Ambiente exclusivo e seguro</strong><small>Cada negócio acessa seus dados em um endereço separado.</small></span></div>
-        {supportUrl ? <a className="landing-access-support" href={supportUrl}>Esqueci meu endereço — falar com o suporte</a> : null}
+
+        <div className="landing-access-trust-card">
+          <div className="landing-access-trust-icon"><ShieldCheck size={20} /></div>
+          <div className="landing-access-trust-text">
+            <strong>Ambiente seguro & dados isolados</strong>
+            <small>Cada profissional conta com espaço e banco de dados privativos com proteção integral.</small>
+          </div>
+        </div>
+
+        <div className="landing-access-footer-actions">
+          {supportUrl ? (
+            <a className="landing-access-support-action" href={supportUrl} target="_blank" rel="noopener noreferrer">
+              <CircleHelp size={14} />
+              <span>Esqueceu o endereço do seu espaço? Falar com o suporte</span>
+            </a>
+          ) : null}
+          <div className="landing-access-signup-callout">
+            <span>Ainda não tem um espaço?</span>
+            <a href="/#preco">Conhecer planos <ArrowRight size={12} /></a>
+          </div>
+        </div>
       </div>
     </section>
   </main>
