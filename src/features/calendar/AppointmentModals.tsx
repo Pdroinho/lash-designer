@@ -8,7 +8,8 @@ import { confirmAction, notify } from '../../components/FeedbackCenter'
 import { ModalRoot } from '../../components/ModalRoot'
 
 import { appointmentPresenceMeta } from './appointmentPresence'
-import type { AdminAppointment, AdminService } from './types'
+import type { AdminAppointment } from './types'
+import type { AdminService } from '../services/types'
 
 export function ProductSelectField({
     value,
