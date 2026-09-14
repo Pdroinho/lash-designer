@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X } from '@phosphor-icons/react'
 import { api } from '../../api'
-import type { AppointmentConfirmationStatus, CalendarEvent } from '../../types'
+import type { CalendarEvent } from '../../types'
 import { formatDateInZone, formatDateTimeInZone, formatTimeInZone, localDateToYmd, zonedDateTimeToUtc } from '../../dateTime'
 import { ProductSelect } from '../../components/ProductSelect'
 import { confirmAction, notify } from '../../components/FeedbackCenter'
