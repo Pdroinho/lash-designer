@@ -2,7 +2,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 're
 import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from './api'
-import type { SessionUser, TenantDev, TenantPublic, CalendarEvent, AppointmentConfirmationStatus } from './types'
+import type { SessionUser, TenantDev, TenantPublic, AppointmentConfirmationStatus } from './types'
 import { applyTenantTheme, getDevTheme, initDevTheme, setAppMode, toggleDevTheme, type DevThemeMode, getDevPrimaryColor, setDevPrimaryColor } from './theme'
 import { ColorPicker } from './components/ColorPicker'
 import { ProductTour, shouldAutoStartTour, type ProductTourStep } from './components/ProductTour'
@@ -17,7 +17,7 @@ import { WhatsAppCenter } from './components/WhatsAppCenter'
 import { ProductSelect } from './components/ProductSelect'
 import { AdminCalendar } from './features/calendar/AdminCalendar'
 import { appointmentPresenceMeta } from './features/calendar/appointmentPresence'
-import type { AdminAppointment, AdminService } from './features/calendar/types'
+import type { AdminService } from './features/calendar/types'
 import { PasswordChecklist } from './components/PasswordChecklist'
 import { FinanceFlowChart } from './components/FinanceFlowChart'
 import { optimizeImageFile } from './imageProcessing'
@@ -32,7 +32,6 @@ import {
   formatDateTimeInZone,
   formatTimeInZone,
   formatYmdPtBr,
-  localDateToYmd,
   minutesInTimeZone,
   weekdayIndexForYmd,
   ymdInTimeZone,
