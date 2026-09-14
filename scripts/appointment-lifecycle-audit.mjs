@@ -2,7 +2,9 @@ import fs from 'node:fs'
 
 const app = fs.readFileSync('src/App.tsx', 'utf8')
 const calendarModals = fs.readFileSync('src/features/calendar/AppointmentModals.tsx', 'utf8')
-const frontend = `${app}\n${calendarModals}`
+const adminCalendar = fs.readFileSync('src/features/calendar/AdminCalendar.tsx', 'utf8')
+const appointmentPresence = fs.readFileSync('src/features/calendar/appointmentPresence.ts', 'utf8')
+const frontend = `${app}\n${calendarModals}\n${adminCalendar}\n${appointmentPresence}`
 const whatsapp = fs.readFileSync('src/components/WhatsAppCenter.tsx', 'utf8')
 const server = fs.readFileSync('server/index.ts', 'utf8')
 const migrate = fs.readFileSync('server/migrate.ts', 'utf8')
