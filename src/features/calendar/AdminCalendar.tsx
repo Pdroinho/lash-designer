@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { ArrowRight, Calendar, Check, ChevronLeft, ChevronRight, Clock, Plus, Trash2 } from '@phosphor-icons/react'
+import { ArrowRight, Calendar, Check, ChevronLeft, ChevronRight, Clock, Plus, Trash2 } from '../../components/Icons'
 import { api } from '../../api'
 import type { CalendarEvent } from '../../types'
 import { addDaysToYmd, formatDateInZone, formatTimeInZone, localDateToYmd, minutesInTimeZone, ymdInTimeZone, zonedDateTimeToUtc } from '../../dateTime'
