@@ -2,6 +2,7 @@ import fs from 'node:fs'
 
 const read = (file) => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')
 const app = read('src/App.tsx')
+const adminClients = read('src/features/clients/AdminClients.tsx')
 const server = read('server/index.ts')
 const migrate = read('server/migrate.ts')
 const css = read('src/booking-v30.css')
@@ -28,7 +29,7 @@ assert(migrate.includes('marketing_whatsapp_opt_in') && migrate.includes('client
 assert(migrate.includes("'GRANTED', 'WITHDRAWN', 'DECLINED'") || server.includes("type MarketingConsentAction = 'GRANTED' | 'WITHDRAWN'"), 'trilha diferencia concessão, retirada e recusa')
 assert(server.includes('/api/client/marketing-preferences') && client.includes('updateMarketingPreference'), 'cliente pode consultar e alterar a autorização depois')
 assert(client.includes('Novidades no WhatsApp') && client.includes("marketingPreferences.whatsappPromotions ? 'Desativar' : 'Ativar'"), 'área da cliente expõe controle simples de opt-out/opt-in')
-assert(server.includes('marketingWhatsappOptIn') && app.includes('Autorizado'), 'lista administrativa sinaliza quem autorizou promoções')
+assert(server.includes('marketingWhatsappOptIn') && adminClients.includes('Autorizado'), 'lista administrativa sinaliza quem autorizou promoções')
 assert(server.includes('/api/admin/whatsapp/campaigns') && server.includes('marketing_whatsapp_opt_in = 1') && server.includes("purpose: 'MARKETING'"), 'campanhas usam fila e audiência com consentimento ativo')
 assert(server.includes('WHATSAPP_BROADCAST_REPLACED'), 'endpoint legado de broadcast não contorna a fila protegida')
 assert(css.includes('.booking30-consent') && css.includes('.booking30-consent-detail') && css.includes('@media (max-width: 820px)'), 'consentimento tem tratamento visual responsivo próprio')
