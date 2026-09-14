@@ -1,5 +1,9 @@
 import fs from 'node:fs'
-const app = [fs.readFileSync('src/App.tsx','utf8'), fs.readFileSync('src/features/clients/AdminClients.tsx','utf8')].join('\n')
+const app = [
+ fs.readFileSync('src/App.tsx','utf8'),
+ fs.readFileSync('src/features/clients/AdminClients.tsx','utf8'),
+ fs.readFileSync('src/features/services/AdminServices.tsx','utf8'),
+].join('\n')
 const wa = fs.readFileSync('src/components/WhatsAppCenter.tsx','utf8')
 const css = fs.readFileSync('src/mobile-app-v510.css','utf8')
 const services = fs.readFileSync('src/services-v24.css','utf8')
