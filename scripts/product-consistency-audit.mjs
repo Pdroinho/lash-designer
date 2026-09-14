@@ -43,7 +43,7 @@ const checks = [
   ['Financeiro não mantém o gráfico SVG artesanal legado', !/finance36-chart-v2|finance36-balance-line|finance36-sparse-note|finance36-zero-line/.test(financeCss)],
   ['Chart.js está travado em versão e lockfile coerentes', lock.version === pkg.version && lock.packages?.['']?.version === pkg.version && pkg.dependencies?.['chart.js'] === '4.5.1' && lock.packages?.['node_modules/chart.js']?.version === '4.5.1'],
   ['componentes novos não introduzem 100vw ou !important', !/100d?vw|!important/.test(productSelect + productCss + fs.readFileSync(path.join(src, 'components', 'FinanceFlowChart.tsx'), 'utf8'))],
-  ['Agenda não envolve ProductSelect em shell de input legado', app.includes('schedule-time-select-field') && !/time-input-wrapper[^>]*>[\s\S]{0,220}<TimeSelect/.test(app)],
+  ['Agenda não envolve ProductSelect em shell de input legado', uiText.includes('schedule-time-select-field') && !/time-input-wrapper[^>]*>[\s\S]{0,220}<TimeSelect/.test(uiText)],
   ['CSS não mantém implementações visuais legadas de dropdown', !/\.custom-select\b|\.time-select-trigger\b|\.time-select-dropdown\b|\.time-option\b/.test(cssText)],
 ]
 
