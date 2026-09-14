@@ -1,13 +1,5 @@
 import type { AppointmentConfirmationStatus } from '../../types'
 
-type AdminService = {
-  id: string
-  name: string
-  durationMinutes: number
-  priceCents: number
-  coverUrl?: string | null
-}
-
 type AdminAppointment = {
   id: string
   serviceId: string
@@ -25,7 +17,7 @@ type AdminAppointment = {
   serviceName: string
   priceCents: number
 }
-export type { AdminService, AdminAppointment }
+export type { AdminAppointment }
 
 export type AdminBusinessHour = {
   id: string
