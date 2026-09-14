@@ -9,7 +9,7 @@ const migratedCss = [
   'src/finance-v24.css','src/billing-v24.css','src/luma-v32.css','src/whatsapp-v24.css',
   'src/auth-v24.css','src/landing-v24.css',
 ]
-const app = [read('src/App.tsx'), read('src/features/calendar/AdminCalendar.tsx'), read('src/features/services/AdminServices.tsx')].join('\n')
+const app = [read('src/App.tsx'), read('src/features/calendar/AdminCalendar.tsx'), read('src/features/services/AdminServices.tsx'), read('src/features/dashboard/AdminDashboard.tsx')].join('\n')
 const modal = read('src/components/ModalRoot.tsx')
 const overlay = read('src/components/OverlayCoordinator.tsx')
 const images = read('src/imageProcessing.ts')
