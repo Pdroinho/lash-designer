@@ -1,6 +1,10 @@
 import fs from 'node:fs'
 
-const app = [fs.readFileSync('src/App.tsx', 'utf8'), fs.readFileSync('src/features/calendar/AdminCalendar.tsx', 'utf8')].join('\n')
+const app = [
+  fs.readFileSync('src/App.tsx', 'utf8'),
+  fs.readFileSync('src/features/calendar/AdminCalendar.tsx', 'utf8'),
+  fs.readFileSync('src/features/clients/AdminClients.tsx', 'utf8'),
+].join('\n')
 const main = fs.readFileSync('src/main.tsx', 'utf8')
 const css = fs.readFileSync('src/mobile-experience-v511.css', 'utf8')
 
