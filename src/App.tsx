@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactElement, type ReactNode } from 'react'
 import { api } from './api'
 import type { SessionUser, TenantDev, TenantPublic, AppointmentConfirmationStatus } from './types'
 import { applyTenantTheme, getDevTheme, initDevTheme, setAppMode, toggleDevTheme, type DevThemeMode, getDevPrimaryColor, setDevPrimaryColor } from './theme'
@@ -31,11 +30,8 @@ import { LandingPage, WorkspaceAccessPage } from './LandingPage'
 import { LegalPage } from './LegalPage'
 import {
   addDaysToYmd,
-  formatDateInZone,
   formatDateTimeInZone,
-  formatTimeInZone,
   formatYmdPtBr,
-  minutesInTimeZone,
   weekdayIndexForYmd,
   ymdInTimeZone,
   zonedDateTimeToUtc,
@@ -68,7 +64,6 @@ import {
   Eye,
   EyeOff,
   Smartphone,
-  Copy,
   Moon,
   Sun,
   Palette,
