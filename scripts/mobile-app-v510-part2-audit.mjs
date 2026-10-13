@@ -1,19 +1,20 @@
 import fs from 'node:fs'
-const app = fs.readFileSync('src/App.tsx','utf8')
+const servicesPage = fs.readFileSync('src/features/services/AdminServices.tsx','utf8')
+const clientsPage = fs.readFileSync('src/features/clients/AdminClients.tsx','utf8')
 const wa = fs.readFileSync('src/components/WhatsAppCenter.tsx','utf8')
 const css = fs.readFileSync('src/mobile-app-v510.css','utf8')
 const services = fs.readFileSync('src/services-v24.css','utf8')
 const waCss = fs.readFileSync('src/whatsapp-v39.css','utf8')
 const checks = [
- ['Clientes possui busca local', app.includes("const [query, setQuery] = useState('')") && app.includes('filteredClients')],
- ['Clientes possui lista mobile própria', app.includes('client-mobile-list') && app.includes('client-mobile-card')],
+ ['Clientes possui busca local', clientsPage.includes("const [query, setQuery] = useState('')") && clientsPage.includes('filteredClients')],
+ ['Clientes possui lista mobile própria', clientsPage.includes('client-mobile-list') && clientsPage.includes('client-mobile-card')],
  ['Tabela de clientes some no mobile', css.includes('.client-desktop-table { display: none; }')],
- ['Cards de clientes exibem total e consentimento', app.includes('client-mobile-value') && app.includes('Promoções autorizadas')],
- ['Busca mobile tem botão limpar', app.includes('Limpar busca') && css.includes('.client-search button')],
+ ['Cards de clientes exibem total e consentimento', clientsPage.includes('client-mobile-value') && clientsPage.includes('Promoções autorizadas')],
+ ['Busca mobile tem botão limpar', clientsPage.includes('Limpar busca') && css.includes('.client-search button')],
  ['Serviços mantém tabela desktop', services.includes('.service-desktop-table')],
- ['Serviços possui catálogo mobile', app.includes('service-mobile-meta') && css.includes('.service-mobile-card')],
- ['Novo serviço tem ícone e touch target', app.includes('service-create-button') && app.includes('<Plus size={16} /> Novo serviço')],
- ['Editor de serviço vira bottom sheet', app.includes('service-editor-dialog') && css.includes('.service-editor-dialog') && css.includes('border-radius: 24px 24px 0 0')],
+ ['Serviços possui catálogo mobile', servicesPage.includes('service-mobile-meta') && css.includes('.service-mobile-card')],
+ ['Novo serviço tem ícone e touch target', servicesPage.includes('service-create-button') && servicesPage.includes('<Plus size={16} /> Novo serviço')],
+ ['Editor de serviço vira bottom sheet', servicesPage.includes('service-editor-dialog') && css.includes('.service-editor-dialog') && css.includes('border-radius: 24px 24px 0 0')],
  ['WhatsApp mantém inbox/chat em uma coluna no celular', waCss.includes('.wa39-inbox .wa39-chat-pane { display: none; }') && waCss.includes('.wa39-inbox.is-mobile-chat-open .wa39-chat-pane { display: grid; }')],
  ['WhatsApp possui voltar de conversa mobile', wa.includes('wa39-chat-back') && wa.includes('setMobileChatOpen(false)')],
  ['WhatsApp tabs viram controle mobile de 4 ações', css.includes('.wa39-tabs') && css.includes('grid-template-columns: repeat(4, minmax(0,1fr))')],

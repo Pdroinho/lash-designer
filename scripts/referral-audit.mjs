@@ -3,10 +3,11 @@ import path from 'node:path'
 
 const root = process.cwd()
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
-const server = read('server/index.ts')
+const server = read('server/index.ts') + read('server/commercialConfig.ts') + read('server/routes/devReferralRoutes.ts') + read('server/routes/referralRoutes.ts') + read('server/routes/publicOnboardingRoutes.ts') + read('server/routes/infinitePayWebhookRoutes.ts')
 const migrate = read('server/migrate.ts')
 const rules = read('server/referrals.ts')
-const app = read('src/App.tsx')
+const adminApp = read('src/features/admin/AdminApp.tsx')
+const devConsole = read('src/features/dev/DevConsole.tsx')
 const checkout = read('src/components/LandingCheckout.tsx')
 
 const checks = []
@@ -22,8 +23,8 @@ assert(server.includes("rr.status = 'PAID'") && server.includes("referral_credit
 assert(migrate.includes('CHECK (invitee_discount_percent BETWEEN 0 AND 100)') && migrate.includes("status IN ('AVAILABLE', 'RESERVED', 'APPLIED', 'REVOKED')"), 'banco impõe limites e estados do programa')
 const checkoutSendsPrice = /body:\s*JSON\.stringify\(\{[^}]*\bamountCents\b/s.test(checkout)
 assert(server.includes('discountQuote(plan.amountCents') && !checkoutSendsPrice, 'preço e desconto são calculados exclusivamente no servidor')
-assert(app.includes('<ReferralCenter') && app.includes('<DevReferrals'), 'painéis ADMIN e DEV expõem o programa')
-assert(checkout.includes('/api/public/onboarding/checkout'), 'landing permite cadastro e compra direta')
+assert(adminApp.includes('<ReferralCenter') && devConsole.includes('<DevReferrals'), 'painéis ADMIN e DEV expõem o programa')
+assert(checkout.includes('/api/public/onboarding/team-checkout'), 'landing permite cadastro e compra direta')
 assert(server.includes("DELETE FROM tenants WHERE id = ? AND status = 'ONBOARDING'") && server.includes("status = 'PAID'"), 'falha ao criar checkout libera conta provisória sem apagar pagamento')
 
 const failed = checks.filter((check) => !check.ok)

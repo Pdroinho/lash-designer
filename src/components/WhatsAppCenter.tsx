@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { api } from '../api'
+import { whatsappConnectionState as statusToUi } from '../whatsappConnectionState'
 import {
   ArrowRight,
   Bell,
@@ -130,20 +131,13 @@ const defaultSettings: WhatsAppSettings = {
   confirmationOffsetHours: 24,
   confirmationRetryHours: 8,
   noResponseCutoffHours: 4,
-  confirmationMessage: 'Oi {{nome}}! Seu horário de {{servico}} no {{espaco}} está chegando. Responda 1 para confirmar ou 2 se não puder comparecer.',
+  confirmationMessage: 'Oi {{nome}}! Seu horário de {{servico}} com {{profissional}} no {{espaco}} está chegando. Responda 1 para confirmar ou 2 se não puder comparecer.',
   autoCancelDeclined: false,
   remindersEnabled: true,
   reminderOffsetHours: 2,
-  reminderMessage: 'Oi {{nome}}! Passando para lembrar que seu horário de {{servico}} é hoje às {{hora}} no {{espaco}}. Até já!',
+  reminderMessage: 'Oi {{nome}}! Passando para lembrar que seu horário de {{servico}} com {{profissional}} é hoje às {{hora}} no {{espaco}}. Até já!',
   promoEnabled: false,
   promoMessage: 'Oi {{nome}}, temos uma novidade especial para você esta semana no {{espaco}}. Responda esta mensagem para saber mais.',
-}
-
-function statusToUi(raw: string | null) {
-  const value = String(raw ?? '').toLowerCase()
-  if (value.includes('open') || value.includes('connected')) return 'connected' as const
-  if (value.includes('qr') || value.includes('scan') || value.includes('pair') || value.includes('connecting')) return 'qr_scan' as const
-  return 'disconnected' as const
 }
 
 function money(cents: number) {
@@ -217,6 +211,7 @@ function previewTemplate(template: string) {
   return template
     .replaceAll('{{nome}}', 'Maria')
     .replaceAll('{{servico}}', 'Volume Brasileiro')
+    .replaceAll('{{profissional}}', 'Beatriz')
     .replaceAll('{{espaco}}', 'Studio Bella')
     .replaceAll('{{data}}', '15/10')
     .replaceAll('{{hora}}', '14:00')
@@ -248,6 +243,7 @@ export function WhatsAppCenter() {
   const [instance, setInstance] = useState<WhatsAppInstance | null>(null)
   const [connectionState, setConnectionState] = useState<string | null>(null)
   const status = statusToUi(connectionState)
+  const connected = status === 'connected'
   const [settings, setSettings] = useState<WhatsAppSettings>(defaultSettings)
   const [settingsBusy, setSettingsBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -313,10 +309,15 @@ export function WhatsAppCenter() {
     if (res.ok) {
       setConnectionState(res.data.state)
       if (statusToUi(res.data.state) === 'connected') setQrCode(null)
+      else setView('connection')
+    } else {
+      setConnectionState(null)
+      setError(res.error.message)
     }
   }
 
   async function refreshConnection() {
+    setError(null)
     setConnectionBusy(true)
     await Promise.all([refreshStatus(), loadDiagnostics(), loadInstance()])
     setConnectionBusy(false)
@@ -365,14 +366,29 @@ export function WhatsAppCenter() {
 
   useEffect(() => {
     let alive = true
-    Promise.all([loadInstance(), loadSettings(), refreshStatus(), loadConversations(false), loadDiagnostics(), loadCampaigns()]).catch(() => {
+    Promise.all([loadInstance(), refreshStatus()]).then(async () => {
+      if (!alive) return
+      await Promise.all([loadDiagnostics(), loadSettings()])
+    }).catch(() => {
       if (alive) setError('Não foi possível carregar a Central de WhatsApp agora.')
     })
     return () => { alive = false }
   }, [])
 
   useEffect(() => {
-    if (view !== 'conversations') return
+    if (connected) {
+      void Promise.all([loadConversations(false), loadCampaigns()])
+      return
+    }
+    if (connectionState === null) return
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshStatus()
+    }, 10_000)
+    return () => window.clearInterval(timer)
+  }, [connected, connectionState === null])
+
+  useEffect(() => {
+    if (view !== 'conversations' || !connected) return
     let stopped = false
     let timer = 0
 
@@ -409,29 +425,29 @@ export function WhatsAppCenter() {
       window.removeEventListener('keydown', markActivity)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [view, selectedId])
+  }, [view, selectedId, connected])
 
   useEffect(() => {
-    if (!selectedId || view !== 'conversations') {
+    if (!selectedId || view !== 'conversations' || !connected) {
       messagesRef.current = []
       setMessages([])
       return
     }
     void loadMessages(selectedId, 'initial')
-  }, [selectedId, view])
+  }, [selectedId, view, connected])
 
   useEffect(() => {
     if (view === 'connection' || view === 'campaigns') void loadDiagnostics()
-    if (view === 'campaigns') void loadCampaigns()
-  }, [view])
+    if (view === 'campaigns' && connected) void loadCampaigns()
+  }, [view, connected])
 
   useEffect(() => {
-    if (view !== 'campaigns' || !campaigns.some((item) => item.status === 'QUEUED' || item.status === 'RUNNING')) return
+    if (view !== 'campaigns' || !connected || !campaigns.some((item) => item.status === 'QUEUED' || item.status === 'RUNNING')) return
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void Promise.all([loadCampaigns(), loadDiagnostics()])
     }, 8000)
     return () => window.clearInterval(timer)
-  }, [view, campaigns])
+  }, [view, campaigns, connected])
 
   const filteredConversations = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -542,6 +558,7 @@ export function WhatsAppCenter() {
     else {
       setQrCode(res.data.qrCode)
       if (res.data.state) setConnectionState(res.data.state)
+      if (!res.data.qrCode && statusToUi(res.data.state ?? null) !== 'connected') setError('Não foi possível gerar o QR Code agora. Verifique a conexão e tente novamente; se persistir, abra um chamado em Suporte.')
     }
     setConnectionBusy(false)
   }
@@ -564,12 +581,12 @@ export function WhatsAppCenter() {
     }))
   }
 
-  const nav: Array<{ id: View; label: string; icon: typeof MessageSquare; badge?: number }> = [
+  const nav: Array<{ id: View; label: string; icon: typeof MessageSquare; badge?: number }> = connected ? [
     { id: 'conversations', label: 'Conversas', icon: MessageSquare, badge: unreadTotal },
     { id: 'automations', label: 'Automações', icon: Bell },
     { id: 'campaigns', label: 'Campanhas', icon: Megaphone },
     { id: 'connection', label: 'Conexão', icon: Settings },
-  ]
+  ] : []
 
   return (
     <div className="wa39">
@@ -581,11 +598,11 @@ export function WhatsAppCenter() {
         </div>
         <div className={`wa39-health is-${status}`}>
           <i />
-          <span>{status === 'connected' ? 'Conectado' : status === 'qr_scan' ? 'Aguardando leitura' : 'Desconectado'}</span>
+          <span>{connectionState === null ? 'Não verificado' : status === 'connected' ? 'Conectado' : status === 'qr_scan' ? 'Aguardando leitura' : 'Desconectado'}</span>
         </div>
       </header>
 
-      <nav className="wa39-tabs" aria-label="Seções do WhatsApp">
+      {connected ? <nav className="wa39-tabs" aria-label="Seções do WhatsApp">
         {nav.map((item) => {
           const Icon = item.icon
           return (
@@ -596,11 +613,13 @@ export function WhatsAppCenter() {
             </button>
           )
         })}
-      </nav>
+      </nav> : null}
+
+      {!connected && connectionState !== null ? <p role="status">Conecte o WhatsApp para acessar conversas, automações e campanhas.</p> : null}
 
       {error ? <div className="wa39-alert" role="alert"><XCircle size={17} /><span>{error}</span><button type="button" onClick={() => setError(null)} aria-label="Fechar aviso"><X size={15} /></button></div> : null}
 
-      {view === 'conversations' && !conversationLoading && conversations.length === 0 ? (
+      {connected && view === 'conversations' && !conversationLoading && conversations.length === 0 ? (
         <section className="wa39-empty-inbox">
           <div className="wa39-empty-orb"><MessageSquare size={26} /></div>
           <span>Caixa de entrada</span>
@@ -611,7 +630,7 @@ export function WhatsAppCenter() {
         </section>
       ) : null}
 
-      {view === 'conversations' && (conversationLoading || conversations.length > 0) ? (
+      {connected && view === 'conversations' && (conversationLoading || conversations.length > 0) ? (
         <section className={`wa39-inbox ${mobileChatOpen ? 'is-mobile-chat-open' : ''}`}>
           <aside className="wa39-conversation-pane">
             <div className="wa39-pane-head">
@@ -717,7 +736,7 @@ export function WhatsAppCenter() {
         </section>
       ) : null}
 
-      {view === 'automations' ? (
+      {connected && view === 'automations' ? (
         <section className="wa39-automation-layout">
           <div className="wa39-automation-main">
             <article className="wa39-automation-hero">
@@ -745,7 +764,7 @@ export function WhatsAppCenter() {
             <div className="wa39-reply-rule"><CheckCircle2 size={17} /><div><strong>Resposta simples para a cliente</strong><span>Ela responde <b>1</b> para confirmar ou <b>2</b> para avisar que não poderá ir. Nenhum código aleatório é necessário no fluxo normal.</span></div></div>
 
             <label className="wa39-template"><span>Mensagem de confirmação</span><textarea value={settings.confirmationMessage} onChange={(e) => setSettings((value) => ({ ...value, confirmationMessage: e.target.value }))} /></label>
-            <div className="wa39-variable-row"><span>Variáveis</span>{['{{nome}}','{{servico}}','{{data}}','{{hora}}','{{espaco}}'].map((item) => <button type="button" key={item} onClick={() => setSettings((value) => ({ ...value, confirmationMessage: `${value.confirmationMessage} ${item}` }))}>{item}</button>)}</div>
+            <div className="wa39-variable-row"><span>Variáveis</span>{['{{nome}}','{{servico}}','{{profissional}}','{{data}}','{{hora}}','{{espaco}}'].map((item) => <button type="button" key={item} onClick={() => setSettings((value) => ({ ...value, confirmationMessage: `${value.confirmationMessage} ${item}` }))}>{item}</button>)}</div>
 
             <article className="wa39-compact-setting">
               <div><strong>Cancelar automaticamente se a cliente recusar</strong><p>Desligado por padrão: a recusa aparece para você decidir o que fazer.</p></div>
@@ -773,7 +792,7 @@ export function WhatsAppCenter() {
         </section>
       ) : null}
 
-      {view === 'campaigns' ? (
+      {connected && view === 'campaigns' ? (
         <section className="wa39-campaigns">
           <div className="wa39-section-intro"><span>Relacionamento</span><h3>Campanhas para quem escolheu receber.</h3><p>O Lash Designer usa somente a audiência com consentimento promocional ativo e revalida essa autorização no momento de cada envio.</p></div>
           <div className="wa39-campaign-overview">
@@ -809,26 +828,27 @@ export function WhatsAppCenter() {
         </section>
       ) : null}
 
-      {view === 'connection' ? (
+      {!connected || view === 'connection' ? (
         <section className="wa39-connection-grid">
           <article className="wa39-connection-status">
             <div className={`wa39-connection-mark is-${status}`}><Smartphone size={22} /></div>
-            <div><span>Conexão</span><h3>{status === 'connected' ? 'WhatsApp conectado' : status === 'qr_scan' ? 'Leia o QR Code' : 'Conecte seu WhatsApp'}</h3><p>{status === 'connected' ? 'A central está pronta para enviar e receber mensagens.' : 'Faça a conexão para ativar conversas e automações.'}</p></div>
+            <div><span>Conexão</span><h3>{connectionState === null ? 'Verifique a conexão' : status === 'connected' ? 'WhatsApp conectado' : status === 'qr_scan' ? 'Leia o QR Code' : 'Conecte seu WhatsApp'}</h3><p>{status === 'connected' ? 'A central está pronta para enviar e receber mensagens.' : 'Use o WhatsApp do estúdio, compartilhado pela equipe autorizada. Conecte pelo QR Code para começar.'}</p></div>
             <button type="button" onClick={() => void refreshConnection()} disabled={connectionBusy}><RefreshCw size={16} /> {connectionBusy ? 'Verificando…' : 'Verificar'}</button>
           </article>
 
-          <article className="wa39-connection-card">
+          {connected ? <article className="wa39-connection-card">
             <header><div><span>Recebimento de mensagens</span><strong>{diagnostics?.providerWebhookConfigured === true ? 'Recebimento preparado' : diagnostics?.providerWebhookConfigured === false ? 'Precisa de atenção' : 'Verificando configuração'}</strong></div><MessageSquare size={20} /></header>
             <p>{diagnostics?.providerWebhookConfigured === false ? 'A conexão existe, mas o recebimento precisa ser configurado novamente.' : 'As respostas das clientes são encaminhadas para a inbox do Lash Designer.'}</p>
             <dl><div><dt>Última recebida</dt><dd>{relativeTime(diagnostics?.lastInboundAt ?? null) || 'Nenhuma ainda'}</dd></div><div><dt>Último envio</dt><dd>{relativeTime(diagnostics?.lastOutboundAt ?? null) || 'Nenhum ainda'}</dd></div></dl>
-          </article>
+          </article> : null}
 
           <article className="wa39-connection-card">
-            <header><div><span>Infraestrutura</span><strong>{instance?.platformManaged ? 'Gerenciada pelo Lash Designer' : 'Conexão configurada'}</strong></div><QrCode size={20} /></header>
-            <p>{instance?.platformManaged ? 'Os dados técnicos da instância ficam ocultos e são gerenciados pela plataforma.' : 'A integração Evolution deste espaço está configurada para operar com a central.'}</p>
-            {status !== 'connected' ? <button type="button" className="is-primary" onClick={() => void handleConnect()} disabled={connectionBusy || !(instance?.baseUrl && instance?.instanceName && instance?.hasApiKey)}>{connectionBusy ? 'Preparando…' : 'Conectar via QR Code'}</button> : <span className="wa39-connected-note"><CheckCircle2 size={15} /> Nenhuma ação necessária agora</span>}
+            <header><div><span>WhatsApp do estúdio</span><strong>{instance?.platformManaged ? 'Conexão preparada pela plataforma' : 'Conectar o número do estúdio'}</strong></div><QrCode size={20} /></header>
+            <p>{instance?.platformManaged ? 'Você só precisa ler o QR Code em WhatsApp → Aparelhos conectados → Conectar aparelho.' : 'Leia o QR Code em WhatsApp → Aparelhos conectados → Conectar aparelho.'}</p>
+            {status !== 'connected' ? <button type="button" className="is-primary" onClick={() => void handleConnect()} disabled={connectionBusy || connectionState === null || !(instance?.baseUrl && instance?.instanceName && instance?.hasApiKey)}>{connectionBusy ? 'Preparando…' : 'Conectar via QR Code'}</button> : <span className="wa39-connected-note"><CheckCircle2 size={15} /> Nenhuma ação necessária agora</span>}
           </article>
 
+          {!connected && !connectionBusy && instance && !(instance.baseUrl && instance.instanceName && instance.hasApiKey) ? <p role="status">A conexão ainda precisa ser preparada. Abra um chamado em Suporte para solicitar a ativação.</p> : null}
           {qrCode && status !== 'connected' ? <article className="wa39-qr-card"><span>Leia no WhatsApp</span><div><img src={qrCode} alt="QR Code para conectar o WhatsApp" /></div><p>Abra <b>Aparelhos conectados</b> no WhatsApp e leia este código.</p></article> : null}
         </section>
       ) : null}

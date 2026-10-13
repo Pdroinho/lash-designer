@@ -1,14 +1,22 @@
 import fs from 'node:fs'
 
-const app = fs.readFileSync('src/App.tsx', 'utf8')
+const adminApp = fs.readFileSync('src/features/admin/AdminApp.tsx', 'utf8')
 const ui = fs.readFileSync('src/components/WhatsAppCenter.tsx', 'utf8')
 const css = fs.readFileSync('src/whatsapp-v39.css', 'utf8')
-const server = fs.readFileSync('server/index.ts', 'utf8')
+const server = [
+  'server/index.ts',
+  'server/whatsappEvolutionRuntime.ts',
+  'server/routes/evolutionWebhookRoutes.ts',
+  'server/routes/adminWhatsappSettingsRoutes.ts',
+  'server/routes/adminWhatsappConnectionRoutes.ts',
+  'server/routes/adminWhatsappCampaignRoutes.ts',
+  'server/routes/adminWhatsappConversationRoutes.ts',
+].map(file => fs.readFileSync(file, 'utf8')).join('\n')
 const migrate = fs.readFileSync('server/migrate.ts', 'utf8')
 const main = fs.readFileSync('src/main.tsx', 'utf8')
 
 const checks = [
-  ['WhatsApp Center substitui tela legada', app.includes('<WhatsAppCenter />') && app.includes("import { WhatsAppCenter }" )],
+  ['WhatsApp Center substitui tela legada', adminApp.includes('<WhatsAppCenter />') && adminApp.includes("import('../../components/WhatsAppCenter')")],
   ['Conversas continua como primeira visão', ui.includes("useState<View>('conversations')")],
   ['navegação separa Conversas, Automações, Campanhas e Conexão', ['Conversas','Automações','Campanhas','Conexão'].every((label) => ui.includes(label))],
   ['empty state único possui CTA de nova conversa', ui.includes('Suas conversas começam aqui.') && ui.includes('wa39-empty-inbox')],
@@ -22,16 +30,16 @@ const checks = [
   ['mensagem padrão usa resposta 1 ou 2 sem código', server.includes('Responda 1 para confirmar ou 2 se não puder comparecer.')],
   ['backend não exige variável de código', !server.includes('CONFIRMATION_CODE_REQUIRED')],
   ['migração preserva customizações e troca apenas default antigo', migrate.includes('apply(29') && migrate.includes('WHERE confirmation_message = ?')],
-  ['webhook é preparado também fora das automações', server.includes('Manual conversations must also prepare inbound delivery') && server.includes('Keep inbound delivery prepared')],
-  ['conexão via QR também prepara webhook', server.includes('Configure inbound delivery as soon as the instance exists')],
+  ['webhook é preparado também fora das automações', server.includes('Manual conversations must also prepare inbound delivery') && server.includes("normalizedState === 'CONNECTED'") && server.includes('await configureEvolutionWebhookForTenant(tenantId).catch(() => false)')],
+  ['conexão via QR também prepara webhook', server.includes("router.get('/whatsapp/qrcode'") && server.includes('await configureEvolutionWebhookForTenant(tenantId).catch(() => false)')],
   ['parser suporta remoteJidAlt e @lid', server.includes('remoteJidAlt') && server.includes("remoteJid.endsWith('@lid')")],
   ['webhook continua ignorando grupos', server.includes("remoteJid.endsWith('@g.us')") && server.includes('!inbound.isGroup')],
   ['webhook persiste mensagens inbound', server.includes("direction: inbound.fromMe ? 'OUTBOUND' : 'INBOUND'") && server.includes('recordWhatsappMessage')],
-  ['diagnóstico verifica webhook por instância', server.includes('/webhook/find/') && server.includes('/api/admin/whatsapp/diagnostics')],
+  ['diagnóstico verifica webhook por instância', server.includes('/webhook/find/') && server.includes("router.get('/whatsapp/diagnostics'")],
   ['diagnóstico mostra última entrada e saída', server.includes('lastInboundAt') && server.includes('lastOutboundAt') && ui.includes('Última recebida')],
   ['campanhas mostram audiência autorizada', ui.includes('Audiência autorizada') && server.includes('optedInClients')],
   ['broadcast legado continua bloqueado em favor da fila', server.includes('WHATSAPP_BROADCAST_REPLACED')],
-  ['campanhas possuem fila consentida e UI de histórico', server.includes('/api/admin/whatsapp/campaigns') && ui.includes('Campanhas recentes') && ui.includes('Criar campanha para')],
+  ['campanhas possuem fila consentida e UI de histórico', server.includes("router.get('/whatsapp/campaigns'") && server.includes("router.post('/whatsapp/campaigns'") && ui.includes('Campanhas recentes') && ui.includes('Criar campanha para')],
   ['camada visual WhatsApp 3.9 está importada', main.includes("import './whatsapp-v39.css'" )],
   ['CSS 3.9 contém inbox, automações, campanhas e conexão', ['.wa39-inbox','.wa39-flow-card','.wa39-campaign-overview','.wa39-connection-grid'].every((selector) => css.includes(selector))],
 ]

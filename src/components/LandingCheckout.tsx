@@ -1,24 +1,30 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { PUBLIC_TEAM_PLANS, validTeamPlans, orderedTeamPlans, type TeamPlan } from '../teamPlans'
 import { api } from '../api'
 import { formatBrazilPhoneInput, normalizeBrazilPhone } from '../phone'
 import { ArrowRight, Check, ShieldCheck, X } from './Icons'
 import { PasswordChecklist } from './PasswordChecklist'
 
-type BillingPlan = { cycle: 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL'; months: number; label: string; amountCents: number; monthlyEquivalentCents: number; savingsPercent: number; featured: boolean }
-type ReferralPreview = { label: string; inviteeDiscountPercent: number; expiresAt: string | null }
 type CheckoutLegalConfig = { documents: { termsVersion: string; privacyVersion: string; updatedAt: string; bundleHash: string } }
 
 const money = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const slugify = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48)
 
-export function LandingCheckout({ open, onClose, referralToken, initialCycle = 'ANNUAL' }: { open: boolean; onClose: () => void; referralToken?: string; initialCycle?: BillingPlan['cycle'] }) {
-  const [plans, setPlans] = useState<BillingPlan[]>([])
-  const [cycle, setCycle] = useState<BillingPlan['cycle']>(initialCycle)
+export function LandingCheckout({ open, onClose, referralToken: providedReferralToken, initialTeamPlan = 'TEAM_3' }: { open: boolean; onClose: () => void; referralToken?: string; initialTeamPlan?: TeamPlan['code'] }) {
+  const [useReferral,setUseReferral]=useState(true)
+  const referralToken=useReferral ? providedReferralToken : undefined
+  const [referralQuote, setReferralQuote] = useState<{amountCents:number;discountPercent:number;fingerprint:string}|null>(null)
+  const [quoteLoading,setQuoteLoading] = useState(false)
+  const [quoteError,setQuoteError] = useState('')
+  const [teamPlans, setTeamPlans] = useState<readonly TeamPlan[]>(PUBLIC_TEAM_PLANS)
+  const [checkoutAvailable, setCheckoutAvailable] = useState(false)
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [teamCode, setTeamCode] = useState<TeamPlan['code']>(initialTeamPlan)
   const [step, setStep] = useState<1 | 2>(1)
-  const [referral, setReferral] = useState<ReferralPreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [recoverySlug, setRecoverySlug] = useState('')
   const [legalConfig, setLegalConfig] = useState<CheckoutLegalConfig | null>(null)
   const [legalAccepted, setLegalAccepted] = useState(false)
   const [platformMarketingWhatsapp, setPlatformMarketingWhatsapp] = useState(false)
@@ -26,9 +32,11 @@ export function LandingCheckout({ open, onClose, referralToken, initialCycle = '
 
   useEffect(() => {
     if (!open) return
+    setUseReferral(true)
     setStep(1)
-    setCycle(initialCycle)
+    setTeamCode(initialTeamPlan)
     setError('')
+    setRecoverySlug('')
     setLegalAccepted(false)
     setPlatformMarketingWhatsapp(false)
     setLegalConfig(null)
@@ -36,19 +44,36 @@ export function LandingCheckout({ open, onClose, referralToken, initialCycle = '
       if (!result.ok) return setError('Não foi possível carregar os documentos legais agora.')
       setLegalConfig(result.data)
     })
-    api<{ plans: BillingPlan[] }>('/api/public/billing/plans').then((result) => {
-      if (!result.ok) return setError('Não foi possível carregar os ciclos agora.')
-      setPlans(result.data.plans)
-      setCycle(result.data.plans.some((plan) => plan.cycle === initialCycle) ? initialCycle : (result.data.plans.find((plan) => plan.featured)?.cycle ?? 'ANNUAL'))
+    setCheckoutAvailable(false)
+    setCatalogLoading(true)
+    let current = true
+    const controller = new AbortController()
+    api<{teamPlans?:unknown;checkoutAvailable?:boolean}>('/api/public/billing/plans',{signal:controller.signal}).then(result => {
+      if(!current)return
+      setCatalogLoading(false)
+      if(result.ok && validTeamPlans(result.data.teamPlans)) {
+        setTeamPlans(orderedTeamPlans(result.data.teamPlans));setCheckoutAvailable(result.data.checkoutAvailable===true)
+        if(result.data.checkoutAvailable!==true)setError('A contratação está temporariamente indisponível. Tente novamente em instantes.')
+      } else setError('Não foi possível confirmar a disponibilidade da contratação. Os planos atuais continuam exibidos; tente novamente em instantes.')
     })
-    if (referralToken) api<{ referral: ReferralPreview }>(`/api/public/referrals/${encodeURIComponent(referralToken)}`).then((result) => {
-      if (result.ok) setReferral(result.data.referral)
-      else setError('Esse link de desconto expirou. Você ainda pode continuar pelo valor normal.')
-    })
-  }, [open, referralToken, initialCycle])
+    return()=>{current=false;controller.abort()}
 
-  const selected = useMemo(() => plans.find((plan) => plan.cycle === cycle) ?? plans[0], [plans, cycle])
-  const finalAmount = selected ? Math.max(0, selected.amountCents - Math.round(selected.amountCents * (referral?.inviteeDiscountPercent ?? 0) / 100)) : 0
+  }, [open, providedReferralToken, initialTeamPlan])
+
+  const selected = useMemo(() => teamPlans.find(plan => plan.code === teamCode), [teamPlans, teamCode])
+  const finalAmount = referralToken ? referralQuote?.amountCents ?? selected?.amountCents ?? 0 : selected?.amountCents ?? 0
+  useEffect(() => {
+    setReferralQuote(null);setQuoteError('')
+    if(!open || !referralToken){setQuoteLoading(false);return}
+    const controller=new AbortController();setQuoteLoading(true)
+    const query=new URLSearchParams({planCode:teamCode,referralToken})
+    void api<{quote:{amountCents:number;discountPercent:number;fingerprint:string}}>(`/api/public/onboarding/team-quote?${query}`,{signal:controller.signal}).then(result=>{
+      if(controller.signal.aborted)return
+      if(result.ok)setReferralQuote(result.data.quote);else setQuoteError(result.error.message)
+      setQuoteLoading(false)
+    })
+    return ()=>controller.abort()
+  },[open,teamCode,referralToken])
 
   function updateStudioName(value: string) {
     setForm((current) => ({ ...current, studioName: value, slug: !current.slug || current.slug === slugify(current.studioName) ? slugify(value) : current.slug }))
@@ -56,6 +81,9 @@ export function LandingCheckout({ open, onClose, referralToken, initialCycle = '
 
   async function submit(event: FormEvent) {
     event.preventDefault()
+    if(busy)return
+    if(referralToken && (quoteLoading || !referralQuote)){setError(quoteError || 'Aguarde a validação da indicação.');return}
+    if (!checkoutAvailable || catalogLoading || !selected) { setError('A contratação está indisponível no momento. Nenhum pagamento foi iniciado.'); return }
     if (step === 1) { setStep(2); setError(''); return }
     if (!normalizeBrazilPhone(form.phone)) { setError('Informe um WhatsApp brasileiro válido, com DDD.'); return }
     if (!legalConfig) { setError('Os documentos legais ainda estão carregando. Tente novamente em instantes.'); return }
@@ -63,12 +91,12 @@ export function LandingCheckout({ open, onClose, referralToken, initialCycle = '
     setBusy(true)
     setError('')
     try {
-      const result = await api<{ activated: boolean; url?: string; workspaceSlug: string }>('/api/public/onboarding/checkout', {
+      const result = await api<{ activated: boolean; url?: string; workspaceSlug: string }>('/api/public/onboarding/team-checkout', {
         method: 'POST',
         body: JSON.stringify({
           ...form,
-          cycle,
-          referralToken: referral ? referralToken : undefined,
+          planCode: teamCode,
+          ...(referralToken ? {referralToken,quoteFingerprint:referralQuote?.fingerprint} : {}),
           legal: {
             accepted: true,
             termsVersion: legalConfig.documents.termsVersion,
@@ -78,7 +106,10 @@ export function LandingCheckout({ open, onClose, referralToken, initialCycle = '
           platformMarketingWhatsapp,
         }),
       })
-      if (!result.ok) throw new Error(result.error.message)
+      if (!result.ok) {
+        if (result.error.code === 'TEAM_CHECKOUT_RECOVERABLE') setRecoverySlug(form.slug)
+        throw new Error(result.error.message)
+      }
       if (result.data.url) return window.location.assign(result.data.url)
       const configured = String(import.meta.env.VITE_APP_BASE_URL ?? '').trim()
       if (configured) {
@@ -97,23 +128,17 @@ export function LandingCheckout({ open, onClose, referralToken, initialCycle = '
     <section className="landing-checkout-panel" role="dialog" aria-modal="true" aria-labelledby="landing-checkout-title" onClick={(event) => event.stopPropagation()}>
       <div className="checkout-progress" aria-label={`Etapa ${step} de 2`}><i className="is-active" /><i className={step === 2 ? 'is-active' : ''} /></div>
       <header className="landing-checkout-header">
-        <div><span>{step === 1 ? '1 de 2 · escolha o ciclo' : '2 de 2 · crie seu acesso'}</span><h2 id="landing-checkout-title">{step === 1 ? 'Quanto mais tempo, menor o valor por mês.' : 'Só o essencial. Sua marca vem depois do pagamento.'}</h2><p>{step === 1 ? 'Todos os ciclos liberam o produto completo.' : 'No setup inicial você envia logo, escolhe cores, horários e serviços.'}</p></div>
+        <div><span>{step === 1 ? '1 de 2 · escolha a equipe' : '2 de 2 · crie seu acesso'}</span><h2 id="landing-checkout-title">{step === 1 ? 'Um plano para o tamanho da sua equipe.' : 'Só o essencial. Sua marca vem depois do pagamento.'}</h2><p>{step === 1 ? 'O valor é mensal por estúdio, conforme o número de profissionais.' : 'No setup inicial você envia logo, escolhe cores, horários e serviços.'}</p></div>
         <button type="button" className="landing-checkout-close" data-modal-close onClick={onClose} aria-label="Fechar compra" disabled={busy}><X size={19} /></button>
       </header>
 
       <form className="landing-checkout-body" onSubmit={submit}>
         {step === 1 ? <>
-          <div className="checkout-plan-grid" role="radiogroup" aria-label="Ciclo de pagamento">{plans.map((plan) => {
-            const discounted = Math.max(0, plan.amountCents - Math.round(plan.amountCents * (referral?.inviteeDiscountPercent ?? 0) / 100))
-            return <button type="button" role="radio" aria-checked={cycle === plan.cycle} className={cycle === plan.cycle ? 'is-selected' : ''} key={plan.cycle} onClick={() => setCycle(plan.cycle)}>
-              <span>{plan.label}{plan.featured ? <i>Melhor valor</i> : null}</span>
-              <strong>{money(Math.round(discounted / plan.months))}<small>/mês</small></strong>
-              <p>{money(discounted)} por {plan.months === 1 ? '1 mês' : `${plan.months} meses`}</p>
-              <b>{cycle === plan.cycle ? <Check size={14} /> : null}</b>
-            </button>
-          })}</div>
-          {referral ? <div className="landing-referral-applied"><Check size={16} /><span><strong>{referral.inviteeDiscountPercent}% de desconto aplicado</strong><small>{referral.label}</small></span></div> : null}
-          <div className="checkout-cycle-note"><span>Incluído em qualquer ciclo</span><div><i><Check size={13} />Agenda e clientes</i><i><Check size={13} />Financeiro</i><i><Check size={13} />Luma</i><i><Check size={13} />Setup guiado</i></div></div>
+          <div className="checkout-plan-grid is-team" role="radiogroup" aria-label="Tamanho da equipe">{teamPlans.map(plan => <button type="button" role="radio" aria-checked={teamCode === plan.code} className={teamCode === plan.code ? 'is-selected' : ''} key={plan.code} onClick={() => setTeamCode(plan.code)}>
+            <span>{plan.label}</span><strong>{money(plan.amountCents)}<small>/mês</small></strong><p>Até {plan.seats} profissionais · 1 mês</p><b>{teamCode === plan.code ? <Check size={14} /> : null}</b>
+          </button>)}</div>
+          {referralToken ? <div className="checkout-cycle-note" role="status">{quoteLoading ? 'Validando indicação…' : quoteError ? quoteError : referralQuote ? `${referralQuote.discountPercent}% de desconto na primeira assinatura: ${money(finalAmount)} agora. As próximas mensalidades seguem o valor da faixa escolhida.` : 'Indicação indisponível.'}{quoteError ? <button type="button" className="checkout-back" onClick={()=>setUseReferral(false)}>Continuar sem indicação e sem desconto</button> : null}</div> : null}
+          <div className="checkout-cycle-note"><span>Incluído em qualquer plano</span><div><i><Check size={13} />Agenda e clientes</i><i><Check size={13} />Financeiro</i><i><Check size={13} />Luma</i><i><Check size={13} />Setup guiado</i></div></div>
         </> : <div className="checkout-account-layout">
           <div className="landing-checkout-fields">
             <label>Seu nome<input value={form.ownerName} onChange={(event) => setForm({ ...form, ownerName: event.target.value })} autoComplete="name" required minLength={2} placeholder="Como podemos chamar você?" /></label>
@@ -123,7 +148,7 @@ export function LandingCheckout({ open, onClose, referralToken, initialCycle = '
             <label>Crie uma senha<input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="new-password" minLength={8} required placeholder="Crie uma senha" aria-describedby="checkout-password-requirements" /><PasswordChecklist id="checkout-password-requirements" password={form.password} /></label>
             <details className="checkout-address-details"><summary>Personalizar endereço do espaço</summary><label>Seu endereço<div className="landing-slug-field"><input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} required minLength={2} /><span>.lashdesigner</span></div></label></details>
           </div>
-          <aside className="checkout-order-card"><span>Seu pedido</span><div><strong>{selected?.label ?? 'Plano'}</strong><small>{selected ? `${selected.months} ${selected.months === 1 ? 'mês' : 'meses'} de acesso completo` : 'Carregando ciclo…'}</small></div><hr /><div className="checkout-order-total"><span>Total agora</span><strong>{selected ? money(finalAmount) : '—'}</strong>{referral && selected ? <small>de {money(selected.amountCents)}</small> : null}</div><ul><li><ShieldCheck size={15} />Pagamento processado pela InfinitePay</li><li><Check size={15} />Sem cobrança automática silenciosa</li></ul></aside>
+          <aside className="checkout-order-card"><span>Seu pedido</span><div><strong>{selected?.label ?? 'Plano'}</strong><small>Um mês de acesso para a equipe</small></div><hr /><div className="checkout-order-total"><span>Total agora</span><strong>{selected ? money(finalAmount) : '—'}</strong></div><ul><li><ShieldCheck size={15} />Pagamento processado pela Appmax</li><li><Check size={15} />Sem cobrança automática silenciosa</li></ul></aside>
           <div className="checkout-legal-stack">
             <label className={`checkout-legal-choice is-required ${legalAccepted ? 'is-checked' : ''}`}>
               <input type="checkbox" checked={legalAccepted} onChange={(event) => { setLegalAccepted(event.target.checked); setError('') }} required />
@@ -137,9 +162,10 @@ export function LandingCheckout({ open, onClose, referralToken, initialCycle = '
         </div>}
 
         {error ? <div className="landing-checkout-error" role="alert">{error}</div> : null}
+        {recoverySlug ? <a href={`/acessar?workspace=${encodeURIComponent(recoverySlug)}`} className="checkout-back">Acessar meu estúdio e tentar novamente</a> : null}
         <footer className="checkout-actions">
           {step === 2 ? <button type="button" className="checkout-back" onClick={() => setStep(1)} disabled={busy}>Voltar</button> : <span />}
-          <button type="submit" className="checkout-next" disabled={busy || !selected || (step === 2 && (!legalConfig || !legalAccepted))}>{busy ? 'Preparando pagamento…' : step === 1 ? <>Continuar com {selected?.label?.toLowerCase() ?? 'este ciclo'} <ArrowRight size={17} /></> : finalAmount === 0 ? <>Ativar meu espaço <ArrowRight size={17} /></> : <>Ir para o pagamento seguro <ArrowRight size={17} /></>}</button>
+          <button type="submit" className="checkout-next" disabled={busy || quoteLoading || Boolean(referralToken && !referralQuote) || catalogLoading || !checkoutAvailable || !selected || (step === 2 && (!legalConfig || !legalAccepted))}>{catalogLoading ? 'Verificando disponibilidade…' : !checkoutAvailable ? 'Contratação indisponível' : busy ? 'Preparando pagamento…' : step === 1 ? <>Continuar com {selected?.label?.toLowerCase() ?? 'este plano'} <ArrowRight size={17} /></> : <>Ir para o pagamento seguro <ArrowRight size={17} /></>}</button>
         </footer>
       </form>
     </section>

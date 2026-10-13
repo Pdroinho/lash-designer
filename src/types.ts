@@ -1,4 +1,4 @@
-export type Role = 'DEV' | 'ADMIN' | 'CLIENT'
+export type Role = 'DEV' | 'ADMIN' | 'CLIENT' | 'STAFF'
 
 export type AppointmentConfirmationStatus =
   | 'NOT_REQUESTED'
@@ -16,6 +16,7 @@ export type TenantPublic = {
   primaryColor: string
   logoUrl: string | null
   publicBaseUrl?: string | null
+  billingRecovery?: boolean
 }
 
 export type TenantDev = TenantPublic & {
@@ -35,11 +36,13 @@ export type SessionUser = {
   tenantId: string | null
   tenantSlug: string | null
   subscriptionStatus?: string | null
+  billingRecovery?: boolean
 }
 
 export type CalendarEvent = {
   id: string
   title: string
+  professionalName?: string | null
   clientName: string
   start: string // ISO date string
   end: string // ISO date string

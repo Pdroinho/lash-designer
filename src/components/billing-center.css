@@ -1,0 +1,5 @@
+@media(max-width:820px){
+  .billing-shell.staff52-billing{padding-bottom:calc(180px + env(safe-area-inset-bottom,0px))}
+  .billing-shell.staff52-billing.billing-shell--locked{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+  .billing-shell--locked .billing-mobile-cta{bottom:max(12px,env(safe-area-inset-bottom,0px))}
+}

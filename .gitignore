@@ -29,3 +29,24 @@ __pycache__/
 .asset-refresh-v57/
 .temp_behance/
 LashDesigner- lp antiga melhor/
+
+# Pacotes e arquivos compactados
+*.zip
+*.tar.gz
+*.tar
+
+# Evidências e relatórios de auditoria
+*.pdf
+RELATORIO_*.html
+conectar-whatsapp.html
+chrome-evidence/
+qa-*-evidence/
+qa-evidence-*/
+qa-practical-evidence/
+
+# Scripts temporários de teste e auditoria na raiz
+/*.py
+/test.json
+/test_*.txt
+/test_*.py
+/evolution_connect.json

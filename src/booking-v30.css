@@ -119,6 +119,18 @@
 
 /* Service gallery: image-led, not a generic SaaS card list. */
 .booking30-services { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.booking30-service-catalog { display: grid; gap: 16px; min-width: 0; }
+.booking30-professionals { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin: 0 0 24px; padding: 0; border: 0; }
+.booking30-professionals legend { width: 100%; margin-bottom: 12px; color: var(--b30-body); font-size: .76rem; font-weight: 700; }
+.booking30-professionals label { display: inline-flex; align-items: center; gap: 9px; min-height: 46px; padding: 10px 15px; border: 1px solid var(--b30-line-strong); border-radius: 14px; background: var(--b30-paper); color: var(--b30-ink); font-size: .8rem; cursor: pointer; }
+.booking30-professionals label:has(input:checked) { border-color: var(--b30-wine); background: color-mix(in srgb, var(--b30-wine) 8%, var(--b30-paper)); }
+.booking30-professionals label:focus-within { outline: 2px solid var(--b30-wine); outline-offset: 2px; }
+.booking30-professionals input { accent-color: var(--b30-wine); }
+.booking30-service-search { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 0 17px; border: 1px solid var(--b30-line-strong); border-radius: 16px; background: var(--b30-paper); color: var(--b30-wine); transition: border-color .18s ease, box-shadow .18s ease; }
+.booking30-service-search:focus-within { border-color: var(--b30-wine); box-shadow: 0 0 0 3px color-mix(in srgb, var(--b30-wine) 12%, transparent); }
+.booking30-service-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--b30-ink); font: inherit; }
+.booking30-service-search input::placeholder { color: var(--b30-muted); }
+.booking30-no-results { grid-column: 1 / -1; padding: 20px; border: 1px dashed var(--b30-line-strong); border-radius: 16px; color: var(--b30-body); }
 .booking30-service {
   position: relative;
   display: grid;

@@ -1,3 +1,48 @@
+﻿# 5.12.12 — Planos por Equipe com Appmax e Sistema de Indicações com Governança de Estorno
+
+- **Planos por Equipe Integrados**: Implementação completa dos planos `TEAM_3` (R$ 74,90), `TEAM_6` (R$ 99,90) e `TEAM_15` (R$ 149,00).
+- **Checkout Appmax em Produção**:
+  - Correção no cliente `server/appmax.ts` para enviar array plano de métodos de pagamento `payments: ['creditcard', 'pix']` em `/v1/payment-link`, eliminando erro HTTP 422 de validação.
+  - Liberação da flag de produção em `server/env.ts` com validação obrigatória das credenciais `APPMAX_MERCHANT_CLIENT_ID` e `APPMAX_MERCHANT_CLIENT_SECRET`.
+- **Migração 45 (Ledger de Indicações e Estornos)**:
+  - Adição de `gross_amount_cents`, `discount_percent` e `referral_redemption_id` em `appmax_checkout_intents`.
+  - Criação das tabelas `appmax_referral_memberships`, `appmax_referral_debts` e `appmax_referral_debt_allocations`.
+  - Governança de estornos: créditos indevidamente usufruídos são compensados automaticamente de futuras recompensas acumuladas.
+- **Segurança de Checkout**:
+  - Geração de `quoteFingerprint` (SHA-256) garantindo integridade de valor e desconto entre cotação e pagamento.
+  - Bloqueio estrito de autoindicação por e-mail, telefone normalizado em E.164 e identificador de estúdio.
+  - Rate limiting em memória (`publicCheckoutLimiter`) em rotas públicas de cotação e checkout.
+- **Auditorias e Testes**: Adição de auditorias automáticas `test:architecture`, `test:recovery-ui`, `test:support-ui`, `test:landing-team-ui`, `test:billing-ui`, `test:report-ux-ui` e `test:referral-team-ui`.
+
+---
+
+# 5.12.10 — Correções Visuais e Homologação Responsiva
+
+- Correções de layout, paddings e contrastes nas telas de Onboarding, Setup e Painel Admin.
+- Estabilização de fluxos responsivos em viewports mobile (320px a 430px) e desktop (1440px).
+- Refinamento de acessibilidade e semântica de formulários no fluxo de agendamento público.
+
+---
+
+# 5.12.9 — Atualização da Landing Page e Pricing
+
+- Sincronização da Landing Page para refletir a nova oferta comercial de planos por equipe.
+- Reorganização das seções de pricing, FAQ e chamadas de conversão com classes `ld54-*`.
+
+---
+
+# 5.12.8 — Central de Suporte e Modo de Recuperação
+
+- **Migração 44 (Central de Suporte)**:
+  - Criação de `support_tickets`, `support_messages`, `support_attachments` e `support_notifications`.
+  - Protocolos de chamado atômicos no formato `SUP-YYYYMMDD-XXXX`.
+  - Anexos binários seguros armazenados diretamente no SQLite com download autenticado.
+- **Migração 43 (Modo de Recuperação)**:
+  - Criação de `suspension_reason` ('APPMAX' vs bloqueio administrativo manual).
+  - Modo de recuperação que libera autenticação ADMIN, telas de billing e suporte para estúdios suspensos regularizarem pendências.
+
+---
+
 # 5.4.1 — Landing Corrective
 
 - headline do hero reduzida para um teto de ~66 px no desktop;
@@ -181,3 +226,4 @@ Consulte `docs/RELEASE_2.5.0.md`, `docs/CUSTOMER_EXPERIENCE_2.5.md` e `docs/VISU
 - Bottom navigation virou dock flutuante de aplicativo.
 - Nova camada `mobile-experience-v511.css`, sem `!important`, `100vw/100dvw` ou paleta hex local.
 - Adicionados audit e QA visual próprios da 5.11.
+

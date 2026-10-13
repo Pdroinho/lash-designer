@@ -2,8 +2,10 @@ import fs from 'node:fs'
 
 const read = (file) => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')
 const theme = read('src/theme.ts')
-const app = read('src/App.tsx')
+const adminApp = read('src/features/admin/AdminApp.tsx')
+const settingsPage = read('src/features/settings/AdminSettings.tsx')
 const shell = read('src/shell-v24.css')
+const shellComponent = read('src/layouts/Shell.tsx')
 const dashboard = read('src/dashboard-v24.css')
 const booking = read('src/booking-v30.css')
 const setup = read('src/setup.css')
@@ -19,9 +21,9 @@ const checks = [
   ['transição foto/banner do dashboard é derivada do tenant', dashboard.includes('color-mix(in srgb, var(--primary-700)')],
   ['booking usa as superfícies globais do tenant', booking.includes('--b30-canvas: var(--surface-canvas') && booking.includes('--b30-panel: var(--surface-soft') && booking.includes('--b30-paper: var(--ld-color-paper')],
   ['booking remove acentos rosa hardcoded das interações', !/rgba\(139\s*,\s*23\s*,\s*71/i.test(booking) && booking.includes('color-mix(in srgb, var(--b30-wine)')],
-  ['sidebar aceita logo e nome do espaço', app.includes("brand?: Pick<TenantPublic, 'name' | 'logoUrl'>") && app.includes("props.brand?.logoUrl || '/brand/logo-symbol.png'") && app.includes("props.brand?.name || 'Lash Designer'")],
-  ['painel admin envia tenant ao shell', (app.match(/brand=\{tenant\}/g) || []).length >= 2],
-  ['salvar identidade atualiza shell sem refetch obrigatório', app.includes('onUpdate?.(res.data.tenant)') && app.includes('onUpdate={(updatedTenant) =>') && app.includes('setTenant(updatedTenant)')],
+  ['sidebar aceita logo e nome do espaço', shellComponent.includes("brand?: Pick<TenantPublic, 'name' | 'logoUrl'>") && shellComponent.includes("props.brand?.logoUrl || '/brand/logo-symbol.png'") && shellComponent.includes("props.brand?.name || 'Lash Designer'")],
+  ['painel admin envia tenant ao shell', (adminApp.match(/brand=\{tenant\}/g) || []).length >= 2],
+  ['salvar identidade atualiza shell sem refetch obrigatório', settingsPage.includes('onUpdate?.(res.data.tenant)') && adminApp.includes('onUpdate={(updatedTenant) =>') && adminApp.includes('setTenant(updatedTenant)')],
   ['logo de tenant recebe tratamento próprio no shell', shell.includes('.logo-icon.is-tenant-logo') && shell.includes('object-fit: contain')],
   ['setup usa a paleta escolhida no próprio container', workspace.includes("'--setup-primary': palette.primary") && workspace.includes("'--setup-secondary': palette.secondary")],
   ['rail do setup deriva a composição da paleta escolhida', setup.includes('var(--setup-primary)') && setup.includes('var(--setup-secondary)') && !/#401b2d|#6e1740|#321723/i.test(setup)],

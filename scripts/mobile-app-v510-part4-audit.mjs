@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 const css = fs.readFileSync('src/mobile-app-v510-part4.css','utf8')
 const main = fs.readFileSync('src/main.tsx','utf8')
-const app = fs.readFileSync('src/App.tsx','utf8')
+const settingsPage = fs.readFileSync('src/features/settings/AdminSettings.tsx','utf8')
+const bookingPage = fs.readFileSync('src/features/booking/BookingPage.tsx','utf8')
 const referral = fs.readFileSync('src/components/ReferralCenter.tsx','utf8')
 const setup = fs.readFileSync('src/components/WorkspaceSetup.tsx','utf8')
 const checks = [
@@ -11,7 +12,7 @@ const checks = [
   ['Domínios mantêm touch targets', css.includes('.domain-actions .btn') && css.includes('min-height: 40px')],
   ['Salvar identidade ocupa largura do celular', css.includes('.form-actions .btnPrimary { width: 100%')],
   ['Histórico de faturas deixa de depender de tabela horizontal', css.includes('.table-scroll .data-table tr') && css.includes('display: block')],
-  ['Segurança é compactada sem remover seções', app.includes('security-settings-section') && css.includes('.security-settings-section { padding: 14px')],
+  ['Segurança é compactada sem remover seções', settingsPage.includes('security-settings-section') && css.includes('.security-settings-section { padding: 14px')],
   ['Indicações preservam métricas reais', referral.includes('data.metrics.paid') && referral.includes('customerSavingsCents')],
   ['Métricas de indicação viram trilho horizontal', css.includes('.referral-metrics') && css.includes('scroll-snap-type: x proximity')],
   ['Link de indicação ganha CTA de largura total', css.includes('.referral-link-field') && css.includes('grid-template-columns: 1fr')],
@@ -19,7 +20,7 @@ const checks = [
   ['Progresso do setup vira barra compacta', css.includes('.workspace-setup-progress li') && css.includes('height: 5px')],
   ['Ações do onboarding ficam persistentes', css.includes('.workspace-setup-actions') && css.includes('position: sticky')],
   ['Paletas do onboarding viram carrossel de toque', css.includes('.workspace-palette-grid') && css.includes('scroll-snap-align: start')],
-  ['Booking público mantém quatro etapas reais', app.includes('aria-label="Etapas do agendamento"') && app.includes('/ 4')],
+  ['Booking público mantém quatro etapas reais', bookingPage.includes('aria-label="Etapas do agendamento"') && bookingPage.includes('/ 4')],
   ['Booking ganha topbar persistente', css.includes('.booking30-topbar') && css.includes('position: sticky')],
   ['Etapas do booking viram barra de progresso compacta', css.includes('.booking30-steps button') && css.includes('height: 4px')],
   ['CTA final do booking fica acessível ao polegar', css.includes('.booking30-confirm-button') && css.includes('bottom: max(10px, env(safe-area-inset-bottom))')],

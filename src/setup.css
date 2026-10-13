@@ -40,14 +40,10 @@
   padding: clamp(30px, 4vw, 52px);
   overflow: hidden;
   color: #fff;
-  background-color: var(--setup-secondary, var(--surface-panel));
-  background:
-    radial-gradient(circle at 90% 5%, color-mix(in srgb, var(--setup-primary) 38%, transparent) 0%, transparent 35%),
-    linear-gradient(155deg,
-      color-mix(in srgb, var(--setup-secondary) 78%, #111 22%) 0%,
-      color-mix(in srgb, var(--setup-primary) 84%, var(--setup-secondary) 16%) 56%,
-      color-mix(in srgb, var(--setup-secondary) 86%, #111 14%) 100%)
-    var(--setup-secondary);
+  /* The solid fallback remains readable if color-mix is unsupported. Keep
+     the authored palette without a nested gradient or transparent mix. */
+  background-color: #33272d;
+  background-image: linear-gradient(155deg, var(--setup-secondary) 0%, var(--setup-primary) 56%, var(--setup-secondary) 100%);
 }
 
 .workspace-setup-aside::after {

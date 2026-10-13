@@ -1,22 +1,24 @@
 import fs from 'node:fs'
 
-const app = fs.readFileSync('src/App.tsx', 'utf8')
+const adminApp = fs.readFileSync('src/features/admin/AdminApp.tsx', 'utf8')
+const shell = fs.readFileSync('src/layouts/Shell.tsx', 'utf8')
+const dashboard = fs.readFileSync('src/features/dashboard/AdminDashboard.tsx', 'utf8')
 const main = fs.readFileSync('src/main.tsx', 'utf8')
 const css = fs.readFileSync('src/mobile-app-v510.css', 'utf8')
 
 const checks = [
   ['CSS mobile 5.10 importado', main.includes("import './mobile-app-v510.css'")],
-  ['Shell aceita navegação mobile', app.includes('mobileNav?: Array<{ key: string; label: string; icon: ReactNode; active: boolean; onClick: () => void }>')],
-  ['Shell marca presença da tabbar', app.includes("props.mobileNav?.length ? 'has-mobile-tabbar' : ''")],
-  ['Topbar mobile usa marca do tenant', app.includes('ld-mobile-topbar-brand') && app.includes("props.brand?.logoUrl || '/brand/logo-symbol.png'")],
-  ['Bottom bar possui navegação acessível', app.includes('ld-mobile-tabbar') && app.includes('Navegação principal mobile')],
-  ['Bottom bar tem Mais para drawer completo', app.includes('Abrir mais áreas') && app.includes('<MoreHorizontal size={21} />')],
-  ['Admin expõe Início na barra mobile', app.includes("key: 'dashboard', label: 'Início'")],
-  ['Admin expõe Agenda na barra mobile', app.includes("key: 'calendar', label: 'Agenda'")],
-  ['Admin expõe Clientes na barra mobile', app.includes("key: 'clients', label: 'Clientes'")],
-  ['Admin expõe WhatsApp na barra mobile', app.includes("key: 'evolution', label: 'WhatsApp'")],
-  ['Áreas secundárias ativam Mais', app.includes("!['dashboard', 'calendar', 'clients', 'evolution'].includes(tab)")],
-  ['Dashboard tem escopo mobile próprio', app.includes('className="ld-dashboard-page"')],
+  ['Shell aceita navegação mobile', shell.includes('mobileNav?: Array<{ key: string; label: string; icon: ReactNode; active: boolean; onClick: () => void }>')],
+  ['Shell marca presença da tabbar', shell.includes("props.mobileNav?.length ? 'has-mobile-tabbar' : ''")],
+  ['Topbar mobile usa marca do tenant', shell.includes('ld-mobile-topbar-brand') && shell.includes("props.brand?.logoUrl || '/brand/logo-symbol.png'")],
+  ['Bottom bar possui navegação acessível', shell.includes('ld-mobile-tabbar') && shell.includes('Navegação principal mobile')],
+  ['Bottom bar tem Mais para drawer completo', shell.includes('Abrir mais áreas') && shell.includes('<MoreHorizontal size={21} />')],
+  ['Admin expõe Início na barra mobile', adminApp.includes("key: 'dashboard', label: 'Início'")],
+  ['Admin expõe Agenda na barra mobile', adminApp.includes("key: 'calendar', label: 'Agenda'")],
+  ['Admin expõe Clientes na barra mobile', adminApp.includes("key: 'clients', label: 'Clientes'")],
+  ['Admin expõe WhatsApp na barra mobile', adminApp.includes("key: 'evolution', label: 'WhatsApp'")],
+  ['Áreas secundárias ativam Mais', adminApp.includes("!['dashboard', 'calendar', 'clients', 'evolution'].includes(tab)")],
+  ['Dashboard tem escopo mobile próprio', dashboard.includes('className="ld-dashboard-page"')],
   ['Dashboard mobile usa métricas 2x2', css.includes('.ld-dashboard-page .stats-grid') && css.includes('repeat(2, minmax(0, 1fr))')],
   ['Dashboard mobile mantém hero editorial compacto', css.includes('.ld-dashboard-page .ld-dashboard-hero') && css.includes('min-height: 154px')],
   ['Agenda mobile usa tabs full-width', css.includes('.ld-agenda-tabs') && css.includes('grid-template-columns: repeat(3, minmax(0, 1fr))')],

@@ -1,0 +1,377 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import type Database from 'better-sqlite3'
+import { renderMarketingCampaignMessage } from './marketingCampaign.js'
+import { normalizeWhatsappMediaPayload, resolvePrivateWhatsappMediaPath, safeWhatsappMediaRelativePath } from './whatsappMedia.js'
+import { normalizeEvolutionConnectionState } from './whatsappWebhook.js'
+import type { MarketingCampaignRow } from './routes/adminWhatsappCampaignRoutes.js'
+
+type TimerHandle = { unref: () => unknown }
+
+type WorkerScheduler = {
+  setInterval: (callback: () => void, delayMs: number) => TimerHandle
+  setTimeout: (callback: () => void, delayMs: number) => TimerHandle
+  clearInterval: (handle: TimerHandle) => void
+  clearTimeout: (handle: TimerHandle) => void
+}
+
+type WhatsappWorkerConfig = {
+  baseUrl: string | null
+  apiKey: string | null
+  instanceName: string | null
+}
+
+type SendWhatsappText = (
+  tenantId: string,
+  phone: string,
+  text: string,
+  options?: {
+    source?: 'AUTOMATION' | 'MANUAL' | 'SYSTEM'
+    purpose?: 'MARKETING' | 'APPOINTMENT_AUTOMATION' | 'MANUAL' | 'SYSTEM'
+    displayName?: string | null
+    onProviderMessageId?: (id: string | null) => void
+  },
+) => Promise<boolean>
+
+type WhatsappWorkerRuntimeOptions = {
+  db: Database.Database
+  mediaDir: string
+  campaignsEnabled: boolean
+  campaignSendIntervalSeconds: number
+  requireWhatsappConfig: (tenantId: string) => WhatsappWorkerConfig | undefined
+  resolveExternalHttpsBaseUrl: (rawUrl: string) => Promise<string>
+  sendWhatsappTextForTenant: SendWhatsappText
+  now?: () => Date
+  fetchFn?: typeof fetch
+  scheduler?: WorkerScheduler
+  logger?: Pick<Console, 'error'>
+}
+
+const defaultScheduler: WorkerScheduler = {
+  setInterval: (callback, delayMs) => setInterval(callback, delayMs),
+  setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
+  clearInterval: handle => clearInterval(handle as ReturnType<typeof setInterval>),
+  clearTimeout: handle => clearTimeout(handle as ReturnType<typeof setTimeout>),
+}
+
+export function createWhatsappWorkerRuntime({
+  db,
+  mediaDir,
+  campaignsEnabled,
+  campaignSendIntervalSeconds,
+  requireWhatsappConfig,
+  resolveExternalHttpsBaseUrl,
+  sendWhatsappTextForTenant,
+  now = () => new Date(),
+  fetchFn = fetch,
+  scheduler = defaultScheduler,
+  logger = console,
+}: WhatsappWorkerRuntimeOptions) {
+  let healthRunning = false
+  let mediaRunning = false
+  let marketingRunning = false
+  let healthInterval: TimerHandle | null = null
+  let healthStartup: TimerHandle | null = null
+  let mediaInterval: TimerHandle | null = null
+  let mediaStartup: TimerHandle | null = null
+  let marketingInterval: TimerHandle | null = null
+  let marketingStartup: TimerHandle | null = null
+
+  const fetchEvolutionConnectionState = async (tenantId: string) => {
+    const config = requireWhatsappConfig(tenantId)
+    if (!config?.baseUrl || !config.apiKey || !config.instanceName) return { state: null, config: null }
+    const response = await fetchFn(`${await resolveExternalHttpsBaseUrl(config.baseUrl)}/instance/connectionState/${encodeURIComponent(config.instanceName)}`, {
+      headers: { apikey: config.apiKey },
+      redirect: 'error',
+      signal: AbortSignal.timeout(8_000),
+    }).catch(() => null)
+    if (!response?.ok) return { state: null, config }
+    const raw = await response.json().catch(() => null)
+    const root = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+    const instance = root.instance && typeof root.instance === 'object' ? root.instance as Record<string, unknown> : {}
+    return { state: normalizeEvolutionConnectionState(instance.state ?? root.state), config }
+  }
+
+  const processConnectionHealth = async () => {
+    if (healthRunning) return
+    healthRunning = true
+    try {
+      const referenceTime = now()
+      const staleClaim = new Date(referenceTime.getTime() - 5 * 60_000).toISOString()
+      const rows = db.prepare(`
+        SELECT tenant_id as tenantId, instance_name as instanceName, reconnect_attempts as reconnectAttempts,
+               reconnect_after as reconnectAfter, reconnect_claimed_at as reconnectClaimedAt
+        FROM whatsapp_instances
+        WHERE instance_name IS NOT NULL AND instance_name <> ''
+        ORDER BY COALESCE(last_health_check_at, created_at) ASC
+        LIMIT 60
+      `).all() as Array<{ tenantId: string; instanceName: string; reconnectAttempts: number; reconnectAfter: string | null; reconnectClaimedAt: string | null }>
+
+      for (const row of rows) {
+        const checkedAt = now().toISOString()
+        const health = await fetchEvolutionConnectionState(row.tenantId)
+        if (health.state === 'CONNECTED') {
+          db.prepare(`
+            UPDATE whatsapp_instances
+            SET connection_state = 'CONNECTED', last_health_check_at = ?, last_connected_at = ?, last_connection_error = NULL,
+                reconnect_attempts = 0, reconnect_after = NULL, reconnect_claimed_at = NULL, updated_at = ?
+            WHERE tenant_id = ? AND instance_name = ?
+          `).run(checkedAt, checkedAt, checkedAt, row.tenantId, row.instanceName)
+          continue
+        }
+
+        if (health.state === 'CONNECTING') {
+          db.prepare(`UPDATE whatsapp_instances SET connection_state = 'CONNECTING', last_health_check_at = ?, reconnect_claimed_at = NULL, updated_at = ? WHERE tenant_id = ? AND instance_name = ?`)
+            .run(checkedAt, checkedAt, row.tenantId, row.instanceName)
+          continue
+        }
+
+        const nextAttempts = Math.min(12, Number(row.reconnectAttempts || 0) + 1)
+        const retryAllowed = !row.reconnectAfter || new Date(row.reconnectAfter).getTime() <= referenceTime.getTime()
+        const cooldownMinutes = Math.min(60, 2 ** Math.min(5, Math.max(0, nextAttempts - 1)) * 2)
+        const retryAt = new Date(referenceTime.getTime() + cooldownMinutes * 60_000).toISOString()
+        const healthError = health.state === 'DISCONNECTED' ? 'Provider informou conexão fechada' : 'Falha ao consultar estado da conexão'
+        db.prepare(`
+          UPDATE whatsapp_instances
+          SET connection_state = ?, last_health_check_at = ?, last_connection_error = ?, reconnect_attempts = ?,
+              reconnect_after = COALESCE(reconnect_after, ?), reconnect_claimed_at = NULL, updated_at = ?
+          WHERE tenant_id = ? AND instance_name = ?
+        `).run(health.state ?? 'UNKNOWN', checkedAt, healthError, nextAttempts, retryAt, checkedAt, row.tenantId, row.instanceName)
+
+        if (!retryAllowed || nextAttempts < 2 || !health.config?.baseUrl || !health.config.apiKey) continue
+        const claimed = db.prepare(`
+          UPDATE whatsapp_instances
+          SET reconnect_claimed_at = ?, reconnect_after = ?, updated_at = ?
+          WHERE tenant_id = ? AND instance_name = ?
+            AND (reconnect_claimed_at IS NULL OR reconnect_claimed_at < ?)
+            AND (reconnect_after IS NULL OR reconnect_after <= ?)
+        `).run(checkedAt, retryAt, checkedAt, row.tenantId, row.instanceName, staleClaim, checkedAt)
+        if (!claimed.changes) continue
+
+        try {
+          const response = await fetchFn(`${await resolveExternalHttpsBaseUrl(health.config.baseUrl)}/instance/connect/${encodeURIComponent(row.instanceName)}`, {
+            headers: { apikey: health.config.apiKey },
+            redirect: 'error',
+            signal: AbortSignal.timeout(12_000),
+          })
+          if (!response.ok) throw new Error(`Evolution connect HTTP ${response.status}`)
+          db.prepare(`UPDATE whatsapp_instances SET connection_state = 'CONNECTING', reconnect_claimed_at = NULL, last_connection_error = NULL, updated_at = ? WHERE tenant_id = ? AND instance_name = ?`)
+            .run(now().toISOString(), row.tenantId, row.instanceName)
+        } catch (error) {
+          const message = error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300)
+          db.prepare(`UPDATE whatsapp_instances SET reconnect_claimed_at = NULL, last_connection_error = ?, reconnect_after = ?, updated_at = ? WHERE tenant_id = ? AND instance_name = ?`)
+            .run(message, retryAt, now().toISOString(), row.tenantId, row.instanceName)
+        }
+      }
+    } finally {
+      healthRunning = false
+    }
+  }
+
+  const processMediaQueue = async () => {
+    if (mediaRunning) return
+    mediaRunning = true
+    try {
+      const referenceTime = now()
+      const rows = db.prepare(`
+        SELECT id, tenant_id as tenantId, provider_message_id as providerMessageId,
+               media_remote_jid as remoteJid, media_attempts as attempts
+        FROM whatsapp_messages
+        WHERE direction = 'INBOUND'
+          AND media_status IN ('PENDING','FAILED')
+          AND provider_message_id IS NOT NULL
+          AND media_remote_jid IS NOT NULL
+          AND media_attempts < 5
+          AND (media_next_attempt_at IS NULL OR media_next_attempt_at <= ?)
+        ORDER BY sent_at ASC
+        LIMIT 12
+      `).all(referenceTime.toISOString()) as Array<{ id: string; tenantId: string; providerMessageId: string; remoteJid: string; attempts: number }>
+
+      for (const row of rows) {
+        const config = requireWhatsappConfig(row.tenantId)
+        if (!config?.baseUrl || !config.apiKey || !config.instanceName) {
+          db.prepare(`UPDATE whatsapp_messages SET media_status = 'FAILED', media_attempts = media_attempts + 1, media_last_error = ?, media_next_attempt_at = ?, status_updated_at = ? WHERE id = ? AND tenant_id = ?`)
+            .run('Integração Evolution indisponível', new Date(referenceTime.getTime() + 30 * 60_000).toISOString(), now().toISOString(), row.id, row.tenantId)
+          continue
+        }
+        try {
+          const response = await fetchFn(`${await resolveExternalHttpsBaseUrl(config.baseUrl)}/chat/getBase64FromMediaMessage/${encodeURIComponent(config.instanceName)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', apikey: config.apiKey },
+            redirect: 'error',
+            signal: AbortSignal.timeout(15_000),
+            body: JSON.stringify({ message: { key: { id: row.providerMessageId, remoteJid: row.remoteJid, fromMe: false } }, convertToMp4: false }),
+          })
+          if (!response.ok) throw new Error(`Evolution media HTTP ${response.status}`)
+          const raw = await response.json().catch(() => null)
+          const media = normalizeWhatsappMediaPayload(raw)
+          if (!media) throw new Error('Mídia vazia, inválida ou acima de 8 MB')
+          const relativePath = safeWhatsappMediaRelativePath(row.tenantId, row.id, media.extension)
+          const absolutePath = resolvePrivateWhatsappMediaPath(mediaDir, relativePath)
+          await mkdir(path.dirname(absolutePath), { recursive: true, mode: 0o750 })
+          await writeFile(absolutePath, media.buffer, { mode: 0o640 })
+          db.prepare(`
+            UPDATE whatsapp_messages
+            SET media_status = 'READY', media_mime_type = ?, media_file_name = ?, media_size_bytes = ?, media_storage_path = ?,
+                media_last_error = NULL, media_next_attempt_at = NULL, status_updated_at = ?
+            WHERE id = ? AND tenant_id = ?
+          `).run(media.mime, media.fileName, media.buffer.length, relativePath, now().toISOString(), row.id, row.tenantId)
+        } catch (error) {
+          const attempts = Number(row.attempts || 0) + 1
+          const retryMinutes = Math.min(120, 2 ** Math.max(0, attempts - 1) * 5)
+          const message = error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300)
+          db.prepare(`
+            UPDATE whatsapp_messages
+            SET media_status = 'FAILED', media_attempts = ?, media_last_error = ?, media_next_attempt_at = ?, status_updated_at = ?
+            WHERE id = ? AND tenant_id = ?
+          `).run(attempts, message, attempts >= 5 ? null : new Date(referenceTime.getTime() + retryMinutes * 60_000).toISOString(), now().toISOString(), row.id, row.tenantId)
+        }
+      }
+    } finally {
+      mediaRunning = false
+    }
+  }
+
+  const processMarketingCampaignQueue = async () => {
+    if (!campaignsEnabled || marketingRunning) return
+    marketingRunning = true
+    try {
+      const referenceTime = now()
+      const currentTime = referenceTime.toISOString()
+      const staleClaimCutoff = new Date(referenceTime.getTime() - 5 * 60_000).toISOString()
+      db.prepare(`UPDATE whatsapp_marketing_recipients SET status = 'PENDING', claimed_at = NULL WHERE status = 'SENDING' AND (claimed_at IS NULL OR claimed_at < ?) AND campaign_id IN (SELECT id FROM whatsapp_marketing_campaigns WHERE status IN ('QUEUED','RUNNING'))`).run(staleClaimCutoff)
+      const campaign = db.prepare(`
+        SELECT id, tenant_id as tenantId, name, message_text as messageText, status,
+               total_recipients as totalRecipients, sent_count as sentCount,
+               failed_count as failedCount, skipped_count as skippedCount,
+               created_at as createdAt, started_at as startedAt, completed_at as completedAt,
+               cancelled_at as cancelledAt, last_error as lastError
+        FROM whatsapp_marketing_campaigns
+        WHERE status IN ('QUEUED','RUNNING')
+        ORDER BY created_at ASC
+        LIMIT 1
+      `).get() as MarketingCampaignRow | undefined
+      if (!campaign) return
+      if (campaign.status === 'QUEUED') {
+        db.prepare(`UPDATE whatsapp_marketing_campaigns SET status = 'RUNNING', started_at = COALESCE(started_at, ?) WHERE id = ? AND status = 'QUEUED'`).run(currentTime, campaign.id)
+      }
+      const recipient = db.prepare(`
+        SELECT r.id, r.client_user_id as clientUserId, r.phone_normalized as phone, r.client_name as clientName, r.attempts,
+               t.name as tenantName
+        FROM whatsapp_marketing_recipients r
+        JOIN tenants t ON t.id = r.tenant_id
+        WHERE r.campaign_id = ? AND r.tenant_id = ? AND r.status = 'PENDING'
+          AND (r.next_attempt_at IS NULL OR r.next_attempt_at <= ?)
+        ORDER BY r.created_at ASC
+        LIMIT 1
+      `).get(campaign.id, campaign.tenantId, currentTime) as { id: string; clientUserId: string; phone: string; clientName: string; attempts: number; tenantName: string } | undefined
+
+      if (!recipient) {
+        const pending = db.prepare(`SELECT COUNT(*) as n FROM whatsapp_marketing_recipients WHERE campaign_id = ? AND status IN ('PENDING','SENDING')`).get(campaign.id) as { n: number }
+        if (!Number(pending.n || 0)) {
+          db.prepare(`UPDATE whatsapp_marketing_campaigns SET status = 'COMPLETED', completed_at = ? WHERE id = ? AND status IN ('QUEUED','RUNNING')`).run(currentTime, campaign.id)
+        }
+        return
+      }
+
+      const claimed = db.prepare(`UPDATE whatsapp_marketing_recipients SET status = 'SENDING', attempts = attempts + 1, claimed_at = ? WHERE id = ? AND status = 'PENDING'`).run(currentTime, recipient.id)
+      if (!claimed.changes) return
+
+      const currentConsent = db.prepare(`
+        SELECT marketing_whatsapp_opt_in as optedIn, phone_normalized as phone
+        FROM clients
+        WHERE tenant_id = ? AND user_id = ? LIMIT 1
+      `).get(campaign.tenantId, recipient.clientUserId) as { optedIn: number; phone: string | null } | undefined
+      if (!currentConsent?.optedIn || !currentConsent.phone || currentConsent.phone !== recipient.phone) {
+        db.transaction(() => {
+          db.prepare(`UPDATE whatsapp_marketing_recipients SET status = 'SKIPPED', last_error = 'Consentimento ausente ou contato alterado', next_attempt_at = NULL, claimed_at = NULL WHERE id = ?`).run(recipient.id)
+          db.prepare(`UPDATE whatsapp_marketing_campaigns SET skipped_count = skipped_count + 1 WHERE id = ?`).run(campaign.id)
+        })()
+        return
+      }
+
+      let providerMessageId: string | null = null
+      const text = renderMarketingCampaignMessage(campaign.messageText, { clientName: recipient.clientName, tenantName: recipient.tenantName })
+      const delivered = await sendWhatsappTextForTenant(campaign.tenantId, recipient.phone, text, {
+        source: 'AUTOMATION',
+        purpose: 'MARKETING',
+        displayName: recipient.clientName,
+        onProviderMessageId: id => { providerMessageId = id },
+      })
+      const finishedAt = now().toISOString()
+      if (delivered) {
+        db.transaction(() => {
+          db.prepare(`UPDATE whatsapp_marketing_recipients SET status = 'SENT', provider_message_id = ?, sent_at = ?, last_error = NULL, next_attempt_at = NULL, claimed_at = NULL WHERE id = ?`).run(providerMessageId, finishedAt, recipient.id)
+          db.prepare(`UPDATE whatsapp_marketing_campaigns SET sent_count = sent_count + 1, last_error = NULL WHERE id = ?`).run(campaign.id)
+        })()
+        return
+      }
+
+      const attempts = Number(recipient.attempts || 0) + 1
+      const retry = attempts < 3
+      const retryAt = retry ? new Date(referenceTime.getTime() + attempts * 60_000).toISOString() : null
+      db.transaction(() => {
+        db.prepare(`UPDATE whatsapp_marketing_recipients SET status = ?, last_error = ?, next_attempt_at = ?, claimed_at = NULL WHERE id = ?`)
+          .run(retry ? 'PENDING' : 'FAILED', 'Falha de entrega pelo provedor', retryAt, recipient.id)
+        if (!retry) db.prepare(`UPDATE whatsapp_marketing_campaigns SET failed_count = failed_count + 1, last_error = ? WHERE id = ?`).run('Uma ou mais mensagens falharam após 3 tentativas.', campaign.id)
+      })()
+    } catch (error) {
+      logger.error('[WhatsAppCampaignWorker]', error)
+    } finally {
+      marketingRunning = false
+    }
+  }
+
+  const runSafely = (label: string, worker: () => Promise<void>) => {
+    void worker().catch(error => logger.error(label, error))
+  }
+
+  const start = () => {
+    if (healthInterval || healthStartup || mediaInterval || mediaStartup || marketingInterval || marketingStartup) return
+    healthInterval = scheduler.setInterval(() => runSafely('[WhatsApp] falha no health worker', processConnectionHealth), 2 * 60_000)
+    healthInterval.unref()
+    healthStartup = scheduler.setTimeout(() => {
+      healthStartup = null
+      runSafely('[WhatsApp] falha no bootstrap de health', processConnectionHealth)
+    }, 18_000)
+    healthStartup.unref()
+    mediaInterval = scheduler.setInterval(() => runSafely('[WhatsApp] falha no worker de mídia', processMediaQueue), 30_000)
+    mediaInterval.unref()
+    mediaStartup = scheduler.setTimeout(() => {
+      mediaStartup = null
+      runSafely('[WhatsApp] falha no bootstrap de mídia', processMediaQueue)
+    }, 20_000)
+    mediaStartup.unref()
+    marketingInterval = scheduler.setInterval(() => runSafely('[WhatsApp] falha no worker de campanhas', processMarketingCampaignQueue), campaignSendIntervalSeconds * 1000)
+    marketingInterval.unref()
+    marketingStartup = scheduler.setTimeout(() => {
+      marketingStartup = null
+      runSafely('[WhatsApp] falha no bootstrap de campanhas', processMarketingCampaignQueue)
+    }, 22_000)
+    marketingStartup.unref()
+  }
+
+  const stop = () => {
+    if (healthInterval) scheduler.clearInterval(healthInterval)
+    if (healthStartup) scheduler.clearTimeout(healthStartup)
+    if (mediaInterval) scheduler.clearInterval(mediaInterval)
+    if (mediaStartup) scheduler.clearTimeout(mediaStartup)
+    if (marketingInterval) scheduler.clearInterval(marketingInterval)
+    if (marketingStartup) scheduler.clearTimeout(marketingStartup)
+    healthInterval = null
+    healthStartup = null
+    mediaInterval = null
+    mediaStartup = null
+    marketingInterval = null
+    marketingStartup = null
+  }
+
+  return {
+    fetchEvolutionConnectionState,
+    processConnectionHealth,
+    processMediaQueue,
+    processMarketingCampaignQueue,
+    start,
+    stop,
+  }
+}

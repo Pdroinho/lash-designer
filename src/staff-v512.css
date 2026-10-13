@@ -1,0 +1,40 @@
+.staff52 { margin-top: 28px; padding: clamp(20px, 3vw, 34px); border: 1px solid var(--line-soft); border-radius: 22px; background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.staff52-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; }
+.staff52-heading span { color: var(--primary-600); font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.staff52-heading h2 { margin: 7px 0; font: 550 clamp(1.4rem, 2.4vw, 2rem)/1.2 var(--font-display); color: var(--ink-strong); }
+.staff52-heading p { max-width: 660px; margin: 0; color: var(--ink-body); font-size: .82rem; line-height: 1.55; }
+.staff52-heading .btn { flex: none; }
+.staff52-counter { margin: 18px 0 14px; color: var(--ink-body); font-size: .76rem; }
+.staff52-error { padding: 11px 14px; border-radius: 10px; background: var(--status-danger-bg); color: var(--danger-strong); font-size: .8rem; }
+.staff52-list { display: grid; gap: 9px; }
+.staff52-list article { display: flex; align-items: center; gap: 14px; padding: 13px; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--surface-soft); }
+.staff52-list article > div { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.staff52-list strong { overflow: hidden; color: var(--ink-strong); font-size: .83rem; text-overflow: ellipsis; }
+.staff52-list small { color: var(--ink-soft); font-size: .69rem; }
+.staff52-avatar { width: 39px; height: 39px; flex: none; display: grid; place-items: center; border-radius: 12px; background: var(--brand-soft); color: var(--primary-600); font-weight: 800; }
+.staff52-form { display: grid; gap: 17px; margin: 14px 0 20px; padding: 22px; border: 1px solid var(--line-strong); border-radius: 17px; background: var(--surface-soft); }
+.staff52-form > label { display: grid; gap: 7px; color: var(--ink-body); font-size: .76rem; font-weight: 700; }
+.staff52-form input:not([type=checkbox]) { min-height: 43px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-raised); color: var(--ink-strong); font: inherit; }
+.staff52-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.staff52-form legend { margin-bottom: 10px; color: var(--ink-body); font-size: .76rem; font-weight: 750; }
+.staff52-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.staff52-options label { display: inline-flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-raised); color: var(--ink-strong); font-size: .74rem; cursor: pointer; }
+.staff52-form > .staff52-check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.staff52-form input[type=checkbox] { accent-color: var(--primary-600); }
+.staff52-hours { display: grid; gap: 7px; }
+.staff52-hours > div { display: flex; align-items: center; gap: 8px; min-height: 45px; }
+.staff52-hours label { width: 84px; color: var(--ink-strong); font-size: .75rem; }
+.staff52-hours input[type=time] { width: 116px; min-width: 0; }
+.staff52-hours span { color: var(--ink-soft); font-size: .7rem; }
+.staff52-actions { display: flex; justify-content: flex-end; gap: 9px; }
+.staff52-off-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--ink-strong); }
+.staff52-off-inputs { display: flex; flex-wrap: wrap; gap: 12px; }
+.staff52-off-inputs label { flex: 1; min-width: 170px; display: grid; gap: 7px; color: var(--ink-body); font-size: .76rem; font-weight: 700; }
+.staff52-off-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.staff52-off-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line-soft); border-radius: 10px; color: var(--ink-body); font-size: .76rem; }
+@media (max-width: 640px) { .staff52-heading { align-items: flex-start; flex-direction: column; } .staff52-heading .btn { width: 100%; } .staff52-list article { flex-wrap: wrap; } .staff52-list article > div { flex-basis: calc(100% - 55px); } .staff52-list article .btn { flex: 1; } .staff52-form { padding: 14px; } .staff52-hours > div { flex-wrap: wrap; } .staff52-hours label { width: 100%; } }
+.staff52-invite-link { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; padding: 16px; border-radius: 15px; background: #fff8fa; }
+.staff52-invite-link label { min-width: min(100%,360px); flex: 1; display: grid; gap: 6px; }
+.staff52-invite-link input { width: 100%; min-height: 40px; padding: 9px; border: 1px solid #ddc6cf; border-radius: 10px; background: white; }
+.staff52-invite-link small { flex-basis: 100%; color: #74616a; }
+.staff52-access-status { color: #316b53; font-size: .8rem; font-weight: 700; }

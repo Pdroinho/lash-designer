@@ -1,254 +1,162 @@
-# CLAUDE.md — Guia para IAs e Desenvolvedores
+﻿# CLAUDE.md — Guia para IAs e Desenvolvedores
 
-> Este arquivo orienta qualquer IA (Claude, GPT, Trae, etc) ou dev novo a navegar
-> e modificar o código do LashDesigner 5.6.0 com confiança.
-
----
-
-## Comece aqui
-
-1. Leia este arquivo inteiro
-2. Leia [ARCHITECTURE.md](ARCHITECTURE.md) para detalhes de implementação
-3. Leia [README.md](README.md) para visão de produto e releases
+> Este arquivo orienta qualquer IA (Claude, GPT, Trae, etc) ou desenvolvedor a navegar,
+> entender a arquitetura e modificar o código do LashDesigner 5.12.12 com segurança.
 
 ---
 
-## Regras de ouro
+## Versão Atual: 5.12.12 (Consolidada)
 
-1. **Nunca rode múltiplas instâncias** gravando no mesmo SQLite
-2. **Sempre faça backup** do banco antes de mudanças em produção
-3. **Sempre rode `npm run build`** após mudanças — o `dist/` é o que serve em produção
-4. **Sempre rode `npm run preflight`** com `.env` carregado antes de reiniciar o serviço
-5. **Nunca commite `.env`**, `data/*.db`, `node_modules/` ou `dist/`
-6. **Mantenha o padrão de CSS versionado**: mudanças visuais em LP usam `landing-v54.css`, não `landing.css`
-7. **Tipos são sagrados**: `ApiResult<T>` é discriminated union — sempre verifica `.ok`
-8. **GSAP restrito a reveals**: entrada do hero, reveals tipográficos, parallax leve. Carousels/tabs são **React-driven** (somente o painel ativo montado, pausa 9s na interação, retorno ao início). Transições de estado em CSS respeitando `prefers-reduced-motion`. Toda animação dentro de `gsap.context()` com cleanup (`context.revert()`). Não adicione libs de motion (Tailwind/Magic UI/Aceternity/Magic Bento/pacote Motion)
+A versão **5.12.12** consolida o modelo comercial de planos por equipe com checkout Appmax, sistema atômico de indicações e recompensas com governança de estorno (Migração 45), central de suporte com anexos locais no SQLite (Migração 44) e modo de recuperação de estúdios inadimplentes (Migração 43).
 
----
-
-## Mapa rápido: onde mexer?
-
-### Quero mudar a landing page
-
-- **Código**: `src/LandingPage.tsx`
-- **CSS**: `src/landing-v54.css` (classes `ld54-*`)
-- **Motion**: GSAP só pra reveals (hero + reveals tipográficos); carousels/tabs são React puro (só o painel ativo montado)
-- **Seções**: hero, outcome-strip, problem, system (carrossel React), luma, index, pricing (comercial), faq, final
-- **Audits**: `npm run test:landing54`
-
-### Quero mudar o painel ADMIN
-
-- **Código**: `src/App.tsx` — procure por `function Admin(` (linha ~3880)
-- **Sub-views**: AdminDashboard(~891), AdminCalendar(~2052), AdminServices(~1286), AdminClients(~2967), AdminFinance(~3593), AdminSettings(~3354)
-- **CSS**: `src/dashboard-v24.css`, `src/agenda-v24.css`, `src/finance-v36.css`
-
-### Quero mudar o fluxo de agendamento público
-
-- **Código**: `src/App.tsx` — procure por `function BookingPage(` (linha ~6165)
-- **CSS**: `src/booking-v30.css`
-
-### Quero mudar a API (backend)
-
-- **Rotas**: `server/index.ts` — procure por `app.get(`, `app.post(`, `app.put(`, `app.delete(`
-- **Schema/migrações**: `server/migrate.ts` — adicione `apply(N+1, (db) => { ... })`
-- **Auth**: `server/auth.ts`, `session.ts`, `mfa.ts`
-
-### Quero mudar a Luma (AI)
-
-- **Servidor**: `server/assistant.ts` (prompt, provider, loop), `server/lumaBridge.ts` (tools)
-- **Frontend**: `src/components/LumaConversation.tsx`, `LumaChatLauncher.tsx`
-- **CSS**: `src/luma-v35.css`
-- **Limites**: `.env` → `LUMA_*` vars
-
-### Quero mudar WhatsApp
-
-- **Servidor**: `server/whatsappWebhook.ts`, `whatsappIntent.ts`, `whatsappMedia.ts`
-- **Frontend**: `src/components/WhatsAppCenter.tsx`
-- **CSS**: `src/whatsapp-v39.css`
-
-### Quero mudar billing/preços
-
-- **Planos**: `server/plans.ts` → `buildBillingPlans(prices)`
-- **Webhook InfinitePay**: `server/index.ts` — procure `/api/webhooks/infinitepay`
-- **Frontend billing**: `src/components/BillingCenter.tsx`, `LandingCheckout.tsx`
-- **`.env`**: `PLAN_MONTHLY_CENTS`, `PLAN_QUARTERLY_CENTS`, `PLAN_SEMIANNUAL_CENTS`, `PLAN_ANNUAL_CENTS`
-
-### Quero adicionar uma migration
-
-```typescript
-// server/migrate.ts — adicione ao final:
-apply(38, (db) => {
-  db.exec(`ALTER TABLE clients ADD COLUMN new_field TEXT`);
-});
-```
-
-As migrações rodam automaticamente no startup. O `schema_migrations` table rastreia qual versão está aplicada.
+### Documentos de Referência da 5.12.12
+- `docs/RELEASE_5_12_12.md`: Release notes oficiais e escopo técnico da versão 5.12.12.
+- `docs/HOMOLOGACAO_INDICACOES_5_12_12.md`: Procedimentos de homologação e validação E2E de indicações.
+- `docs/APPMAX_INTEGRATION_5_12.md`: Contrato técnico de integração, payloads e webhooks da Appmax.
+- `docs/PRODUCT_CHANGE_5_12.md`: Transição de modelo comercial (planos por equipe vs legados).
 
 ---
 
-## Comandos essenciais
+## Regras de Ouro
 
-```bash
-# Desenvolvimento
-npm run dev          # API :3000 + Vite :5173
-
-# Validação
-npm run typecheck    # tsc sem emit (frontend + server)
-npm run lint         # eslint
-npm run test         # testes tsx
-npm run build        # vite build + tsc server
-npm run preflight    # valida env + config antes de prod
-
-# Audits específicos (todos em scripts/)
-npm run test:responsive
-npm run test:landing53
-npm run test:luma
-npm run test:security5
-npm run test:whatsapp
-
-# Tudo de uma vez
-npm run check
-```
+1. **Nunca rode múltiplas instâncias** gravando no mesmo SQLite (risco de corrupção WAL).
+2. **Sempre faça backup** do banco de dados antes de mudanças em produção (`sqlite3 <db> '.backup <destino>'`).
+3. **Sempre rode `npm run build`** após qualquer alteração em `src/` ou `server/` — a produção serve exclusivamente `dist/`.
+4. **Sempre rode `npm run preflight`** com `.env` carregado antes de reiniciar o serviço em produção.
+5. **Nunca commite `.env`**, `data/*.db`, `node_modules/`, `dist/`, arquivos `*.zip`, `*.tar.gz`, `*.pdf` ou relatórios temporários.
+6. **Mantenha o padrão de CSS versionado**: não edite folhas de versões antigas; use a folha canônica da funcionalidade.
+7. **Tipos são sagrados**: `ApiResult<T>` é discriminated union — sempre verifique `.ok`.
+8. **GSAP restrito a reveals**: hero e reveals tipográficos. Carousels e tabs são **React-driven** com transições CSS respeitando `prefers-reduced-motion`. Cleanup obrigatório com `gsap.context()` e `context.revert()`. Nunca adicione bibliotecas externas de animação desnecessárias.
 
 ---
 
-## Estrutura de arquivos: o que é o quê
+## Arquitetura & Módulos Principais
 
-### Arquivos grandes (cuidado ao abrir)
+### 1. Cobrança e Checkout (Appmax + InfinitePay)
+- **Planos por Equipe (Team Plans)**:
+  - `TEAM_3` (até 3 profissionais): R$ 74,90/mês
+  - `TEAM_6` (até 6 profissionais): R$ 99,90/mês
+  - `TEAM_15` (até 15 profissionais): R$ 149,00/mês
+- **Contrato da API Appmax (`server/appmax.ts`)**:
+  - Endpoint `/v1/payment-link` exige métodos de pagamento como **array plano de strings**:
+    `payments: ['creditcard', 'pix']`
+    *(ATENÇÃO: passar arrays aninhados `[['creditcard', 'pix']]` gera erro HTTP 422 na Appmax)*.
+  - Credenciais: `APPMAX_MERCHANT_CLIENT_ID` e `APPMAX_MERCHANT_CLIENT_SECRET`.
+  - Ativação controlada por `APPMAX_CHECKOUT_ENABLED=true`.
 
-| Arquivo | Tamanho | Conteúdo |
+### 2. Sistema de Indicações & Compensação de Estornos (Migração 45)
+- **Desconto na Primeira Mensalidade**: 15% para a nova assinante indicada (ex: TEAM_3 de R$ 74,90 sai por R$ 63,66).
+- **Recompensa da Indicadora**: 10% de crédito por indicação confirmada, acumulável até o teto de 30% de desconto na renovação.
+- **Segurança Criptográfica (`quoteFingerprint`)**: Hash SHA-256 gerado a partir do valor bruto, valor líquido, percentual de desconto e token de indicação. Impede adulteração de valores no checkout.
+- **Anti-Autoindicação**: Validação cruzada por telefone normalizado em E.164, e-mail e tenant ID (`appmaxBilling.validateReferral`).
+- **Governança de Estornos (`appmax_referral_debts`)**: Caso uma assinatura indicada seja estornada/revertida após o crédito ter sido usufruído pela indicadora, o sistema cria uma dívida percentual deduzida automaticamente de recompensas futuras, sem cobranças inesperadas no cartão.
+
+### 3. Banco de Dados SQLite & Migrações (`server/migrate.ts`)
+- `better-sqlite3` operando em modo WAL (`journal_mode = WAL`), foreign keys habilitadas e busy timeout de 5000ms.
+- **Migrações Recentes**:
+  - `Migração 43`: Distinção de `suspension_reason` ('APPMAX' vs bloqueio administrativo manual).
+  - `Migração 44`: Central de Suporte (`support_tickets`, `support_messages`, `support_attachments`, `support_notifications`). Anexos binários seguros no SQLite com download autenticado.
+  - `Migração 45`: Ledger financeiro de indicações (`gross_amount_cents`, `discount_percent`, `referral_redemption_id` em `appmax_checkout_intents`, mais tabelas `appmax_referral_memberships`, `appmax_referral_debts`, `appmax_referral_debt_allocations`).
+
+### 4. Roteamento Modular de Backend
+O backend em `server/index.ts` é desacoplado através de registradores de domínio:
+- `server/routes/registerPlatformRoutes.ts`: Rotas públicas, autenticação, portal da cliente, documentação legal e console DEV.
+- `server/routes/registerBillingAssistantRoutes.ts`: Onboarding público, checkout Appmax, webhook InfinitePay, rotas da Luma AI e webhooks Evolution.
+- `server/routes/registerTenantRoutes.ts`: Painel ADMIN (dashboard, agenda, serviços, clientes, finanças, equipe, configurações, whatsapp, suporte, indicações).
+
+### 5. WhatsApp & Evolution API
+- **Instância Global da Plataforma (`EVOLUTION_INSTANCE_NAME`)**:
+  - Instância dedicada para tráfego operacional da plataforma: envio de códigos OTP/MFA, onboarding e suporte.
+  - Conectada à Evolution API (`EVOLUTION_API_URL`, ex: `https://evo.lashdesigner.space`).
+  - Totalmente isolada das instâncias multi-tenant de estúdios.
+
+---
+
+## Mapa Rápido: Onde Mexer?
+
+| Objetivo | Arquivos Principais | CSS Canônico |
 |---|---|---|
-| `src/App.tsx` | ~360KB | Toda a SPA (router + 3 roles + todas as views) |
-| `server/index.ts` | ~7200 linhas | Express app + ~139 rotas + timers + shutdown |
-| `server/migrate.ts` | ~1011 linhas | 37 migrações de schema |
-| `src/landing-v54.css` | CSS 5.4 | Estilos da landing atual (motion classes `ld54-*`) |
-
-### Onde estão os testes
-
-- **Servidor**: `server/*.test.ts` (rodam via `npm run test`)
-- **Migrations**: `server/*.test.mjs` (rodam via `npm run test:migrations5`)
-- **Security**: `server/session.test.mjs`, `secretCrypto.test.mjs` (`npm run test:security-primitives5`)
-- **WhatsApp**: `server/whatsappIntent.test.mjs`, `whatsappWebhook.test.mjs` (`npm run test:whatsapp5`)
-- **Audits estáticos**: `scripts/*.mjs` (27 scripts que validam contratos de UI/UX/segurança)
+| **Landing Page** | `src/LandingPage.tsx` | `src/landing-v54.css` (classes `ld54-*`) |
+| **Painel ADMIN** | `src/features/admin/AdminApp.tsx`, `src/features/*` | `src/dashboard-v24.css`, `src/agenda-v24.css`, `src/finance-v36.css` |
+| **Equipe & Multi-Staff** | `src/features/staff/StaffPage.tsx` | `src/staff-v512.css` |
+| **Booking Público** | `src/features/booking/BookingPage.tsx` | `src/booking-v30.css` |
+| **Checkout & Onboarding** | `server/routes/publicOnboardingRoutes.ts`, `src/components/LandingCheckout.tsx` | `src/setup.css` |
+| **Appmax & Indicações** | `server/appmax.ts`, `server/appmaxBillingService.ts`, `server/appmaxReferralService.ts` | `src/components/billing-center.css` |
+| **Central de Suporte** | `server/support/*`, `src/features/support/SupportCenter.tsx` | `src/components/report-review.css` |
+| **Luma AI** | `server/assistant.ts`, `server/lumaBridge.ts`, `src/components/LumaConversation.tsx` | `src/luma-v35.css` |
+| **WhatsApp Center** | `server/whatsappWebhook.ts`, `src/components/WhatsAppCenter.tsx` | `src/whatsapp-v39.css` |
+| **Migrações de Banco** | `server/migrate.ts`, `server/appmaxReferralSchema.ts` | — |
 
 ---
 
-## Environment (.env)
-
-Veja `.env.example` para o template completo. Variáveis críticas:
-
-### Obrigatórias (preflight falha sem estas)
-
-| Var | Descrição |
-|---|---|
-| `NODE_ENV` | `production` ou `development` |
-| `PORT` | Porta do Express (default: 3000) |
-| `DATABASE_PATH` | Caminho do SQLite |
-| `APP_BASE_URL` | Origem da plataforma (ex: `https://app.lashdesigner.space`) |
-| `FRONTEND_ORIGIN` | Mesmo valor de APP_BASE_URL |
-| `DEV_HOST` | Hostname do console DEV |
-| `APP_ENCRYPTION_KEY` | base64url de 32 bytes para criptografia |
-| `DEV_BOOTSTRAP_SECRET` | Segredo para criar primeiro DEV |
-| `DOMAIN_AUTH_SECRET` | Segredo para autorização de TLS on-demand |
-| `INFINITEPAY_HANDLE` | Handle da conta InfinitePay |
-| `PLAN_*_CENTS` | Preços dos 4 ciclos em centavos |
-| `VITE_SUBSCRIPTION_PRICE_CENTS` | Deve igualar `PLAN_ANNUAL_CENTS` |
-
-### Opcionais (mas importantes)
-
-| Var | Default | Descrição |
-|---|---|---|
-| `AI_ASSISTANT_ENABLED` | `false` | Habilita Luma |
-| `OPENROUTER_API_KEY` | — | Key da Luma (DeepSeek + Gemini) |
-| `EVOLUTION_API_URL` | — | URL da Evolution API |
-| `EVOLUTION_API_KEY` | — | Key global da Evolution |
-| `EVOLUTION_INSTANCE_NAME` | — | Nome da instância global |
-| `WHATSAPP_MEDIA_DIR` | `../media` | Diretório de mídia |
-| `CUSTOM_DOMAIN_CNAME_TARGET` | — | CNAME target para domínios personalizados |
-
-### Gerar segredos
+## Comandos Essenciais
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"  # APP_ENCRYPTION_KEY
-openssl rand -hex 32     # DEV_BOOTSTRAP_SECRET, DOMAIN_AUTH_SECRET, EVOLUTION_WEBHOOK_SECRET
+# Desenvolvimento local
+npm run dev               # API Express :3000 + Vite :5173
+
+# Validação e Checagens
+npm run typecheck         # Verificação de tipos TypeScript (frontend + server)
+npm run lint              # ESLint em todo o repositório
+npm run test              # Suíte completa de testes unitários e de integração
+npm run build             # Build de produção (Vite client + tsc server)
+npm run preflight         # Validação de variáveis de ambiente e integridade antes do deploy
+
+# Auditorias de Qualidade e Arquitetura
+npm run test:architecture # Validação de limites arquiteturais e isolamento de rotas
+npm run test:responsive   # Auditoria de layouts responsivos
+npm run test:security5    # Auditoria de segurança e autenticação
+npm run test:recovery-ui  # Auditoria de UI do modo de recuperação
+npm run test:support-ui   # Auditoria de UI da Central de Suporte
+npm run test:landing-team-ui # Auditoria de UI da landing por equipe
+npm run test:billing-ui   # Auditoria de UI de cobrança e planos
+npm run test:referral-team-ui # Auditoria de UI do programa de indicações
+
+# Suite Completa de Verificação
+npm run check             # Executa typecheck, lint, todos os testes e build
 ```
 
 ---
 
-## Deploy: checklist rápido
+## Procedimento de Deploy em Produção (VPS)
 
 ```bash
-# 1. Parar + backup
+# 1. Conectar na VPS e parar o serviço com segurança
 sudo systemctl stop lashdesigner
+
+# 2. Realizar backup consistente do banco SQLite em WAL
 sudo -u lashdesigner sqlite3 /opt/lashdesigner/db_data/app.db '.backup /opt/lashdesigner/backups/pre-deploy.db'
 
-# 2. Upload do código (sem .env, node_modules, dist, data/*.db)
-# scp ou rsync para /opt/lashdesigner/app/
-
-# 3. Na VPS
+# 3. Atualizar o código na pasta da aplicação (sem sobrescrever .env ou db_data)
 cd /opt/lashdesigner/app
+sudo -u lashdesigner git pull origin main
 sudo -u lashdesigner npm ci
 sudo -u lashdesigner npm run build
+
+# 4. Validar pré-requisitos com o .env carregado
 sudo -u lashdesigner bash -lc 'set -a; source ./.env; set +a; npm run preflight'
 
-# 4. Reiniciar
+# 5. Iniciar o serviço
 sudo systemctl start lashdesigner
 
-# 5. Verificar
+# 6. Confirmar integridade
 curl -sf http://127.0.0.1:3000/api/ready
 ```
 
-> **IMPORTANTE**: O `npm run build` é obrigatório após qualquer mudança em `src/` ou `server/`.
-> O systemd roda `dist/server/index.js` e serve `dist/client/`. Sem build = mudança não aplicada.
-
 ---
 
-## Padrões de código
+## Padrões de Código
 
 ### Frontend
-
-- Tipos de domínio em `src/types.ts`
-- API calls via `api<T>()` de `src/api.ts` — sempre verifica `.ok`
-- CSS versionado: `feature-vXX.css` — não editar versões antigas
-- Ícones: Phosphor Icons (`@phosphor-icons/react`)
-- Charts: Chart.js puro (sem react-chartjs2)
-- Sem animation libraries — CSS + IntersectionObserver + APIs nativas
-- `prefers-reduced-motion` respeitado em todo motion
+- Tipos de domínio estritos em `src/types.ts`.
+- Chamadas de API via `api<T>()` de `src/api.ts` — sempre verificar discriminated union `.ok`.
+- Ícones: exclusivamente Phosphor Icons (`@phosphor-icons/react`).
+- Gráficos: Chart.js nativo (sem wrappers react-chartjs2).
+- Zero bibliotecas externas desnecessárias de motion.
 
 ### Backend
-
-- Validação de input com Zod schemas
-- `HttpError` + `handleError` para erros estruturados
-- Sessão sempre via `sessionMiddleware` → `requireAuth` → `requireRole`
-- Queries SQL diretas via `db.prepare()` (sem ORM)
-- Transações via `db.transaction()`
-- Secrets sempre criptografados via `secretCrypto` antes de armazenar
-
-### CSS
-
-- Design system canônico em `docs/DESIGN_SYSTEM_3.3.md`
-- Tokens CSS (cores, espaçamento) em `foundation-v24.css` e `design-system.css`
-- Responsivo: breakpoints em `docs/RESPONSIVE.md`
-- Cada feature tem seu CSS versionado — não misturar
-
----
-
-## Documentação de referência
-
-| Quando precisar de... | Leia |
-|---|---|
-| Histórico de mudanças | `docs/RELEASE_*.md` |
-| Modelo de segurança | `docs/SECURITY.md` |
-| Backup e restore | `docs/OPERATIONS.md` |
-| API endpoints | `docs/API.md` |
-| Sistema de design | `docs/DESIGN_SYSTEM_3.3.md` |
-| Landing page | `docs/LANDING_PAGE.md` |
-| Luma AI | `docs/LUMA_ASSISTANT.md` |
-| WhatsApp | `docs/WHATSAPP.md` |
-| Billing | `docs/BILLING_AND_PIX.md` |
-| Domínios | `docs/CUSTOM_DOMAINS.md` |
-| Indicações | `docs/REFERRALS_AND_DISCOUNTS.md` |
-| Responsividade | `docs/RESPONSIVE.md` |
-| Ícones | `docs/ICONOGRAPHY.md` |
-| Assets | `docs/ASSET_CATALOG.md` |
-| Deploy VPS | `DEPLOY_VPS.md` |
+- Schemas de validação Zod em todas as entradas de requisição (`req.body`, `req.query`, `req.params`).
+- Erros estruturados via `HttpError`, `badRequest()`, `unauthorized()`, `notFound()`.
+- Sessão e autenticação sempre via middlewares de pipeline: `sessionMiddleware` → `requireAuth` → `requireRole`.
+- Acesso a banco de dados com queries preparadas nativas `db.prepare()` e transações atômicas `db.transaction()`.
+- Segredos e tokens criptografados em repouso com `secretCrypto` antes da persistência.

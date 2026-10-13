@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 
-export type Role = 'DEV' | 'ADMIN' | 'CLIENT'
+export type Role = 'DEV' | 'ADMIN' | 'CLIENT' | 'STAFF'
 
 export async function hashPassword(password: string) {
   const salt = await bcrypt.genSalt(12)

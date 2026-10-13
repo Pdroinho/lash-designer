@@ -1,10 +1,10 @@
 import fs from 'node:fs'
 
 const read = (file) => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')
-const app = read('src/App.tsx')
+const adminApp = read('src/features/admin/AdminApp.tsx')
 const setup = read('src/components/WorkspaceSetup.tsx')
 const setupCss = read('src/setup.css')
-const server = read('server/index.ts')
+const server = read('server/index.ts') + read('server/routes/publicOnboardingRoutes.ts') + read('server/routes/adminOnboardingRoutes.ts')
 const migrate = read('server/migrate.ts')
 const assistant = read('server/assistant.ts')
 const landing = read('src/LandingPage.tsx')
@@ -19,10 +19,10 @@ const checks = [
   ['análise visual é opcional e possui fallback curado', server.includes("source: 'CURATED'") && server.includes("source: 'VISION'")],
   ['análise visual limita tentativas por tenant', server.includes('ai_attempts < 3') && server.includes('onboardingAssistantLimiter')],
   ['logo é validada e limitada no servidor', server.includes("max(450_000)") && server.includes('data:image')],
-  ['conclusão salva marca, agenda e serviços em transação', server.includes("app.post('/api/admin/onboarding/complete'") && server.includes('db.transaction(() =>') && server.includes('DELETE FROM business_hours')],
+  ['conclusão salva marca, agenda e serviços em transação', server.includes("router.post('/onboarding/complete'") && server.includes('db.transaction(() =>') && server.includes('DELETE FROM business_hours')],
   ['catálogo inicial não duplica serviços existentes', server.includes('activeServices === 0')],
   ['interface móvel do setup possui contrato dedicado', setupCss.includes('@media (max-width: 820px)') && setupCss.includes('min-height: 100dvh')],
-  ['setup é montado somente no painel administrativo', app.includes('<WorkspaceSetup tenant={tenant}')],
+  ['setup é montado somente no painel administrativo', adminApp.includes('<WorkspaceSetup tenant={tenant}')],
   ['checkout separa pagamento da personalização', checkout.includes("step === 1") && checkout.includes('Sua marca vem depois do pagamento')],
   ['landing comunica o setup pós-compra sem prometer dependência de IA', landing.includes('setup guiado ajuda a organizar marca, horários e serviços') && landing.includes('assistente opcional')],
   ['OpenRouter usa modelos síncronos separados para conversa e visão', assistant.includes('assistantProvider') && env.includes('OPENROUTER_MODEL') && env.includes('OPENROUTER_VISION_MODEL')],

@@ -1,4 +1,6 @@
+import { createAppmaxReferralSchema } from './appmaxReferralSchema.js'
 import { getDb } from './db.js'
+import { createSupportSchema } from './support/schema.js'
 import { ensureWhatsAppInboxSchema } from './whatsappInboxMigration.js'
 import { ensureWhatsappReliabilitySchema } from './whatsappReliabilityMigration.js'
 import { ensurePlatformSettingsV51, ensureProfessionalWhatsappMfaSchema } from './auth51Migration.js'
@@ -1101,5 +1103,155 @@ export function migrate() {
         ON whatsapp_marketing_recipients(campaign_id, status, created_at ASC);
     `)
   })
+
+  // Additive foundation for bookable professionals. Existing appointments
+  // retain their original single-calendar semantics through the backfill.
+  apply(39, () => {
+    db.exec(`
+      CREATE TABLE professionals (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        bookable INTEGER NOT NULL DEFAULT 1 CHECK (bookable IN (0, 1)),
+        user_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, id),
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      );
+      CREATE UNIQUE INDEX idx_professionals_tenant_user ON professionals(tenant_id, user_id) WHERE user_id IS NOT NULL;
+      CREATE INDEX idx_professionals_bookable ON professionals(tenant_id, active, bookable);
+      CREATE UNIQUE INDEX idx_services_tenant_service_pair ON services(tenant_id, id);
+
+      CREATE TABLE professional_services (
+        tenant_id TEXT NOT NULL,
+        professional_id TEXT NOT NULL,
+        service_id TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, professional_id, service_id),
+        FOREIGN KEY (tenant_id, professional_id) REFERENCES professionals(tenant_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (tenant_id, service_id) REFERENCES services(tenant_id, id) ON DELETE CASCADE
+      );
+      CREATE INDEX idx_professional_services_service ON professional_services(tenant_id, service_id, professional_id);
+
+      CREATE TABLE professional_hours (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        professional_id TEXT NOT NULL,
+        weekday INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+        start_minute INTEGER NOT NULL CHECK (start_minute BETWEEN 0 AND 1439),
+        end_minute INTEGER NOT NULL CHECK (end_minute BETWEEN 1 AND 1440),
+        CHECK (start_minute < end_minute),
+        FOREIGN KEY (tenant_id, professional_id) REFERENCES professionals(tenant_id, id) ON DELETE CASCADE
+      );
+      CREATE INDEX idx_professional_hours_person_day ON professional_hours(tenant_id, professional_id, weekday);
+
+      CREATE TABLE professional_time_off (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        professional_id TEXT NOT NULL,
+        starts_at TEXT NOT NULL,
+        ends_at TEXT NOT NULL,
+        reason TEXT,
+        CHECK (starts_at < ends_at),
+        FOREIGN KEY (tenant_id, professional_id) REFERENCES professionals(tenant_id, id) ON DELETE CASCADE
+      );
+      CREATE INDEX idx_professional_time_off_person ON professional_time_off(tenant_id, professional_id, starts_at);
+
+      ALTER TABLE appointments ADD COLUMN professional_id TEXT REFERENCES professionals(id);
+      CREATE INDEX idx_appointments_professional_time ON appointments(tenant_id, professional_id, starts_at);
+
+      INSERT INTO professionals (id, tenant_id, name, created_at, updated_at)
+      SELECT t.id, t.id, 'Profissional principal', t.created_at, t.created_at FROM tenants t;
+      INSERT INTO professional_services (tenant_id, professional_id, service_id)
+      SELECT s.tenant_id, s.tenant_id, s.id FROM services s;
+      UPDATE appointments SET professional_id = tenant_id;
+
+      CREATE TRIGGER new_tenant_default_professional AFTER INSERT ON tenants
+      BEGIN
+        INSERT INTO professionals (id, tenant_id, name, created_at, updated_at)
+        VALUES (NEW.id, NEW.id, 'Profissional principal', NEW.created_at, NEW.created_at);
+      END;
+      CREATE TRIGGER new_service_default_professional AFTER INSERT ON services
+      BEGIN
+        INSERT INTO professional_services (tenant_id, professional_id, service_id)
+        VALUES (NEW.tenant_id, NEW.tenant_id, NEW.id);
+      END;
+    `)
+  })
+
+  // Appmax preparation is additive. No checkout switches providers until the
+  // merchant credentials and authenticated confirmation path are homologated.
+  apply(40, () => {
+    db.exec(`
+      CREATE TABLE appmax_checkout_intents (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        plan_code TEXT NOT NULL CHECK (plan_code IN ('TEAM_3','TEAM_6','TEAM_15')),
+        amount_cents INTEGER NOT NULL CHECK (amount_cents >= 500),
+        payment_link_id INTEGER UNIQUE,
+        checkout_url TEXT,
+        order_id INTEGER UNIQUE,
+        status TEXT NOT NULL CHECK (status IN ('CREATING','PENDING','PAID','FAILED','REFUNDED')),
+        created_at TEXT NOT NULL,
+        paid_at TEXT,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      );
+      CREATE INDEX idx_appmax_checkout_intents_tenant ON appmax_checkout_intents(tenant_id, status);
+
+      CREATE TABLE appmax_webhook_inbox (
+        id TEXT PRIMARY KEY,
+        event_name TEXT NOT NULL,
+        order_id INTEGER NOT NULL,
+        payment_link_id INTEGER,
+        payload_hash TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('PENDING','APPLIED','IGNORED','FAILED')),
+        received_at TEXT NOT NULL,
+        processed_at TEXT,
+        error_code TEXT,
+        UNIQUE (event_name, order_id)
+      );
+      CREATE INDEX idx_appmax_webhook_inbox_pending ON appmax_webhook_inbox(status, received_at);
+    `)
+  })
+
+  // Round-robin verification of paid Appmax orders catches reversals even
+  // when the provider notification is delayed or never delivered.
+  apply(41, () => {
+    db.exec(`
+      ALTER TABLE appmax_checkout_intents ADD COLUMN provider_checked_at TEXT;
+      CREATE INDEX idx_appmax_paid_review ON appmax_checkout_intents(status, provider_checked_at, paid_at);
+    `)
+  })
+
+  // One-time invitations link a STAFF user to exactly one professional in
+  // the same tenant. Raw invite tokens never enter the database.
+  apply(42, () => {
+    db.exec(`
+      ALTER TABLE users ADD COLUMN staff_access_disabled_at TEXT;
+      CREATE TABLE professional_invitations (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        professional_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        consumed_at TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (tenant_id, professional_id) REFERENCES professionals(tenant_id, id) ON DELETE CASCADE
+      );
+      CREATE INDEX idx_professional_invitations_person ON professional_invitations(tenant_id, professional_id, expires_at);
+    `)
+  })
+
+  // Distinguish provider reversals from manual administrative suspensions.
+  apply(43, () => {
+    db.exec('ALTER TABLE tenants ADD COLUMN suspension_reason TEXT')
+  })
+
+  apply(44, () => createSupportSchema(db))
+  apply(45, () => createAppmaxReferralSchema(db))
 
 }

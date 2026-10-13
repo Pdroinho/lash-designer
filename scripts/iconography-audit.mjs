@@ -13,7 +13,7 @@ const walk = (directory) => {
 }
 walk('src')
 
-const app = read('src/App.tsx')
+const sharedUi = read('src/components/SharedUi.tsx')
 const tour = read('src/components/ProductTour.tsx')
 const icons = read('src/components/Icons.ts')
 const main = read('src/main.tsx')
@@ -33,13 +33,13 @@ assert(!/export \{ (?![A-Za-z0-9]+Icon)/.test(icons), 'mapa usa os exports Icon 
 assert((icons.match(/@phosphor-icons\/react\/dist\/csr\//g) ?? []).length >= 40, 'mapa semântico cobre a interface com glyphs oficiais')
 assert(!/<path\b|<svg\b/.test(icons), 'mapa semântico não inventa paths SVG')
 assert(!main.includes("from '@phosphor-icons/react'"), 'entry point principal da biblioteca não é carregado pelo runtime')
-assert(app.includes("weight: props.active ? 'duotone' : 'regular'"), 'navegação usa peso duotone somente para o estado ativo')
+assert(sharedUi.includes("weight: props.active ? 'duotone' : 'regular'"), 'navegação usa peso duotone somente para o estado ativo')
 assert(source.includes("from './components/Icons'") || source.includes("from './Icons'"), 'telas consomem o mapa semântico, não nomes aleatórios da biblioteca')
-assert(!app.includes('className="input has-icon"'), 'campos comuns não usam ícones decorativos')
-assert(!app.includes('className="input-icon"'), 'não há símbolos soltos dentro de inputs')
+assert(!source.includes('className="input has-icon"'), 'campos comuns não usam ícones decorativos')
+assert(!source.includes('className="input-icon"'), 'não há símbolos soltos dentro de inputs')
 assert(tour.includes('ld-tour-brand-mark'), 'Product Tour usa marca editorial discreta')
 assert(!tour.includes('<Sparkles') && !tour.includes('<ChevronLeft') && !tour.includes('<ChevronRight'), 'tour evita ornamentos redundantes em controles textuais')
-assert(app.includes('finance36-transaction-sign') || app.includes('finance-transaction-mark'), 'movimentações financeiras usam sinal semântico, não metáfora destrutiva')
+assert(source.includes('finance36-transaction-sign') || source.includes('finance-transaction-mark'), 'movimentações financeiras usam sinal semântico, não metáfora destrutiva')
 
 const failed = checks.filter((check) => !check.ok)
 for (const check of checks) console.log(`${check.ok ? '✓' : '✗'} ${check.label}`)

@@ -12,7 +12,7 @@ const LAST_SEEN_WRITE_INTERVAL_MS = 5 * 60 * 1000
 export type SessionRecord = {
   id: string
   userId: string
-  role: 'DEV' | 'ADMIN' | 'CLIENT'
+  role: 'DEV' | 'ADMIN' | 'CLIENT' | 'STAFF'
   tenantId: string | null
   tenantStatus: string | null
   persistent: boolean
@@ -107,7 +107,7 @@ export function resolveSession(db: Database.Database, token: string): SessionRec
     return null
   }
 
-  if (row.role !== 'DEV' && row.role !== 'ADMIN' && row.role !== 'CLIENT') return null
+  if (row.role !== 'DEV' && row.role !== 'ADMIN' && row.role !== 'CLIENT' && row.role !== 'STAFF') return null
 
   if (now.getTime() - lastSeenAt >= LAST_SEEN_WRITE_INTERVAL_MS) {
     db.prepare('UPDATE auth_sessions SET last_seen_at = ? WHERE id = ? AND revoked_at IS NULL').run(now.toISOString(), row.id)

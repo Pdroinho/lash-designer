@@ -15,7 +15,8 @@ const cssText = cssFiles.map((file) => fs.readFileSync(file, 'utf8')).join('\n')
 const productSelect = fs.readFileSync(path.join(src, 'components', 'ProductSelect.tsx'), 'utf8')
 const productCss = fs.readFileSync(path.join(src, 'product-controls-v40.css'), 'utf8')
 const main = fs.readFileSync(path.join(src, 'main.tsx'), 'utf8')
-const app = fs.readFileSync(path.join(src, 'App.tsx'), 'utf8')
+const calendarPage = fs.readFileSync(path.join(src, 'features', 'calendar', 'AdminCalendar.tsx'), 'utf8')
+const financePage = fs.readFileSync(path.join(src, 'features', 'finance', 'AdminFinance.tsx'), 'utf8')
 const whatsapp = fs.readFileSync(path.join(src, 'components', 'WhatsAppCenter.tsx'), 'utf8')
 const setup = fs.readFileSync(path.join(src, 'components', 'WorkspaceSetup.tsx'), 'utf8')
 const financeCss = fs.readFileSync(path.join(src, 'finance-v36.css'), 'utf8')
@@ -35,7 +36,7 @@ const checks = [
   ['ProductSelect fecha fora e reposiciona em resize/scroll', productSelect.includes("document.addEventListener('pointerdown'") && productSelect.includes("window.addEventListener('resize'") && productSelect.includes("window.addEventListener('scroll'")],
   ['estilo canônico de dropdown é globalmente importado', main.includes("import './product-controls-v40.css'")],
   ['novo CSS de controles nasce sem !important/100vw', !productCss.includes('!important') && !/100d?vw/.test(productCss)],
-  ['Financeiro usa ProductSelect', app.includes("import { ProductSelect } from './components/ProductSelect'") && app.includes('Filtrar extrato por tipo')],
+  ['Financeiro usa ProductSelect', financePage.includes("import { ProductSelect } from '../../components/ProductSelect'") && financePage.includes('Filtrar extrato por tipo')],
   ['WhatsApp usa ProductSelect', whatsapp.includes("import { ProductSelect } from './ProductSelect'") && whatsapp.match(/<ProductSelect/g)?.length >= 4],
   ['Setup usa ProductSelect', setup.includes("import { ProductSelect } from './ProductSelect'") && setup.includes('ariaLabel={`Duração de ${service.name')],
   ['CSS de WhatsApp não estiliza select nativo localmente', !/\.wa39-[^{,]*select\b/.test(waCss)],
@@ -43,7 +44,7 @@ const checks = [
   ['Financeiro não mantém o gráfico SVG artesanal legado', !/finance36-chart-v2|finance36-balance-line|finance36-sparse-note|finance36-zero-line/.test(financeCss)],
   ['Chart.js está travado em versão e lockfile coerentes', lock.version === pkg.version && lock.packages?.['']?.version === pkg.version && pkg.dependencies?.['chart.js'] === '4.5.1' && lock.packages?.['node_modules/chart.js']?.version === '4.5.1'],
   ['componentes novos não introduzem 100vw ou !important', !/100d?vw|!important/.test(productSelect + productCss + fs.readFileSync(path.join(src, 'components', 'FinanceFlowChart.tsx'), 'utf8'))],
-  ['Agenda não envolve ProductSelect em shell de input legado', app.includes('schedule-time-select-field') && !/time-input-wrapper[^>]*>[\s\S]{0,220}<TimeSelect/.test(app)],
+  ['Agenda não envolve ProductSelect em shell de input legado', calendarPage.includes('schedule-time-select-field') && !/time-input-wrapper[^>]*>[\s\S]{0,220}<TimeSelect/.test(calendarPage)],
   ['CSS não mantém implementações visuais legadas de dropdown', !/\.custom-select\b|\.time-select-trigger\b|\.time-select-dropdown\b|\.time-option\b/.test(cssText)],
 ]
 

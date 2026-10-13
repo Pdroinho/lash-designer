@@ -1,3 +1,4 @@
+import './report-review.css'
 import { useCallback, useEffect, useState } from 'react'
 import { AlertCircle, Check, CheckCircle2, Copy, ExternalLink, RefreshCw, ShieldCheck, Star, Trash2 } from './Icons'
 import { api } from '../api'
@@ -55,14 +56,16 @@ export function CustomDomainsSettings() {
   const [domain, setDomain] = useState('')
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [creating, setCreating] = useState(false)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadFailed(false)
     const result = await api<{ domains: DomainItem[] }>('/api/admin/domains')
     if (result.ok) setDomains(result.data.domains)
-    else setMessage({ type: 'error', text: result.error.message })
+    else { setLoadFailed(true); setMessage({ type: 'error', text: result.error.message }) }
     setLoading(false)
   }, [])
 
@@ -71,6 +74,7 @@ export function CustomDomainsSettings() {
   }, [load])
 
   const createDomain = async () => {
+    if (creating || loading || loadFailed || domains.length >= 5) return
     const normalized = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
     if (!normalized) return
     setCreating(true)
@@ -151,7 +155,7 @@ export function CustomDomainsSettings() {
             </div>
           </div>
         </div>
-        <span className="domain-security-pill"><ShieldCheck size={15} /> DNS verificado</span>
+        <span className={`domain-security-pill ${!loading && !loadFailed && domains.some(item => item.status === 'ACTIVE') ? '' : 'is-pending'}`}><ShieldCheck size={15} /> {loading ? 'Verificando domínios…' : loadFailed ? 'Verificação indisponível' : domains.some(item => item.status === 'ACTIVE') ? 'Domínio verificado' : domains.length ? 'Verificação pendente' : 'Verificação após cadastro'}</span>
       </div>
 
       <div className="cardBody custom-domains-body">
@@ -173,7 +177,7 @@ export function CustomDomainsSettings() {
               spellCheck={false}
             />
           </div>
-          <button type="button" className="btn btnPrimary" onClick={() => void createDomain()} disabled={creating || !domain.trim() || domains.length >= 5}>
+          <button type="button" className="btn btnPrimary" onClick={() => void createDomain()} disabled={creating || loading || loadFailed || !domain.trim() || domains.length >= 5}>
             {domains.length >= 5 ? 'Limite atingido' : creating ? 'Adicionando...' : 'Conectar domínio'}
           </button>
         </div>
@@ -182,7 +186,7 @@ export function CustomDomainsSettings() {
 
         {loading ? (
           <div className="domain-loading skeleton" />
-        ) : domains.length === 0 ? (
+        ) : loadFailed ? (<div className="domain-empty"><strong>Não foi possível carregar seus domínios</strong><button type="button" className="btn btnPrimary" onClick={() => void load()}>Tentar novamente</button></div>) : domains.length === 0 ? (
           <div className="domain-empty">
             <img decoding="async" src="/empty-states/empty-domain.png" alt="" aria-hidden="true" loading="lazy" />
             <strong>Nenhum domínio conectado</strong>

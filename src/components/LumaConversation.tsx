@@ -1,3 +1,4 @@
+import './report-review.css'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react'
 import { api } from '../api'
 import { ArrowRight, CheckCircle2, Compass, Paperclip, Plus, Search, Send, StopCircle, Trash2, X } from './Icons'
@@ -497,9 +498,9 @@ export function LumaConversation({ variant = 'page', onClose, initialPrompt = ''
         </div>
 
         <div className="luma34-header-actions">
-          <div className="luma34-usage" aria-label={remaining === null ? 'Carregando limite diário' : `${remaining} consultas disponíveis hoje`}>
+          <div className="luma34-usage" title="Consultas restantes no limite diário; créditos extras são exibidos separadamente." aria-label={remaining === null ? 'Carregando limite diário' : `${remaining} consultas disponíveis hoje`}>
             <strong>{remaining ?? '—'}</strong>
-            <span>de {usage?.limit ?? '—'} hoje</span>
+            <span>consultas hoje</span>
           </div>
           {hasConversation ? (
             <button type="button" className="luma34-new" onClick={startFresh} disabled={busy} title="Nova conversa">

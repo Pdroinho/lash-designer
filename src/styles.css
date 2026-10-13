@@ -5108,7 +5108,7 @@ svg {
 
 .skip-link {
   position: fixed;
-  top: max(8px, env(safe-area-inset-top));
+  top: -120px;
   left: max(8px, env(safe-area-inset-left));
   z-index: 10000;
   padding: 10px 14px;
@@ -5122,6 +5122,7 @@ svg {
 }
 
 .skip-link:focus {
+  top: 12px;
   transform: translateY(0);
 }
 

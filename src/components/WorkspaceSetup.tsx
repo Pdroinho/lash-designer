@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { optimizeImageFile } from '../imageProcessing'
 import type { TenantPublic } from '../types'
@@ -30,6 +31,7 @@ function timeToMinutes(value: string) {
 const optimizeLogo = (file: File) => optimizeImageFile(file, { maxBytes: 300_000, maxDimension: 720, quality: .82 })
 
 export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | null; onComplete: (tenant?: TenantPublic) => void }) {
+  const navigate = useNavigate()
   const [visible, setVisible] = useState(false)
   const [mode, setMode] = useState<SetupMode>('ASSISTED')
   const [step, setStep] = useState(0)
@@ -181,6 +183,7 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
             ))}
           </ol>
           <button type="button" className="workspace-setup-later" onClick={skip} disabled={busy}>Prefiro configurar depois</button>
+          <button type="button" className="workspace-back" disabled={busy} onClick={() => { setVisible(false); navigate('/admin?view=support') }}>Preciso de ajuda</button>
         </aside>
 
         <div className="workspace-setup-main">

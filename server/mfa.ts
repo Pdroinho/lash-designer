@@ -95,7 +95,7 @@ export function resolveAuthChallenge(db: Database.Database, token: string) {
     | undefined
 
   if (!row || row.kind !== 'WHATSAPP_OTP' || Date.parse(row.expiresAt) <= Date.now()) return null
-  if (row.role !== 'DEV' && row.role !== 'ADMIN') return null
+  if (row.role !== 'DEV' && row.role !== 'ADMIN' && row.role !== 'STAFF') return null
   return { ...row, keepSigned: Boolean(row.keepSigned) }
 }
 

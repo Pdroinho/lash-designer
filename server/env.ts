@@ -50,6 +50,10 @@ const envSchema = z.object({
   APP_ENCRYPTION_KEY: z.string().optional(),
   INFINITEPAY_HANDLE: z.string().min(2).optional(),
   INFINITEPAY_BASE_URL: z.string().url().default('https://api.checkout.infinitepay.io'),
+  APPMAX_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
+  APPMAX_MERCHANT_CLIENT_ID: z.string().min(2).optional(),
+  APPMAX_MERCHANT_CLIENT_SECRET: z.string().min(12).optional(),
+  APPMAX_CHECKOUT_ENABLED: envBoolean(false),
   APP_BASE_URL: z.string().url().optional(),
   SUBSCRIPTION_PRICE_CENTS: z.coerce.number().int().positive().default(59880),
   PLAN_MONTHLY_CENTS: z.coerce.number().int().positive().default(5990),
@@ -112,6 +116,13 @@ export type Env = Omit<EnvParsed, 'APP_ENCRYPTION_KEY'> & { APP_ENCRYPTION_KEY: 
 
 export const env: Env = (() => {
   const parsed = envSchema.parse(process.env)
+  if (Boolean(parsed.APPMAX_MERCHANT_CLIENT_ID) !== Boolean(parsed.APPMAX_MERCHANT_CLIENT_SECRET)) {
+    throw new Error('Configure APPMAX_MERCHANT_CLIENT_ID e APPMAX_MERCHANT_CLIENT_SECRET juntos.')
+  }
+  if (parsed.APPMAX_CHECKOUT_ENABLED && (!parsed.APPMAX_MERCHANT_CLIENT_ID || !parsed.APPMAX_MERCHANT_CLIENT_SECRET)) {
+    throw new Error('APPMAX_CHECKOUT_ENABLED exige credenciais merchant Appmax.')
+  }
+  // Checkout Appmax liberado em produção com validação de credenciais
   const encryptionKeyCandidate = (parsed.APP_ENCRYPTION_KEY ?? '').trim()
   const encryptionKey = (() => {
     if (/^[A-Za-z0-9_-]{43,}$/.test(encryptionKeyCandidate) && Buffer.from(encryptionKeyCandidate, 'base64url').length >= 32) {

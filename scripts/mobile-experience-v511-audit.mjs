@@ -1,21 +1,24 @@
 import fs from 'node:fs'
 
-const app = fs.readFileSync('src/App.tsx', 'utf8')
+const clientsPage = fs.readFileSync('src/features/clients/AdminClients.tsx', 'utf8')
+const dashboard = fs.readFileSync('src/features/dashboard/AdminDashboard.tsx', 'utf8')
+const calendarPage = fs.readFileSync('src/features/calendar/AdminCalendar.tsx', 'utf8')
+const bookingPage = fs.readFileSync('src/features/booking/BookingPage.tsx', 'utf8')
 const main = fs.readFileSync('src/main.tsx', 'utf8')
 const css = fs.readFileSync('src/mobile-experience-v511.css', 'utf8')
 
 const checks = [
   ['Camada 5.11 está importada por último', main.indexOf("import './mobile-experience-v511.css'") > main.indexOf("import './mobile-app-v510-part4.css'")],
-  ['Dashboard possui composição mobile própria', app.includes('ld-mobile-dashboard-stage') && app.includes('ld-mobile-next-card') && app.includes('ld-mobile-business-pulse')],
-  ['Dashboard prioriza próximo atendimento real', app.includes('const nextAppointment = upcoming[0]') && app.includes('nextAppointment?.time') && app.includes('nextAppointment?.service')],
-  ['Agenda possui visão mobile independente do grid desktop', app.includes('ld-mobile-agenda-view') && app.includes('ld-mobile-agenda-timeline') && css.includes('.ld-agenda > .ld-calendar { display: none; }')],
-  ['Agenda diária navega em datas reais', app.includes('mobileAgendaDays') && app.includes('setCurrentDate(date)') && app.includes('mobileDayEvents')],
-  ['Agenda mobile abre o mesmo detalhe de evento', app.includes('className="ld-mobile-agenda-event"') && app.includes('setSelectedEvent(event)')],
-  ['Clientes possuem resumo editorial com dados reais', app.includes('client-mobile-overview') && app.includes('topClient.totalSpentCents') && app.includes('visitedClients')],
-  ['Cards de clientes mantêm busca e dados reais', app.includes('normalizedQuery') && app.includes('client-mobile-card') && app.includes('formatBRL(client.totalSpentCents / 100)')],
-  ['Booking mantém as quatro etapas e handlers existentes', app.includes("const stepLabels = ['Serviço', 'Data', 'Horário', 'Confirmar']") && app.includes('confirmBooking') && app.includes('setStep(4)')],
-  ['Booking agrupa horários por contexto no mobile', app.includes('mobileTimeGroups') && app.includes("label: 'Manhã'") && app.includes("label: 'Tarde'") && app.includes("label: 'Noite'")],
-  ['Galeria de serviços continua usando serviços reais', app.includes('services.map((service, index)') && app.includes('service.coverUrl || bundledServiceCover(service.name)')],
+  ['Dashboard possui composição mobile própria', dashboard.includes('ld-mobile-dashboard-stage') && dashboard.includes('ld-mobile-next-card') && dashboard.includes('ld-mobile-business-pulse')],
+  ['Dashboard prioriza próximo atendimento real', dashboard.includes('const nextAppointment = upcoming[0]') && dashboard.includes('nextAppointment?.time') && dashboard.includes('nextAppointment?.service')],
+  ['Agenda possui visão mobile independente do grid desktop', calendarPage.includes('ld-mobile-agenda-view') && calendarPage.includes('ld-mobile-agenda-timeline') && css.includes('.ld-agenda > .ld-calendar { display: none; }')],
+  ['Agenda diária navega em datas reais', calendarPage.includes('mobileAgendaDays') && calendarPage.includes('setCurrentDate(date)') && calendarPage.includes('mobileDayEvents')],
+  ['Agenda mobile abre o mesmo detalhe de evento', calendarPage.includes('className="ld-mobile-agenda-event"') && calendarPage.includes('setSelectedEvent(event)')],
+  ['Clientes possuem resumo editorial com dados reais', clientsPage.includes('client-mobile-overview') && clientsPage.includes('topClient.totalSpentCents') && clientsPage.includes('visitedClients')],
+  ['Cards de clientes mantêm busca e dados reais', clientsPage.includes('normalizedQuery') && clientsPage.includes('client-mobile-card') && clientsPage.includes('formatBRL(client.totalSpentCents / 100)')],
+  ['Booking mantém as quatro etapas e handlers existentes', bookingPage.includes("const stepLabels = ['Serviço', 'Profissional e data', 'Horário', 'Confirmar']") && bookingPage.includes('confirmBooking') && bookingPage.includes('setStep(4)')],
+  ['Booking agrupa horários por contexto no mobile', bookingPage.includes('mobileTimeGroups') && bookingPage.includes("label: 'Manhã'") && bookingPage.includes("label: 'Tarde'") && bookingPage.includes("label: 'Noite'")],
+  ['Galeria de serviços continua usando serviços reais', bookingPage.includes('filteredServices.map((service, index)') && bookingPage.includes('service.coverUrl || bundledServiceCover(service.name)')],
   ['Navegação inferior vira dock flutuante', css.includes('.ld-mobile-tabbar {') && css.includes('border-radius: 24px') && css.includes('background: var(--ink-strong)')],
   ['Tela de agenda não é mera compressão do calendário desktop', css.includes('.ld-mobile-day-rail') && css.includes('.ld-mobile-agenda-event-body')],
   ['Booking usa galeria horizontal com scroll snap', css.includes('.booking30-services') && css.includes('grid-auto-flow: column') && css.includes('scroll-snap-type: x mandatory')],
