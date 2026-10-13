@@ -218,7 +218,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
   }
   return (
     <section
-      className={`support-center ${dev ? 'support-dev' : 'support-friendly'} ${create ? 'is-creating' : ''}`}
+      className={`support-center ${dev ? 'support-dev' : 'support-friendly'} ${create ? 'is-creating' : ''} ${selected && !create ? 'has-ticket' : ''}`}
       aria-label="Central de suporte"
     >
       <header className="support-heading">
@@ -226,8 +226,12 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
           <span className="support-eyebrow">
             {dev ? 'ATENDIMENTO DA PLATAFORMA' : 'ESTAMOS AQUI PARA AJUDAR'}
           </span>
-          <h2 className="support-title">
-            {dev ? 'Central de atendimento' : 'Como podemos ajudar?'}
+          <h2 className="ld-ds-page-title support-title">
+            {dev
+              ? 'Central de atendimento'
+              : selected && !create
+                ? 'Seu pedido de ajuda'
+                : 'Como podemos ajudar?'}
           </h2>
           <p>
             {dev
@@ -268,6 +272,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
           </span>
           <button
             type="button"
+            className="btn btn-ghost"
             aria-pressed={status === 'PENDING'}
             onClick={() => {
               setStatus(status === 'PENDING' ? '' : 'PENDING')
@@ -295,7 +300,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
         </div>
       ) : null}
       {create ? (
-        <div className="support-panel">
+        <div className="card support-panel">
           <div className="support-heading">
             <div>
               <h2>Conte o que você precisa</h2>
@@ -322,13 +327,14 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
       ) : (
         <div className={`support-layout ${selected ? 'has-selection' : ''}`}>
           <aside
-            className="support-panel support-list"
+            className="card support-panel support-list"
             aria-label={dev ? 'Lista de chamados' : 'Meus pedidos de ajuda'}
           >
             <div className="support-filters">
               <label>
                 Buscar
                 <input
+                  className="input"
                   type="search"
                   value={search}
                   maxLength={160}
@@ -420,7 +426,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                 >
                   <span className="support-ticket-meta">
                     {dev ? item.protocol : categoryLabels[item.category]}
-                    <span className="support-badge">
+                    <span className="status-badge support-badge">
                       {statusLabels[item.status]}
                     </span>
                   </span>
@@ -467,7 +473,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
               </button>
             </div>
           </aside>
-          <article className="support-panel support-conversation">
+          <article className="card support-panel support-conversation">
             {selected ? (
               <button
                 type="button"
@@ -498,7 +504,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                   <span>
                     {categoryLabels[t.category]} · {t.protocol}
                   </span>
-                  <span className="support-badge">
+                  <span className="status-badge support-badge">
                     {statusLabels[t.status]}
                   </span>
                 </div>

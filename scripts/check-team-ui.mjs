@@ -296,7 +296,7 @@ try {
     (await page.getByText('09:00 — 18:00', { exact: true }).count()) >= 5,
   )
   await page
-    .getByRole('button', { name: 'Horário personalizado', exact: false })
+    .getByRole('switch', { name: 'Personalizar horários', exact: true })
     .click()
   assert.equal(
     await page
@@ -310,7 +310,7 @@ try {
       .count(),
     0,
   )
-  assert.equal(await page.locator('.team-switch').first().evaluate(el => window.getComputedStyle(el, '::after').backgroundColor), 'rgb(255, 255, 255)')
+  assert.equal(await page.locator('.switch-toggle-slider').first().evaluate(el => window.getComputedStyle(el).pointerEvents), 'none')
   await page.getByRole('button', { name: 'Início Segunda período 1' }).click()
   await page.getByRole('option', { name: '10:00', exact: true }).click()
   await page
@@ -364,6 +364,12 @@ try {
   await page.getByLabel('WhatsApp dela, com DDD').fill('71999995555')
   await page.getByRole('button', { name: 'Criar convite de acesso' }).click()
   await page.getByText('Convite pronto para compartilhar').waitFor()
+  await page.getByLabel('WhatsApp para receber códigos de acesso').fill('71999996666')
+  await page.getByRole('button',{name:'Salvar WhatsApp',exact:true}).click()
+  await page.locator('.confirm-card').getByRole('button',{name:'Salvar WhatsApp',exact:true}).click()
+  await page.getByText('WhatsApp corrigido.',{exact:true}).waitFor()
+  assert.equal(db.prepare('SELECT phone FROM professional_invitations WHERE professional_id=? AND consumed_at IS NULL').get(camila).phone,'5571999996666')
+  pass('admin corrects pending invitation phone through shared confirmation')
   const url = await page.getByLabel('Link do convite').inputValue()
   assert.ok(url.includes('/convite/'))
   await page.getByRole('button', { name: 'Concluir', exact: true }).click()
@@ -551,6 +557,25 @@ try {
   await page.locator('.team-page').waitFor({ state: 'detached' })
   assert.equal(await page.locator('.team-page, .staff52').count(), 0)
   pass('services tab contains only service management')
+  assert.equal((await apiCall(`/api/admin/professionals/${professional}/phone`,'PATCH',{phone:'71999997777'})).status,200)
+  assert.equal(db.prepare('SELECT phone FROM users WHERE id=?').get(users.staff).phone,'5571999997777')
+  assert.ok(db.prepare('SELECT revoked_at AS v FROM auth_sessions WHERE user_id=?').get(users.staff).v)
+  assert.equal((await apiCall(`/api/admin/professionals/${owner}/phone`,'PATCH',{phone:'71999997777'})).status,400)
+  pass('linked staff phone can be corrected; owner security remains protected')
+  assert.equal((await apiCall(`/api/admin/professionals/${professional}`,'DELETE')).status,400)
+  assert.equal((await apiCall(`/api/admin/professionals/${owner}`,'DELETE')).status,400)
+  pass('future appointments and owner account prevent unsafe removal')
+  await page.getByRole('button',{name:'Equipe',exact:true}).click()
+  await page.getByRole('button',{name:'Inativas',exact:true}).click()
+  await page.locator('.team-person').filter({hasText:'Camila Souza'}).getByRole('button',{name:'Configurar',exact:true}).click()
+  await page.getByRole('button',{name:'Remover da equipe',exact:true}).click()
+  await page.locator('.confirm-card').getByRole('button',{name:'Remover da equipe',exact:true}).click()
+  await page.getByText('Profissional removida da equipe.',{exact:true}).waitFor()
+  assert.equal((await apiCall('/api/admin/professionals')).data.professionals.some(p=>p.id===camila),false)
+  assert.ok(db.prepare('SELECT removed_at FROM professionals WHERE id=?').get(camila).removed_at)
+  assert.ok(db.prepare('SELECT consumed_at FROM professional_invitations WHERE professional_id=?').get(camila).consumed_at)
+  assert.equal((await apiCall(`/api/admin/professionals/${camila}`,'PATCH',{active:true})).status,404)
+  pass('confirmed removal hides member, frees seat, invalidates invitation and preserves historical identity')
   assert.deepEqual(errors, [])
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])
   console.log(

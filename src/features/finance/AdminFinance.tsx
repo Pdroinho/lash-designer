@@ -28,6 +28,8 @@ export function AdminFinance() {
 
     useEffect(() => {
         loadData()
+        window.addEventListener('lashdesigner:luma-data-updated',loadData)
+        return ()=>window.removeEventListener('lashdesigner:luma-data-updated',loadData)
     }, [])
 
     if (loading && !finance) {

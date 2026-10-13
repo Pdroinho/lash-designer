@@ -13,7 +13,7 @@ export function ProfessionalAccess({
   onBusyChange: (busy: boolean) => void
 }) {
   const [email, setEmail] = useState(person.pendingInvitation?.email ?? ''),
-    [phone, setPhone] = useState(''),
+    [phone, setPhone] = useState(formatBrazilPhoneInput(person.accessPhone ?? person.pendingInvitation?.phone ?? '')),
     [url, setUrl] = useState(''),
     [expiry, setExpiry] = useState(''),
     [busy, setBusy] = useState(false),
@@ -45,6 +45,14 @@ export function ProfessionalAccess({
     setUrl(`${window.location.origin}${result.data.path}`)
     setExpiry(result.data.expiresAt)
     onSaved()
+  }
+  async function savePhone() {
+    if(!(await confirmAction({title:'Corrigir WhatsApp?',message:'O novo número receberá os próximos códigos de acesso. A profissional precisará entrar novamente no painel.',confirmLabel:'Salvar WhatsApp'})))return
+    setBusy(true);setError('')
+    const result=await api(`/api/admin/professionals/${person.id}/phone`,{method:'PATCH',body:JSON.stringify({phone})})
+    setBusy(false)
+    if(!result.ok){setError(result.error.message);return}
+    notify('WhatsApp corrigido.','success');onSaved()
   }
   async function toggle() {
     const enabling = Boolean(person.accessDisabledAt)
@@ -126,6 +134,7 @@ export function ProfessionalAccess({
           <label className="team-field">
             E-mail da profissional
             <input
+              className="input"
               type="email"
               required
               maxLength={254}
@@ -139,6 +148,7 @@ export function ProfessionalAccess({
           <label className="team-field">
             WhatsApp dela, com DDD
             <input
+              className="input"
               type="tel"
               required
               value={phone}
@@ -162,6 +172,11 @@ export function ProfessionalAccess({
           </button>
         </form>
       )}
+      {person.accessRole!=='ADMIN' && person.active && (person.userId || person.pendingInvitation) ? <form onSubmit={event=>{event.preventDefault();void savePhone()}}>
+        <label className="team-field">WhatsApp para receber códigos de acesso<input className="input" type="tel" value={phone} placeholder="(71) 99999-9999" disabled={busy} onChange={event=>setPhone(formatBrazilPhoneInput(event.target.value))}/></label>
+        <p className="team-help">Digitou errado? Corrija o número aqui. Nenhuma senha será alterada.</p>
+        <button className="btn" type="submit" disabled={busy}>{busy?'Salvando…':'Salvar WhatsApp'}</button>
+      </form> : null}
       {url ? (
         <div className="team-notice">
           <strong>Convite pronto para compartilhar</strong>
@@ -170,6 +185,7 @@ export function ProfessionalAccess({
             {new Date(expiry).toLocaleString('pt-BR')}.
           </p>
           <input
+            className="input"
             aria-label="Link do convite"
             readOnly
             value={url}

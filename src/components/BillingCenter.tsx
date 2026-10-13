@@ -187,8 +187,8 @@ export function BillingCenter({ locked = false }: { locked?: boolean }) {
             </button>
           ))}
         </div>
-        <aside className="billing-summary">
-          <span className="eyebrow">Resumo</span>
+        <aside className="card billing-summary" data-tour="billing-summary">
+          <span className="eyebrow">{active ? catalog?.currentSubscription?.planCode === selected.code ? 'Seu plano atual' : 'Comparar faixa' : 'Sua assinatura'}</span>
           <h2>{selected.label}</h2>
           <div className="billing-summary__price">
             <strong>{money(finalAmount)}</strong>
@@ -197,16 +197,14 @@ export function BillingCenter({ locked = false }: { locked?: boolean }) {
           {quote?.debtRecoveryPercent ? <p role="status">{quote.debtRecoveryPercent}% dos créditos compensam benefícios de indicações estornadas. O restante entra no desconto mostrado; não há cobrança automática.</p> : null}
           {quote && quote.discountPercent > 0 ? <p role="status">{quote.discountPercent}% de desconto {quote.source === 'REFERRAL' ? 'pela indicação, na primeira assinatura' : 'com seus créditos de indicação'}. Valor normal da faixa: {money(selected.amountCents)}/mês. Créditos excedentes ficam para renovações futuras.</p> : null}
           <p>
-            Pagamento avulso. A renovação não é automática. Acesso liberado após
-            confirmação do pagamento.
+            {active ? 'Você já tem uma assinatura ativa.' : 'Pagamento único por um mês. Renovação manual, sem cobrança automática.'}
           </p>
           {active ? (
             <p role="status">
               {catalog?.currentSubscription?.currentPeriodEnd
                 ? `Seu período atual vai até ${new Date(catalog.currentSubscription.currentPeriodEnd).toLocaleDateString('pt-BR')}. `
                 : ''}
-              A transição de contratos ativos ainda não está disponível neste
-              checkout.
+              Para trocar de faixa durante este período, peça ajuda ao suporte.
             </p>
           ) : tooSmall ? (
             <p role="status">
@@ -239,8 +237,9 @@ export function BillingCenter({ locked = false }: { locked?: boolean }) {
                 ? 'Preparando checkout…'
                 : !catalog?.checkoutAvailable
                   ? 'Contratação indisponível'
-                  : 'Ir para o checkout Appmax'}
+                  : active ? 'Assinatura ativa' : 'Continuar para pagamento'}
           </button>
+          {active ? <a className="btn btn-ghost billing-help" href="/admin?view=support">Quero ajuda com meu plano</a> : null}
           {!loading && !catalog?.checkoutAvailable ? (
             <button
               type="button"
@@ -253,7 +252,7 @@ export function BillingCenter({ locked = false }: { locked?: boolean }) {
         </aside>
       </div>
       <div
-        className="billing-mobile-cta"
+        className={`billing-mobile-cta ${active ? 'is-active-subscription' : ''}`}
         aria-label={`Plano selecionado: ${selected.label}`}
       >
         <div>

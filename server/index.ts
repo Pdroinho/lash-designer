@@ -1,3 +1,5 @@
+import { createLumaAppmaxCredits } from './lumaAppmaxCredits.js'
+import { createLumaReminderRuntime } from './lumaReminderRuntime.js'
 import express from 'express'
 import { sessionMiddleware } from './auth.js'
 import { closeDb, getDb } from './db.js'
@@ -52,7 +54,8 @@ const appmaxClient = env.APPMAX_CHECKOUT_ENABLED && env.APPMAX_MERCHANT_CLIENT_I
   ? createAppmaxClient({ environment: env.APPMAX_ENVIRONMENT, merchantClientId: env.APPMAX_MERCHANT_CLIENT_ID, merchantClientSecret: env.APPMAX_MERCHANT_CLIENT_SECRET })
   : null
 const appmaxBilling = appmaxClient ? createAppmaxBillingService(db, appmaxClient) : null
-const appmaxWebhook = appmaxBilling ? createAppmaxWebhookRuntime(db, appmaxBilling) : null
+const lumaAppmaxCredits = appmaxClient ? createLumaAppmaxCredits(db, appmaxClient) : null
+const appmaxWebhook = appmaxBilling ? createAppmaxWebhookRuntime(db, appmaxBilling, lumaAppmaxCredits ?? undefined) : null
 const network = createPlatformNetworkConfig({
   appBaseUrl: env.APP_BASE_URL,
   frontendOrigin: env.FRONTEND_ORIGIN,
@@ -133,7 +136,7 @@ registerPlatformRoutes(app, {
 })
 
 registerBillingAssistantRoutes(app, {
-  db, commercial, infinitePay, limiters, whatsapp, clientConsent, appmaxBilling, appmaxWebhook,
+  db, commercial, infinitePay, limiters, whatsapp, clientConsent, appmaxBilling, appmaxWebhook, lumaAppmaxCredits,
   appmaxEnabled: env.APPMAX_CHECKOUT_ENABLED, production: env.NODE_ENV === 'production',
   infinitePayConfigured: Boolean(env.INFINITEPAY_HANDLE),
   assistantEnabled: env.AI_ASSISTANT_ENABLED,
@@ -177,7 +180,7 @@ const serverLifecycleRuntime = createApplicationServerRuntime({
   db,
   nodeEnv: env.NODE_ENV,
   port: env.PORT,
-  managedRuntimes: [...(appmaxWebhook ? [appmaxWebhook] : []), domains, appointments, whatsappWorkerRuntime],
+  managedRuntimes: [...(appmaxWebhook ? [appmaxWebhook] : []), createLumaReminderRuntime(db, whatsapp.sendWhatsappTextForTenant), domains, appointments, whatsappWorkerRuntime],
   closeDatabase: closeDb,
 })
 serverLifecycleRuntime.start()

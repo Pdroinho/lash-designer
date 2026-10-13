@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { requireActiveSubscription, requireRole } from '../auth.js'
 import { badRequest, notFound } from '../http.js'
 import { currentLegalBundleHash, PRIVACY_VERSION, TERMS_VERSION } from '../legal.js'
+import { revokeSessionsForUser } from '../session.js'
 import { hashPassword } from '../security.js'
 
 type Options = {
@@ -18,6 +19,29 @@ const tokenHash = (token: string) => createHash('sha256').update(token).digest('
 
 export function createProfessionalAccessRouter({ db, publicLimiter, subscriptionGate = requireActiveSubscription, normalizeUserE164Phone, recordLegalAcceptance }: Options) {
   const router = Router()
+
+  router.patch('/admin/professionals/:id/phone', requireRole('ADMIN'), (req,res,next)=>{
+    try {
+      const tenantId=req.sessionUser!.tenantId!, professionalId=z.string().uuid().parse(req.params.id)
+      const {phone}=z.object({phone:z.string().min(8).max(40)}).strict().parse(req.body)
+      const normalized=normalizeUserE164Phone(phone)
+      if(!normalized) throw badRequest('Confira o WhatsApp com DDD.','INVALID_PHONE')
+      db.transaction(()=>{
+        const person=db.prepare('SELECT p.user_id AS userId,u.role FROM professionals p LEFT JOIN users u ON u.id=p.user_id AND u.tenant_id=p.tenant_id WHERE p.tenant_id=? AND p.id=? AND p.active=1').get(tenantId,professionalId) as {userId:string|null;role:string|null}|undefined
+        if(!person) throw notFound('Profissional ativa não encontrada.','PROFESSIONAL_NOT_FOUND')
+        if(person.role==='ADMIN') throw badRequest('Altere o telefone da administradora nas configurações de segurança.','OWNER_PHONE_FORBIDDEN')
+        if(person.userId){
+          db.prepare("UPDATE users SET phone=? WHERE id=? AND tenant_id=? AND role='STAFF'").run(normalized,person.userId,tenantId)
+          revokeSessionsForUser(db,person.userId)
+          if(db.prepare("SELECT 1 FROM sqlite_master WHERE name='auth_challenges'").get()) db.prepare('DELETE FROM auth_challenges WHERE user_id=?').run(person.userId)
+        }else {
+          const changed=db.prepare('UPDATE professional_invitations SET phone=? WHERE tenant_id=? AND professional_id=? AND consumed_at IS NULL AND expires_at>?').run(normalized,tenantId,professionalId,new Date().toISOString())
+          if(!changed.changes) throw badRequest('Crie um convite de acesso primeiro.','INVITATION_REQUIRED')
+        }
+      }).immediate()
+      res.json({ok:true,phone:normalized})
+    }catch(error){next(error)}
+  })
 
   router.post('/admin/professionals/:id/invitation', requireRole('ADMIN'), (req, res, next) => {
     try {

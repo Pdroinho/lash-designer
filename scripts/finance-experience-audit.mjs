@@ -22,7 +22,7 @@ const checks = [
   ['backend converte data civil usando timezone do tenant', server.includes('utcForLocalTime({ timeZone, ...parsed, hour: 12, minute: 0 })')],
   ['extrato envia startDate/endDate sem fuso do navegador', financePage.includes('/api/admin/finance/extract?startDate=') && !financePage.includes('new Date(`${start}T00:00:00`).toISOString()')],
   ['extrato converte limites com dayBoundsUtc no servidor', server.includes('const startBounds = dayBoundsUtc({ timeZone, ymd: startDate })') && server.includes('const endBounds = dayBoundsUtc({ timeZone, ymd: endDate })')],
-  ['janela mensal da Luma usa monthBoundsUtc', server.includes('monthBoundsUtc({ timeZone: timezone, year: nowParts.year, month: nowParts.month }).start.toISOString()')],
+  ['janela mensal da Luma usa monthBoundsUtc', server.replace(/\s+/g,'').includes('monthBoundsUtc({timeZone:timezone,year:nowParts.year,month:nowParts.month,}).start.toISOString()')],
   ['Luma possui ferramenta financeira dedicada', bridge.includes("name: 'get_finance_overview'")],
   ['visão financeira da Luma inclui metas atuais', bridge.includes('revenueProgressPercent') && bridge.includes('newClientsProgressPercent')],
   ['Luma e Financeiro compartilham cálculo mensal', bridge.includes('financeMonthSnapshot(') && server.includes('financeMonthSnapshot(') && finance.includes('export function financeMonthSnapshot')],

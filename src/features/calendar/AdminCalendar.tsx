@@ -389,7 +389,7 @@ export function AdminCalendar() {
         if (res.ok) {
             const mapped: CalendarEvent[] = res.data.appointments.map(a => {
                 const status = a.status === 'CONFIRMED' ? 'confirmed' : a.status === 'PENDING' ? 'pending' : 'cancelled'
-                const presence = appointmentPresenceMeta(a.status, a.confirmationStatus)
+                const presence = appointmentPresenceMeta(a.status, a.confirmationStatus,a.attendanceStatus)
                 return {
                     id: a.id,
                     title: a.serviceName,
@@ -399,6 +399,7 @@ export function AdminCalendar() {
                     end: a.endsAt,
                     status,
                     confirmationStatus: a.confirmationStatus,
+                    attendanceStatus:a.attendanceStatus,
                     confirmationSentAt: a.confirmationSentAt,
                     confirmationRespondedAt: a.confirmationRespondedAt,
                     appointmentReminderSentAt: a.appointmentReminderSentAt,
@@ -506,7 +507,7 @@ export function AdminCalendar() {
                     <div className="ld-mobile-agenda-timeline">
                         {loading ? <div className="ld-mobile-agenda-loading"><span className="spinner" /><small>Atualizando agenda…</small></div> : null}
                         {!loading && mobileDayEvents.map((event, index) => {
-                            const presence = appointmentPresenceMeta(event.status, event.confirmationStatus)
+                            const presence = appointmentPresenceMeta(event.status, event.confirmationStatus,event.attendanceStatus)
                             return <button type="button" className="ld-mobile-agenda-event" key={event.id} onClick={() => setSelectedEvent(event)}>
                                 <span className="ld-mobile-agenda-time"><strong>{formatTimeInZone(event.start, tenantTimeZone)}</strong><small>{index === 0 ? 'próximo' : ''}</small></span>
                                 <span className="ld-mobile-agenda-line"><i style={{ background: event.textColor }} /></span>

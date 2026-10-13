@@ -1,3 +1,4 @@
+import { createLumaOperationsSchema } from './lumaOperationsSchema.js'
 import { createAppmaxReferralSchema } from './appmaxReferralSchema.js'
 import { getDb } from './db.js'
 import { createSupportSchema } from './support/schema.js'
@@ -1253,5 +1254,7 @@ export function migrate() {
 
   apply(44, () => createSupportSchema(db))
   apply(45, () => createAppmaxReferralSchema(db))
+  apply(46, () => createLumaOperationsSchema(db))
+  apply(47, () => db.exec('ALTER TABLE professionals ADD COLUMN removed_at TEXT'))
 
 }

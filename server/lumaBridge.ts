@@ -1,3 +1,4 @@
+import { operationalToolDefinitions, executeOperationalTool, confirmOperationalAction, type OperationType } from './lumaOperations.js'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { getDb } from './db.js'
@@ -6,7 +7,7 @@ import { financeExpenseCategories, financeMonthSnapshot, tenantFinanceTimeZone }
 
 export type LumaPendingAction = {
   id: string
-  type: 'CREATE_SERVICE' | 'CONFIRM_APPOINTMENT'
+  type: 'CREATE_SERVICE' | 'CONFIRM_APPOINTMENT' | OperationType
   title: string
   description: string
   confirmLabel: string
@@ -102,6 +103,7 @@ function storePendingAction(context: LumaToolContext, input: {
 }
 
 export const lumaToolDefinitions = [
+  ...operationalToolDefinitions,
   {
     type: 'function',
     function: {
@@ -210,6 +212,7 @@ const serviceArgs = z.object({
 const appointmentIdArgs = z.object({ appointment_id: z.string().uuid() }).strict()
 
 export function executeLumaTool(context: LumaToolContext, name: string, rawArgs: unknown): LumaToolExecution {
+  const operational = executeOperationalTool(context, name, rawArgs); if (operational) return operational
   if (name === 'get_business_snapshot') {
     z.object({}).strict().parse(rawArgs ?? {})
     const timeZone = tenantFinanceTimeZone(context.tenantId)
@@ -266,7 +269,7 @@ export function executeLumaTool(context: LumaToolContext, name: string, rawArgs:
     const currentNewClients = Number(newClientsRow?.currentNewClients ?? 0)
     const revenueChangePercent = previous.entriesCents > 0
       ? Number((((current.entriesCents - previous.entriesCents) / previous.entriesCents) * 100).toFixed(1))
-      : current.entriesCents > 0 ? 100 : 0
+      : null
     return {
       toolResult: {
         ok: true,
@@ -288,10 +291,10 @@ export function executeLumaTool(context: LumaToolContext, name: string, rawArgs:
         goals: {
           revenueGoalCents,
           currentRevenueCents: current.entriesCents,
-          revenueProgressPercent: Math.min(100, Number(((current.entriesCents / Math.max(1, revenueGoalCents)) * 100).toFixed(1))),
+          revenueProgressPercent: revenueGoalCents > 0 ? Math.min(100, Number(((current.entriesCents / revenueGoalCents) * 100).toFixed(1))) : 0,
           newClientsGoal,
           currentNewClients,
-          newClientsProgressPercent: Math.min(100, Number(((currentNewClients / Math.max(1, newClientsGoal)) * 100).toFixed(1))),
+          newClientsProgressPercent: newClientsGoal > 0 ? Math.min(100, Number(((currentNewClients / newClientsGoal) * 100).toFixed(1))) : 0,
         },
         semantics: {
           entries: 'Agendamentos confirmados no período + entradas manuais.',
@@ -419,6 +422,7 @@ export function executeLumaTool(context: LumaToolContext, name: string, rawArgs:
 }
 
 export function confirmLumaAction(context: LumaToolContext, actionId: string) {
+  const operational = confirmOperationalAction(context, actionId); if (operational) return operational
   const tx = db.transaction(() => {
     const raw = db.prepare(`SELECT * FROM assistant_pending_actions WHERE id = ? AND tenant_id = ? AND user_id = ?`).get(actionId, context.tenantId, context.userId)
     const action = pendingActionSchema.safeParse(raw)

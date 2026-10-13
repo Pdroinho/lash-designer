@@ -29,7 +29,7 @@ test('link hospedado usa credenciais merchant, centavos e apenas uma venda', asy
   assert.equal((calls[1].init?.headers as Record<string, string>).Authorization, `Bearer ${fakeToken}`)
   assert.deepEqual(JSON.parse(calls[1].init?.body as string), {
     name: 'Studio', value: 7490, description: 'Equipe até 3', product_type: 'digital',
-    payments: ['creditcard', 'pix'], max_installments: 1, fee_transfer_from_installment: 0, allow_multiple_sales: false,
+    payments: [['creditcard', 'pix']], max_installments: 1, fee_transfer_from_installment: 0, allow_multiple_sales: false,
   })
   assert.equal(await client.verifyPaymentLinkOrder({ linkId: 71, orderId: 42, expectedAmountCents: 7490 }), true)
   assert.deepEqual(await client.listPaymentLinkOrders(71), [{ id: 42, status: 'aprovado' }])

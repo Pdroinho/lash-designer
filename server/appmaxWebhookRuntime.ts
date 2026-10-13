@@ -15,7 +15,7 @@ type BillingService = {
   reconcilePaidIntents?: () => Promise<void>
 }
 
-export function createAppmaxWebhookRuntime(db: Database.Database, billing: BillingService) {
+export function createAppmaxWebhookRuntime(db: Database.Database, billing: BillingService, credits?: {reconcile:(input:{tenantId:string;intentId:string;orderId:number})=>Promise<boolean>;reconcileRecent:()=>Promise<void>}) {
   let timer: ReturnType<typeof setInterval> | undefined
   let running = false
 
@@ -25,7 +25,8 @@ export function createAppmaxWebhookRuntime(db: Database.Database, billing: Billi
     const { event, data } = result.data
     const intent = db.prepare(`SELECT id FROM appmax_checkout_intents WHERE payment_link_id = ? AND status IN ('PENDING','PAID')`)
       .get(data.payment_link_id) as { id: string } | undefined
-    if (!intent) return false
+    const credit = credits ? db.prepare("SELECT id FROM assistant_appmax_orders WHERE payment_link_id=? AND status IN ('PENDING','PAID')").get(data.payment_link_id) : null
+    if (!intent && !credit) return false
     const pending = db.prepare(`SELECT count(*) as total FROM appmax_webhook_inbox WHERE payment_link_id = ? AND status IN ('PENDING','FAILED')`)
       .get(data.payment_link_id) as { total: number }
     if (pending.total >= 10) return false
@@ -48,11 +49,12 @@ export function createAppmaxWebhookRuntime(db: Database.Database, billing: Billi
       for (const row of rows) {
         const intent = db.prepare(`SELECT id, tenant_id as tenantId FROM appmax_checkout_intents WHERE payment_link_id = ? AND status IN ('PENDING','PAID')`)
           .get(row.paymentLinkId) as { id: string; tenantId: string } | undefined
+        const credit = credits ? db.prepare("SELECT id,tenant_id as tenantId FROM assistant_appmax_orders WHERE payment_link_id=? AND status IN ('PENDING','PAID','REVERSED')").get(row.paymentLinkId) as {id:string;tenantId:string}|undefined : undefined
         try {
           const reversedEvent = row.eventName === 'order_refund' || row.eventName === 'order_chargeback_in_treatment'
           const applied = intent ? reversedEvent
             ? Boolean(billing.reconcileOrder && await billing.reconcileOrder({ tenantId: intent.tenantId, intentId: intent.id, orderId: row.orderId }))
-            : await billing.confirmOrder({ tenantId: intent.tenantId, intentId: intent.id, orderId: row.orderId }) : false
+            : await billing.confirmOrder({ tenantId: intent.tenantId, intentId: intent.id, orderId: row.orderId }) : credit && credits ? await credits.reconcile({tenantId:credit.tenantId,intentId:credit.id,orderId:row.orderId}) : false
           db.prepare(`UPDATE appmax_webhook_inbox SET status = ?, error_code = ?, processed_at = ? WHERE id = ?`)
             .run(applied ? 'APPLIED' : 'FAILED', applied ? null : 'ORDER_NOT_CONFIRMED', new Date().toISOString(), row.id)
         } catch {
@@ -62,6 +64,7 @@ export function createAppmaxWebhookRuntime(db: Database.Database, billing: Billi
       }
       if (billing.reconcilePendingIntents) await billing.reconcilePendingIntents()
       if (billing.reconcilePaidIntents) await billing.reconcilePaidIntents()
+      if (credits) await credits.reconcileRecent()
     } finally { running = false }
   }
 

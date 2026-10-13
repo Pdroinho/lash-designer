@@ -8,6 +8,7 @@ export const shellTourSteps = (area: 'admin' | 'dev' | 'client', screen: string)
     clients: 'clientes',
     services: 'serviços',
     team: 'equipe',
+    assistant:'Luma',billing:'assinatura',support:'suporte',referrals:'indicações',
     finance: 'financeiro',
     evolution: 'WhatsApp',
     settings: 'configurações',
@@ -22,6 +23,10 @@ export const shellTourSteps = (area: 'admin' | 'dev' | 'client', screen: string)
     clients: 'Consulte o histórico das clientes e identifique relacionamento, retorno e valor gerado.',
     services: 'Mantenha catálogo, duração, preço, imagem e disponibilidade dos serviços sempre atualizados.',
     team: 'Adicione profissionais, escolha os serviços que cada uma realiza e organize horários, folgas e acesso ao painel.',
+    assistant:'Converse com a Luma, consulte atendimentos por período, marque comparecimentos, acompanhe pedidos de ajuda e programe lembretes pessoais. Ajuste o jeito de conversar em Do meu jeito.',
+    billing:'Escolha a faixa que comporta sua equipe: até 3, 6 ou 15 profissionais. Confira o valor, a validade e a disponibilidade da contratação antes de pagar.',
+    support:'Toque em Pedir ajuda para descrever o que aconteceu. Meus pedidos reúne as conversas; Aguardando você significa que a equipe precisa de uma resposta sua.',
+    referrals:'Compartilhe seu convite e acompanhe os benefícios das indicações válidas. Descontos só são aplicados conforme as regras mostradas na assinatura.',
     finance: 'Acompanhe entradas, despesas, metas e evolução mensal do espaço.',
     evolution: 'Configure automações e mensagens do WhatsApp com atenção às credenciais e ao consentimento das clientes.',
     settings: 'Personalize a marca, gerencie assinatura, segurança e os domínios conectados ao espaço.',
@@ -67,6 +72,9 @@ export const shellTourSteps = (area: 'admin' | 'dev' | 'client', screen: string)
       description: 'Conecte um domínio próprio com verificação DNS e HTTPS automático. O painel mostra cada registro e o estado da propagação.',
     })
   }
+  if(area === 'admin') filtered.push({selector:'[data-tour="luma-context"]',title:'Luma junto da sua rotina',description:'Peça ajuda sobre a tela em que você está. Alterações em agenda, financeiro e suporte ficam prontas para você revisar e confirmar.'})
+  if(area==='admin' && screen==='assistant') filtered.push({selector:'[data-tour="luma-tools"]',title:'Mais que uma conversa',description:'Minha rotina mostra a agenda no período escolhido. Meus pedidos acompanha o suporte; Lembretes programa mensagens para seu WhatsApp e Do meu jeito personaliza a Luma.'})
+  if(area==='admin' && screen==='billing') filtered.push({selector:'[data-tour="billing-summary"]',title:'Confira antes de contratar',description:'Veja o valor final, a validade e os descontos aplicados. Se sua assinatura já estiver ativa, a tela mostra a próxima ação disponível.'})
   return filtered
 }
 

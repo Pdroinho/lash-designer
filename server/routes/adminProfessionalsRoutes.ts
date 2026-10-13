@@ -50,12 +50,13 @@ const patchSchema = z
 
 export function createAdminProfessionalsRouter(db: Database.Database) {
   const router = Router()
+  const hasRemoval = (db.prepare('PRAGMA table_info(professionals)').all() as Array<{name:string}>).some(c=>c.name==='removed_at')
 
   const detail = (tenantId: string, id: string) => {
     const professional = db
       .prepare(
-        `SELECT p.id, p.name, p.active, p.bookable, p.user_id as userId, u.staff_access_disabled_at as accessDisabledAt, u.role as accessRole
-      FROM professionals p LEFT JOIN users u ON u.id = p.user_id AND u.tenant_id = p.tenant_id WHERE p.tenant_id = ? AND p.id = ?`,
+        `SELECT p.id, p.name, p.active, p.bookable, p.user_id as userId, u.staff_access_disabled_at as accessDisabledAt, u.role as accessRole, u.phone as accessPhone
+      FROM professionals p LEFT JOIN users u ON u.id = p.user_id AND u.tenant_id = p.tenant_id WHERE p.tenant_id = ? AND p.id = ? ${hasRemoval ? 'AND p.removed_at IS NULL' : ''}`,
       )
       .get(tenantId, id) as
       | {
@@ -66,6 +67,7 @@ export function createAdminProfessionalsRouter(db: Database.Database) {
           userId: string | null
           accessDisabledAt: string | null
           accessRole: string | null
+          accessPhone: string | null
         }
       | undefined
     if (!professional)
@@ -83,7 +85,7 @@ export function createAdminProfessionalsRouter(db: Database.Database) {
     const pendingInvitation =
       db
         .prepare(
-          'SELECT email, expires_at as expiresAt FROM professional_invitations WHERE tenant_id = ? AND professional_id = ? AND consumed_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
+          'SELECT email, phone, expires_at as expiresAt FROM professional_invitations WHERE tenant_id = ? AND professional_id = ? AND consumed_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
         )
         .get(tenantId, id, new Date().toISOString()) ?? null
     return {
@@ -134,7 +136,7 @@ export function createAdminProfessionalsRouter(db: Database.Database) {
       const tenantId = req.sessionUser!.tenantId!
       const rows = db
         .prepare(
-          'SELECT id FROM professionals WHERE tenant_id = ? ORDER BY created_at, id',
+          `SELECT id FROM professionals WHERE tenant_id = ? ${hasRemoval ? 'AND removed_at IS NULL' : ''} ORDER BY created_at, id`,
         )
         .all(tenantId) as Array<{ id: string }>
       res.json({
@@ -290,6 +292,26 @@ export function createAdminProfessionalsRouter(db: Database.Database) {
     } catch (error) {
       next(error)
     }
+  })
+
+  router.delete('/professionals/:id', requireRole('ADMIN'), (req,res,next)=>{
+    try {
+      const tenantId=req.sessionUser!.tenantId!, id=z.string().uuid().parse(req.params.id)
+      db.transaction(()=>{
+        const person=detail(tenantId,id)
+        if(person.accessRole==='ADMIN') throw badRequest('A administradora não pode ser removida da equipe por aqui.','OWNER_REMOVAL_FORBIDDEN')
+        if(db.prepare("SELECT 1 FROM appointments WHERE tenant_id=? AND professional_id=? AND status IN ('PENDING','CONFIRMED') AND ends_at>? LIMIT 1").get(tenantId,id,new Date().toISOString())) throw badRequest('Reagende ou cancele os atendimentos futuros antes de remover esta profissional.','PROFESSIONAL_FUTURE_APPOINTMENTS')
+        if(!hasRemoval) throw badRequest('Atualize o banco antes de remover membros.','MIGRATION_REQUIRED')
+        const now=new Date().toISOString()
+        db.prepare('UPDATE professionals SET active=0,bookable=0,removed_at=?,updated_at=? WHERE tenant_id=? AND id=?').run(now,now,tenantId,id)
+        db.prepare('UPDATE professional_invitations SET consumed_at=? WHERE tenant_id=? AND professional_id=? AND consumed_at IS NULL').run(now,tenantId,id)
+        if(person.userId && person.accessRole==='STAFF') {
+          db.prepare("UPDATE users SET staff_access_disabled_at=? WHERE tenant_id=? AND id=? AND role='STAFF'").run(now,tenantId,person.userId)
+          revokeSessionsForUser(db,person.userId)
+        }
+      }).immediate()
+      res.json({ok:true})
+    }catch(error){next(error)}
   })
 
   router.patch(

@@ -48,7 +48,7 @@ export function ProductTour({
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const step = steps[index]
 
-  const storageKey = useMemo(() => `lashdesigner:tour:${tourKey}:v3`, [tourKey])
+  const storageKey = useMemo(() => `lashdesigner:tour:${tourKey}:v4`, [tourKey])
   const active = open && enabled
 
   const remember = useCallback(() => {
@@ -264,7 +264,7 @@ export function shouldAutoStartTour(tourKey: string) {
   if (typeof window === 'undefined') return false
   try {
     const prefix = `lashdesigner:tour:${tourKey}`
-    return !['v3', 'v2', 'v1'].some((version) => localStorage.getItem(`${prefix}:${version}`))
+    return !['v4', 'v3', 'v2', 'v1'].some((version) => localStorage.getItem(`${prefix}:${version}`))
   } catch {
     return true
   }

@@ -127,7 +127,7 @@ export function NewAppointmentModal({
 
         const a = res.data.appointment
         const status = a.status === 'CONFIRMED' ? 'confirmed' : a.status === 'PENDING' ? 'pending' : 'cancelled'
-        const presence = appointmentPresenceMeta(a.status, a.confirmationStatus)
+        const presence = appointmentPresenceMeta(a.status, a.confirmationStatus,a.attendanceStatus)
 
         onSuccess({
             id: a.id,
@@ -138,6 +138,7 @@ export function NewAppointmentModal({
             end: a.endsAt,
             status,
             confirmationStatus: a.confirmationStatus,
+                    attendanceStatus:a.attendanceStatus,
             confirmationSentAt: a.confirmationSentAt,
             confirmationRespondedAt: a.confirmationRespondedAt,
             appointmentReminderSentAt: a.appointmentReminderSentAt,
@@ -279,7 +280,7 @@ export function AppointmentDetailsModal({
     const [actionBusy, setActionBusy] = useState(false)
     if (!isOpen || !event) return null
 
-    const presence = appointmentPresenceMeta(event.status.toUpperCase(), event.confirmationStatus)
+    const presence = appointmentPresenceMeta(event.status.toUpperCase(), event.confirmationStatus,event.attendanceStatus)
     const presenceResolved = event.confirmationStatus === 'CONFIRMED' || event.confirmationStatus === 'MANUALLY_CONFIRMED'
     const rawCancelled = event.status === 'cancelled'
 

@@ -73,8 +73,10 @@ export function bundledServiceCover(name: string) {
   return bundledServiceCovers.classico
 }
 
-export function appointmentPresenceMeta(rawStatus: string, confirmationStatus?: AppointmentConfirmationStatus) {
+export function appointmentPresenceMeta(rawStatus: string, confirmationStatus?: AppointmentConfirmationStatus, attendanceStatus?:string) {
   if (rawStatus.trim().toUpperCase() === 'CANCELLED') return { label: 'Cancelado', className: 'status-warning', color: 'var(--status-neutral-bg)', textColor: 'var(--status-neutral-ink)' }
+  if (attendanceStatus==='ATTENDED') return {label:'Compareceu',className:'status-success',color:'var(--status-success-bg)',textColor:'var(--status-success-ink)'}
+  if (attendanceStatus==='NO_SHOW') return {label:'Faltou',className:'status-warning',color:'var(--status-warning-bg)',textColor:'var(--status-warning-ink)'}
   if (confirmationStatus === 'CONFIRMED' || confirmationStatus === 'MANUALLY_CONFIRMED') return { label: 'Presença confirmada', className: 'status-success', color: 'var(--status-success-bg)', textColor: 'var(--status-success-ink)' }
   if (confirmationStatus === 'AWAITING_CONFIRMATION') return { label: 'Aguardando resposta', className: 'status-pending', color: 'var(--status-warning-bg)', textColor: 'var(--status-warning-ink)' }
   if (confirmationStatus === 'NO_RESPONSE') return { label: 'Sem resposta', className: 'status-warning', color: 'var(--status-warning-bg)', textColor: 'var(--status-warning-ink)' }

@@ -62,7 +62,7 @@ export function createAppmaxClient(input: {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: inputLink.name, value: inputLink.amountCents, description: inputLink.description,
-        product_type: 'digital', payments: ['creditcard', 'pix'],
+        product_type: 'digital', payments: [['creditcard', 'pix']],
         max_installments: 1, fee_transfer_from_installment: 0, allow_multiple_sales: false,
       }),
     })

@@ -84,20 +84,20 @@ export function ProfessionalEditor({
         role="dialog"
         aria-modal="true"
         aria-labelledby="team-editor-title"
-        className="team-dialog"
+        className="ld-dialog team-dialog"
       >
-        <header>
+        <header className="cardHeader">
           <div>
             <span className="team-eyebrow">
               {person ? 'CONFIGURAR PROFISSIONAL' : 'ADICIONAR À EQUIPE'}
             </span>
-            <h2 id="team-editor-title">
+            <h2 className="cardTitle" id="team-editor-title">
               {person ? person.name : 'Uma nova profissional'}
             </h2>
           </div>
           <button
             type="button"
-            className="btn btn-ghost"
+            className="icon-btn"
             aria-label="Fechar cadastro"
             disabled={busy}
             onClick={onClose}
@@ -120,7 +120,7 @@ export function ProfessionalEditor({
           }}
           className="team-editor-form"
         >
-          <div className="team-dialog-body">
+          <div className="cardBody team-dialog-body">
             {step === 0 ? (
               <>
                 <h3>Como ela se chama?</h3>
@@ -131,6 +131,7 @@ export function ProfessionalEditor({
                 <label className="team-field">
                   Nome da profissional
                   <input
+                    className="input"
                     autoFocus
                     value={name}
                     onChange={(event) => setName(event.target.value)}
@@ -150,6 +151,7 @@ export function ProfessionalEditor({
                   serviços marcados abaixo.
                 </p>
                 <input
+                  className="input"
                   aria-label="Buscar serviço da profissional"
                   type="search"
                   placeholder="Buscar pelo nome do serviço"
@@ -160,7 +162,7 @@ export function ProfessionalEditor({
                   <span>{ids.length} selecionado(s)</span>
                   <button
                     type="button"
-                    className="team-text-button"
+                    className="btn btn-ghost team-text-button"
                     disabled={busy}
                     onClick={() =>
                       setIds(services.map((service) => service.id))
@@ -170,7 +172,7 @@ export function ProfessionalEditor({
                   </button>
                   <button
                     type="button"
-                    className="team-text-button"
+                    className="btn btn-ghost team-text-button"
                     disabled={busy}
                     onClick={() => setIds([])}
                   >
@@ -185,26 +187,22 @@ export function ProfessionalEditor({
                         .includes(search.toLocaleLowerCase('pt-BR')),
                     )
                     .map((service) => (
-                      <button
-                        type="button"
+                      <label
                         key={service.id}
-                        className="team-service"
-                        role="checkbox"
-                        aria-checked={ids.includes(service.id)}
-                        disabled={busy}
-                        onClick={() =>
-                          setIds((current) =>
-                            current.includes(service.id)
-                              ? current.filter((id) => id !== service.id)
-                              : [...current, service.id],
-                          )
-                        }
+                        className={`team-service ${ids.includes(service.id) ? 'is-selected' : ''}`}
                       >
-                        <span className="team-check" aria-hidden="true">
-                          {ids.includes(service.id) ? (
-                            <Check size={14} />
-                          ) : null}
-                        </span>
+                        <input
+                          type="checkbox"
+                          checked={ids.includes(service.id)}
+                          disabled={busy}
+                          onChange={() =>
+                            setIds((current) =>
+                              current.includes(service.id)
+                                ? current.filter((id) => id !== service.id)
+                                : [...current, service.id],
+                            )
+                          }
+                        />
                         <span>
                           <strong>{service.name}</strong>
                           <small>
@@ -215,7 +213,7 @@ export function ProfessionalEditor({
                             )}
                           </small>
                         </span>
-                      </button>
+                      </label>
                     ))}
                 </div>
                 {!services.some((service) =>
@@ -248,7 +246,7 @@ export function ProfessionalEditor({
               </p>
             ) : null}
           </div>
-          <footer>
+          <footer className="modal-footer">
             <button
               type="button"
               className="btn"

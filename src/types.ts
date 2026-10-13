@@ -49,6 +49,7 @@ export type CalendarEvent = {
   color?: string
   textColor?: string
   status: 'confirmed' | 'pending' | 'cancelled'
+  attendanceStatus?:string
   confirmationStatus?: AppointmentConfirmationStatus
   confirmationSentAt?: string | null
   confirmationRespondedAt?: string | null

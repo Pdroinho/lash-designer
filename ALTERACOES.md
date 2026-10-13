@@ -1,3 +1,28 @@
+﻿# 5.13.0 — Luma Integrada, Gestão de Presença, Ações Operacionais e Créditos Appmax
+
+- **Luma com Ferramentas Operacionais e Aprovação Humana (`server/lumaOperations.ts` e `server/routes/adminLumaOperationsRoutes.ts`)**:
+  - Ações operacionais preparadas com proposta atômica, expiração e confirmação explícita (`assistant_operation_actions`): registro de presença real em agendamentos (`ATTENDED`, `NO_SHOW`), lançamentos e correções financeiras com controle de versão/concorrência, metas do estúdio, abertura e respostas a chamados de suporte, e preferências da assistente (`assistant_preferences`).
+  - Resumos de agenda e rotina de até 93 dias com paginação e fuso horário do estúdio (`lumaCalendar`).
+  - Lembretes pessoais no WhatsApp da administradora via Evolution API (`assistant_reminders`) com worker dedicado (`server/lumaReminderRuntime.ts`), respeitando fuso horário e evitando reenvio em incertezas.
+  - Isolamento estrito por estúdio (`tenant_id`) e usuária (`user_id`).
+- **Recarga de Créditos da Luma via Appmax (`server/lumaAppmaxCredits.ts`)**:
+  - Compra de pacotes extras de créditos através do checkout Appmax (25 créditos por R$ 5,00, 100 créditos por R$ 12,90, 250 créditos por R$ 24,90).
+  - Tabela `assistant_appmax_orders` vinculada a `assistant_credit_orders`.
+  - Reconciliação atômica via webhook e fallback para pedidos legados.
+- **Refinamento de Equipe e Exclusão Segura (Migração 47)**:
+  - Exclusão lógica de profissionais (`removed_at` em `professionals`): libera a vaga da equipe mantendo o histórico de atendimentos íntegro.
+  - Correção de telefone de convite pendente e contas STAFF com invalidação de sessões e desafios MFA.
+  - Proteção da administradora contra exclusão pelo fluxo de equipe.
+- **Migração 46 (`server/lumaOperationsSchema.ts`)**:
+  - Coluna `credit_source` em `assistant_usage`.
+  - Colunas `attendance_status`, `attendance_recorded_at`, `attendance_recorded_by` em `appointments`.
+  - Tabelas `assistant_operation_actions`, `assistant_preferences`, `assistant_reminders`, `assistant_appmax_orders`.
+- **Suíte de Testes e Auditorias Integradas**:
+  - 28 novos testes unitários/integrados (`server/lumaOperations.test.ts`, `server/lumaAppmaxCredits.test.ts`), totalizando 209 testes na suíte.
+  - Script de validação de interface `npm run test:luma-integrated-ui` (`scripts/check-luma-integrated-ui.mjs`).
+
+---
+
 # 5.12.14 — Equipe Independente e Central de Suporte Simplificada
 
 - **Módulo de Equipe Desacoplado (`src/features/team/`)**:
@@ -32,7 +57,7 @@
 
 ---
 
-﻿# 5.12.12 — Planos por Equipe com Appmax e Sistema de Indicações com Governança de Estorno
+# 5.12.12 — Planos por Equipe com Appmax e Sistema de Indicações com Governança de Estorno
 
 - **Planos por Equipe Integrados**: Implementação completa dos planos `TEAM_3` (R$ 74,90), `TEAM_6` (R$ 99,90) e `TEAM_15` (R$ 149,00).
 - **Checkout Appmax em Produção**:

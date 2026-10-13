@@ -6,8 +6,9 @@ export type Professional = {
   bookable: boolean
   userId: string | null
   accessRole: string | null
+  accessPhone?: string | null
   accessDisabledAt: string | null
-  pendingInvitation: { email: string; expiresAt: string } | null
+  pendingInvitation: { phone?: string; email: string; expiresAt: string } | null
   serviceIds: string[]
   hours: Hours[]
 }

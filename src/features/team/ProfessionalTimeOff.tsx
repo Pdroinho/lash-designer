@@ -164,6 +164,7 @@ export function ProfessionalTimeOff({
         <label className="team-field">
           Motivo (opcional)
           <input
+            className="input"
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             placeholder="Ex.: férias"

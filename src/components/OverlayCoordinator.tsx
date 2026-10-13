@@ -81,6 +81,7 @@ export function OverlayCoordinator() {
       if (!panel) return
 
       if (event.key === 'Escape') {
+        if (event.target instanceof Element && event.target.closest('.ld-select-menu, [data-inline-popover]')) return
         const close = panel.querySelector<HTMLButtonElement>('[data-modal-close], .modal-close, button[aria-label^="Fechar"]')
         if (close && !close.disabled) {
           event.preventDefault()

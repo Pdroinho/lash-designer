@@ -1,3 +1,5 @@
+import { X } from '../../components/Icons'
+import { Switch } from '../../components/SharedUi'
 import { ProductSelect } from '../../components/ProductSelect'
 import { clock, weekdays, type Hours } from './teamTypes'
 export function TeamTime({
@@ -51,26 +53,23 @@ export function TeamHours({
         Use o horário do estúdio ou escolha uma rotina diferente para esta
         profissional. As folgas são cadastradas separadamente.
       </p>
-      <div className="team-choice-row">
-        <button
-          type="button"
-          aria-pressed={!custom}
+      <div className="team-hours-mode">
+        <Switch
+          label="Personalizar horários"
+          ariaLabel="Personalizar horários"
+          checked={custom}
           disabled={disabled}
-          onClick={() => onCustom(false)}
-        >
-          Horário do estúdio<span>Segue as configurações gerais</span>
-        </button>
-        <button
-          type="button"
-          aria-pressed={custom}
-          disabled={disabled}
-          onClick={() => {
-            if (!hours.length) onChange(inherited.map((row) => ({ ...row })))
-            onCustom(true)
+          onChange={(value) => {
+            if (value && !hours.length)
+              onChange(inherited.map((row) => ({ ...row })))
+            onCustom(value)
           }}
-        >
-          Horário personalizado<span>Escolha os dias e períodos</span>
-        </button>
+        />
+        <small className="form-help">
+          {custom
+            ? 'Escolha os dias e períodos desta profissional.'
+            : 'Esta profissional segue o horário do estúdio.'}
+        </small>
       </div>
       {!custom && !inherited.length ? (
         <p className="team-notice">
@@ -88,31 +87,26 @@ export function TeamHours({
             <div className="team-day" key={day}>
               <div className="team-day-heading">
                 {custom ? (
-                  <button
-                    type="button"
-                    className="team-day-toggle"
-                    role="switch"
-                    aria-checked={rows.length > 0}
-                    aria-label={`Atender ${weekdays[day]}`}
+                  <Switch
+                    checked={rows.length > 0}
+                    ariaLabel={`Atender ${weekdays[day]}`}
+                    label={weekdays[day]}
                     disabled={disabled}
-                    onClick={() =>
+                    onChange={(checked) =>
                       onChange(
-                        rows.length
-                          ? hours.filter((row) => row.weekday !== day)
-                          : [
+                        checked
+                          ? [
                               ...hours,
                               {
                                 weekday: day,
                                 startMinute: 540,
                                 endMinute: 1080,
                               },
-                            ],
+                            ]
+                          : hours.filter((row) => row.weekday !== day),
                       )
                     }
-                  >
-                    <span className="team-switch" aria-hidden="true" />
-                    {weekdays[day]}
-                  </button>
+                  />
                 ) : (
                   <strong>{weekdays[day]}</strong>
                 )}
@@ -123,39 +117,44 @@ export function TeamHours({
                   <div className="team-period" key={row.index}>
                     {custom ? (
                       <>
-                        <TeamTime
-                          label={`Início ${weekdays[day]} período ${n + 1}`}
-                          value={row.startMinute}
-                          disabled={disabled}
-                          onChange={(value) =>
-                            onChange(
-                              hours.map((h, index) =>
-                                index === row.index
-                                  ? { ...h, startMinute: value }
-                                  : h,
-                              ),
-                            )
-                          }
-                        />
-                        <span>até</span>
-                        <TeamTime
-                          end
-                          label={`Fim ${weekdays[day]} período ${n + 1}`}
-                          value={row.endMinute}
-                          disabled={disabled}
-                          onChange={(value) =>
-                            onChange(
-                              hours.map((h, index) =>
-                                index === row.index
-                                  ? { ...h, endMinute: value }
-                                  : h,
-                              ),
-                            )
-                          }
-                        />
+                        <div className="team-hour-field">
+                          <span className="label">Das</span>
+                          <TeamTime
+                            label={`Início ${weekdays[day]} período ${n + 1}`}
+                            value={row.startMinute}
+                            disabled={disabled}
+                            onChange={(value) =>
+                              onChange(
+                                hours.map((h, index) =>
+                                  index === row.index
+                                    ? { ...h, startMinute: value }
+                                    : h,
+                                ),
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="team-hour-field">
+                          <span className="label">Até</span>
+                          <TeamTime
+                            end
+                            label={`Fim ${weekdays[day]} período ${n + 1}`}
+                            value={row.endMinute}
+                            disabled={disabled}
+                            onChange={(value) =>
+                              onChange(
+                                hours.map((h, index) =>
+                                  index === row.index
+                                    ? { ...h, endMinute: value }
+                                    : h,
+                                ),
+                              )
+                            }
+                          />
+                        </div>
                         <button
                           type="button"
-                          className="btn btn-ghost team-remove"
+                          className="icon-btn team-remove"
                           aria-label={`Remover período ${n + 1} ${weekdays[day]}`}
                           disabled={disabled}
                           onClick={() =>
@@ -164,7 +163,7 @@ export function TeamHours({
                             )
                           }
                         >
-                          ×
+                          <X size={16} />
                         </button>
                       </>
                     ) : (
@@ -180,7 +179,7 @@ export function TeamHours({
                 {custom && rows.length > 0 && rows.length < 4 ? (
                   <button
                     type="button"
-                    className="team-text-button"
+                    className="btn btn-ghost team-text-button"
                     disabled={disabled}
                     onClick={() => {
                       const previous = rows.at(-1)!

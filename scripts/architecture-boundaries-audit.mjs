@@ -153,7 +153,7 @@ const checks = [
     'createWhatsappWorkerRuntime({', "app.use('/api/public', createPublicClientAccessRouter({",
   ])],
   ['workflows continuam compartilhando os runtimes originais', serverSource.includes('appointmentAutomationBridge.current = appointments') &&
-    serverSource.includes('managedRuntimes: [...(appmaxWebhook ? [appmaxWebhook] : []), domains, appointments, whatsappWorkerRuntime]') &&
+    serverSource.includes('managedRuntimes: [...(appmaxWebhook ? [appmaxWebhook] : []), createLumaReminderRuntime(db, whatsapp.sendWhatsappTextForTenant), domains, appointments, whatsappWorkerRuntime]') &&
     domainVerificationRuntimeSource.includes('const verifyPendingDomains = async () =>') &&
     whatsappWorkerRuntimeSource.includes('const processMediaQueue = async () =>') &&
     appointmentAutomationRuntimeSource.includes('const processQueue = async () =>')],

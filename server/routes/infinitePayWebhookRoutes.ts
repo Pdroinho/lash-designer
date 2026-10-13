@@ -63,6 +63,7 @@ export function createInfinitePayWebhookRouter(options: InfinitePayWebhookRouter
       WHERE order_nsu = ?
     `).get(orderNsu) as { id: string; tenantId: string; userId: string; amountCents: number; credits: number; status: string } | undefined
 
+    if (creditOrder && db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='assistant_appmax_orders'").get() && db.prepare('SELECT 1 FROM assistant_appmax_orders WHERE id=?').get(creditOrder.id)) return res.status(400).json({success:false,message:'Este pedido pertence ao checkout Appmax.'})
     if (creditOrder) {
       if (creditOrder.amountCents !== amount) {
         logInfinitePayWebhookEvent({ orderNsu, eventHash, outcome: 'REJECTED', errorCode: 'AMOUNT_MISMATCH' })

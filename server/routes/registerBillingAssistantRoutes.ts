@@ -1,3 +1,5 @@
+import { createAdminLumaOperationsRouter } from './adminLumaOperationsRoutes.js'
+import type { createLumaAppmaxCredits } from '../lumaAppmaxCredits.js'
 import type Database from 'better-sqlite3'
 import type express from 'express'
 import { requireActiveSubscription } from '../auth.js'
@@ -34,6 +36,7 @@ type BillingAssistantRouteOptions = {
   evolutionWebhookSecret?: string
   appmaxBilling: ReturnType<typeof createAppmaxBillingService> | null
   appmaxWebhook: ReturnType<typeof createAppmaxWebhookRuntime> | null
+  lumaAppmaxCredits?: ReturnType<typeof createLumaAppmaxCredits> | null
   appmaxEnabled: boolean
   production: boolean
 }
@@ -52,7 +55,8 @@ export function registerBillingAssistantRoutes(app: express.Express, options: Bi
     createInfinitePayLink: infinitePay.createInfinitePayLink,
   }))
 
-  app.use('/api/admin', createAdminLumaBillingRouter({ db, createInfinitePayLink: infinitePay.createInfinitePayLink }))
+  app.use('/api/admin/assistant/credits', requireActiveSubscription)
+  app.use('/api/admin', createAdminLumaBillingRouter({ db, createInfinitePayLink: infinitePay.createInfinitePayLink, appmaxCredits:options.lumaAppmaxCredits, appmaxEnabled:true }))
   app.use('/api/admin', createAdminAppmaxRouter(db, appmaxBilling, appmaxEnabled, production))
   app.use('/api/webhooks', createAppmaxWebhookRouter(appmaxWebhook))
 
@@ -83,10 +87,12 @@ export function registerBillingAssistantRoutes(app: express.Express, options: Bi
     generateBrandSetupSuggestions,
   }))
 
+  app.use('/api/admin', createAdminLumaOperationsRouter(db, limiters.lumaAssistantLimiter))
   app.use('/api/admin', createAdminLumaAssistantRouter({
     db,
     lumaAssistantLimiter: limiters.lumaAssistantLimiter,
     assistantEnabled,
+    creditCheckoutAvailable:Boolean(assistantEnabled && assistantProvider.apiKey && options.lumaAppmaxCredits),
     assistantProvider,
     generateAssistantAnswer,
     confirmLumaAction,

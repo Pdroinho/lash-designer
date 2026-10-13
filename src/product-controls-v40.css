@@ -35,8 +35,16 @@
 }
 
 .ld-select-trigger:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--ld-color-accent) 36%, var(--ld-color-line-strong));
-  background: color-mix(in srgb, var(--ld-color-raised) 90%, var(--ld-color-soft));
+  border-color: color-mix(
+    in srgb,
+    var(--ld-color-accent) 36%,
+    var(--ld-color-line-strong)
+  );
+  background: color-mix(
+    in srgb,
+    var(--ld-color-raised) 90%,
+    var(--ld-color-soft)
+  );
 }
 
 .ld-select-trigger:focus-visible,
@@ -53,7 +61,7 @@
   cursor: not-allowed;
   color: var(--ld-color-ink-faint);
   background: var(--ld-color-soft);
-  opacity: .72;
+  opacity: 0.72;
 }
 
 .ld-select-value {
@@ -71,7 +79,9 @@
   white-space: nowrap;
 }
 
-.ld-select-value.is-placeholder { color: var(--ld-color-ink-faint); }
+.ld-select-value.is-placeholder {
+  color: var(--ld-color-ink-faint);
+}
 
 .ld-select-leading {
   flex: 0 0 auto;
@@ -87,7 +97,9 @@
   transition: transform var(--ld-motion-base) var(--ld-ease-standard);
 }
 
-.ld-select-trigger.is-open .ld-select-chevron { transform: rotate(180deg); }
+.ld-select-trigger.is-open .ld-select-chevron {
+  transform: rotate(180deg);
+}
 
 .ld-select-menu {
   position: fixed;
@@ -103,18 +115,29 @@
   animation: ld-select-in var(--ld-motion-fast) var(--ld-ease-emphasized);
 }
 
-.ld-select-menu.is-top { transform-origin: bottom center; }
+.ld-select-menu.is-top {
+  transform-origin: bottom center;
+}
 
 .ld-select-menu-scroll {
   max-height: inherit;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--ld-color-ink-faint) 44%, transparent) transparent;
+  scrollbar-color: color-mix(
+      in srgb,
+      var(--ld-color-ink-faint) 44%,
+      transparent
+    )
+    transparent;
 }
 
-.ld-select-menu-scroll::-webkit-scrollbar { width: 7px; }
-.ld-select-menu-scroll::-webkit-scrollbar-track { background: transparent; }
+.ld-select-menu-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+.ld-select-menu-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
 .ld-select-menu-scroll::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: var(--ld-radius-pill);
@@ -153,7 +176,7 @@
 .ld-select-option:disabled {
   cursor: not-allowed;
   color: var(--ld-color-ink-faint);
-  opacity: .55;
+  opacity: 0.55;
 }
 
 .ld-select-option-copy {
@@ -194,12 +217,91 @@
 }
 
 @keyframes ld-select-in {
-  from { opacity: 0; transform: translateY(-3px) scale(.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ld-select-trigger,
   .ld-select-chevron,
-  .ld-select-menu { transition: none; animation: none; }
+  .ld-select-menu {
+    transition: none;
+    animation: none;
+  }
 }
+
+/* Shared Switch: same control in every product area, including Team. */
+.switch-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ld-space-3);
+  min-height: var(--ld-touch-target);
+  cursor: pointer;
+  color: var(--ld-color-ink-strong);
+  font: 600 var(--ld-type-body-size)/var(--ld-type-body-line) var(--ld-font-ui);
+}
+.switch-field-label {
+  min-width: 0;
+}
+.switch-toggle {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 24px;
+  vertical-align: middle;
+}
+.switch-toggle input[type='checkbox'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.switch-toggle-slider {
+  pointer-events: none;
+  background: var(--ld-color-muted);
+  border-radius: var(--ld-radius-pill);
+  transition: background-color var(--ld-motion-base) var(--ld-ease-standard);
+}
+.switch-toggle-slider::before {
+  background: var(--ld-color-raised);
+  box-shadow: var(--ld-shadow-xs);
+  transition: transform var(--ld-motion-base) var(--ld-ease-standard);
+}
+.switch-toggle input:checked + .switch-toggle-slider {
+  pointer-events: none;
+  background: var(--ld-color-accent);
+}
+.switch-toggle input:focus-visible + .switch-toggle-slider {
+  pointer-events: none;
+  box-shadow: var(--ld-focus-ring);
+}
+.switch-field:has(input:disabled),
+.switch-toggle:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch-toggle-slider,
+  .switch-toggle-slider::before {
+    transition: none;
+  }
+}
+
+/* Shared calendar: used for personal absences, reports and reminders. */
+.ld-date{display:grid;gap:var(--ld-space-2);font-size:var(--ld-type-small-size);font-weight:700;min-width:0}
+.ld-date-trigger{justify-content:flex-start;width:100%;font-weight:500}
+.ld-date-picker{padding:var(--ld-space-3);border:1px solid var(--ld-color-line-soft);border-radius:var(--ld-radius-control);background:var(--ld-color-raised)}
+.ld-date-picker header{display:flex;justify-content:space-between;align-items:center;gap:var(--ld-space-1);font-size:var(--ld-type-small-size)}
+.ld-date-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:var(--ld-space-1);margin-top:var(--ld-space-3);text-align:center}
+.ld-date-grid>span{font-size:var(--ld-type-caption-size);color:var(--ld-color-ink-soft);padding-block:var(--ld-space-1)}
+.ld-date-grid .btn{min-width:0;min-height:var(--ld-control-height);padding-inline:0}

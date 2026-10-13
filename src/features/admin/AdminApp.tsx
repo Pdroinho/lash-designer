@@ -1,3 +1,5 @@
+import { LumaContextAction } from '../../components/LumaContextAction'
+import '../luma/luma-workspace.css'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api'
@@ -86,6 +88,8 @@ function LegalAcceptanceGate({ documents, onAccepted }: { documents: { termsVers
   </main>
 }
 
+type AdminTab='dashboard'|'calendar'|'team'|'services'|'clients'|'finance'|'settings'|'evolution'|'billing'|'assistant'|'referrals'|'support'
+const adminTabs:AdminTab[]=['dashboard','calendar','team','services','clients','finance','settings','evolution','billing','assistant','referrals','support']
 export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; basePath?: string } = {}) {
   const { tenantSlug } = useParams()
   const nav = useNavigate()
@@ -101,14 +105,14 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
     if (typeof window !== 'undefined') return localStorage.getItem('lashdesigner_test_mode') === 'true'
     return false
   })
-  const [tab, setTab] = useState<'dashboard' | 'calendar' | 'services' | 'clients' | 'finance' | 'settings' | 'evolution' | 'billing' | 'assistant' | 'referrals' | 'support' | 'team'>(() => {
+  const [tab, setTab] = useState<AdminTab>(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('lumaCredits') === 'return') return 'assistant'
-    if (new URLSearchParams(window.location.search).get('view') === 'support') return 'support'
-    if (new URLSearchParams(window.location.search).get('view') === 'team') return 'team'
+    const view=new URLSearchParams(window.location.search).get('view') as AdminTab|null
+    if(view&&adminTabs.includes(view))return view
     return 'dashboard'
   })
 
-  useEffect(() => { const view = new URLSearchParams(location.search).get('view'); if (view === 'support' || view === 'team') setTab(view) }, [location.search])
+  useEffect(() => { const view = new URLSearchParams(location.search).get('view'); if (view && adminTabs.includes(view as AdminTab)) setTab(view as AdminTab) }, [location.search])
 
   const [stats, setStats] = useState<AdminStats | null>(null)
   const adminTourSteps = useMemo(() => shellTourSteps('admin', tab), [tab])
@@ -173,7 +177,7 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
         localStorage.removeItem('lashdesigner_pending_luma_credit_order')
         notify(`${result.data.order.credits} créditos da Luma adicionados. Saldo extra: ${result.data.balance}.`, 'success')
       } else {
-        notify('Pagamento recebido. Os créditos serão liberados assim que a InfinitePay confirmar a transação.', 'info')
+        notify('Pagamento recebido. Os créditos serão liberados assim que o provedor confirmar a transação.', 'info')
       }
     })
   }, [authLoading, me])
@@ -252,7 +256,7 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
     setTab(next)
     const params = new URLSearchParams(location.search)
     params.delete('ticket')
-    if (next === 'team' || next === 'support') params.set('view', next)
+    if (next !== 'dashboard') params.set('view', next)
     else params.delete('view')
     nav({ pathname: location.pathname, search: params.toString() })
   }
@@ -261,12 +265,13 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
     <Shell
         title={subscriptionInactive && tab !== 'support' ? 'Assinatura' : ({dashboard: 'Visão Geral', calendar: 'Agenda', services: 'Serviços', team: 'Equipe', clients: 'Clientes', finance: 'Financeiro', settings: 'Configurações', evolution: 'WhatsApp', billing: 'Assinatura', assistant: 'Luma', referrals: 'Indicações', support: 'Suporte'} as const)[tab]}
         subtitle="Seu estúdio"
+        actions={!subscriptionInactive && tab !== 'assistant' ? <LumaContextAction screen={tab}/> : null}
         user={me}
         brand={tenant}
         isTestMode={isTestMode}
         tourKey={`admin-${tab}`}
         tourSteps={adminTourSteps}
-        tourEnabled={!subscriptionInactive && tab !== 'billing' && tab !== 'support'}
+        tourEnabled={!subscriptionInactive}
         autoStartTour={!subscriptionInactive && tab === 'dashboard'}
         mobileNav={subscriptionInactive ? undefined : [
           { key: 'dashboard', label: 'Início', icon: <LayoutDashboard size={21}/>, active: tab === 'dashboard', onClick: () => goTab('dashboard') },
@@ -347,7 +352,7 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
                   }
                   loadStats()
                 }} /> : null}
-                {tab !== 'assistant' && tab !== 'support' && tab !== 'billing' && tab !== 'team' ? <LumaChatLauncher /> : null}
+                {tab !== 'assistant' ? <LumaChatLauncher floating={!['team','support','billing'].includes(tab)} /> : null}
               </>
           )}
         </Suspense>

@@ -16,7 +16,7 @@ assert(overlayCss.includes('.ld-overlay') && overlayCss.includes('z-index: 1000'
 assert(!tour.includes("document.body.style.overflow = 'hidden'") && !coordinator.includes("document.body.style.overflow = 'hidden'"), 'componentes não manipulam overflow inline')
 assert(tour.includes('hasBlockingOverlay') && tour.includes('lashdesigner:overlay-open'), 'Product Tour encerra quando overlay bloqueante aparece')
 assert(tour.includes("['v3', 'v2', 'v1']") || tour.includes('v3'), 'Product Tour mantém versão persistente de conclusão')
-assert(adminApp.includes("tourEnabled={!subscriptionInactive && tab !== 'billing' && tab !== 'support'}") && adminApp.includes("if (subscriptionInactive && tab !== 'billing' && tab !== 'support') setTab('billing')"), 'billing e Product Tour obedecem ao estado da assinatura')
+assert(adminApp.includes("tourEnabled={!subscriptionInactive}") && adminApp.includes("if (subscriptionInactive && tab !== 'billing' && tab !== 'support') setTab('billing')"), 'billing e Product Tour obedecem ao estado da assinatura')
 assert(!source.includes('wa.me/') && landing.includes('<LandingCheckout') && landing.includes("onClick={() => buyTeam("), 'CTA comercial inicia checkout direto')
 assert(setup.includes("'ASSISTED' | 'MANUAL'") && setup.includes('/api/admin/onboarding/complete'), 'setup possui caminhos assistido e manual')
 assert(shell.includes("localStorage.getItem('lashdesigner:sidebar-collapsed')") && shell.includes("localStorage.setItem('lashdesigner:sidebar-collapsed'"), 'sidebar recolhível persiste preferência')

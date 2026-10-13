@@ -22,7 +22,7 @@ assert(html.includes('fonts.googleapis.com') && html.includes('fonts.gstatic.com
 assert(overlay.includes('.ld-overlay') && overlay.includes('position: fixed') && overlay.includes('inset: 0'), 'overlay 2.4 cobre o viewport por portal/fixed inset')
 assert(modalRoot.includes('createPortal') && modalRoot.includes('document.body') && modalRoot.includes('data-blocking-overlay="true"'), 'modais transacionais são portalled diretamente para body')
 assert(tour.includes('createPortal') && tour.includes('document.body') && tour.includes('.ld-overlay'), 'tour vive no body e observa overlays transacionais')
-assert(tour.includes('enabled = true') && adminApp.includes("tourEnabled={!subscriptionInactive && tab !== 'billing' && tab !== 'support'}"), 'tour pode ser desabilitado pelo estado do produto')
+assert(tour.includes('enabled = true') && adminApp.includes("tourEnabled={!subscriptionInactive}"), 'tour pode ser desabilitado pelo estado do produto')
 assert(adminApp.includes("if (subscriptionInactive && tab !== 'billing' && tab !== 'support') setTab('billing')") && adminApp.includes('autoStartTour={!subscriptionInactive'), 'tenant sem assinatura permite cobrança e suporte, sem tour automático')
 assert(overlay.includes('100dvh') && overlay.includes('max-height: calc(100dvh') && overlay.includes('overflow-y: auto') && overlay.includes('@media'), 'diálogos possuem viewport dinâmico, corpo rolável e contrato móvel')
 assert(foundation.includes('--ld-scroll-lock-gap') && !foundation.includes('scrollbar-gutter: stable'), 'compensação de scrollbar 2.4 é centralizada sem gutter duplicado')

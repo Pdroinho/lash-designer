@@ -127,7 +127,7 @@ export function SupportComposer({
         <>
           <label>
             Em poucas palavras, o que você precisa?
-            <input
+            <input className="input"
               disabled={busy || fileBusy}
               required
               minLength={5}
@@ -139,7 +139,7 @@ export function SupportComposer({
           </label>
           <button
             type="button"
-            className="support-details-toggle"
+            className="btn btn-ghost support-details-toggle"
             aria-expanded={more}
             onClick={() => setMore(!more)}
           >
@@ -208,7 +208,7 @@ export function SupportComposer({
           : draft.internal
             ? 'Nota para a equipe'
             : 'Sua mensagem'}
-        <textarea
+        <textarea className="input"
           aria-label={
             create
               ? 'Descreva o problema'

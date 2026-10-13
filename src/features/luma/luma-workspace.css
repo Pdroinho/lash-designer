@@ -1,0 +1,264 @@
+/* Reuse product cards, tabs, controls and dialogs. This layer arranges the work area. */
+.luma-workspace {
+  max-width: 1200px;
+  margin-inline: auto;
+  display: grid;
+  gap: var(--ld-space-6);
+  min-width: 0;
+}
+.luma-workspace > .ld-agenda-tabs {
+  max-width: 100%;
+}
+.luma-work-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ld-space-5);
+  margin-bottom: var(--ld-space-5);
+}
+.luma-work-heading h2,
+.luma-work-form h2 {
+  font-size: var(--ld-type-section-size);
+  margin: 0 0 var(--ld-space-2);
+}
+.luma-quick-periods,
+.luma-support-actions {
+  display: flex;
+  gap: var(--ld-space-2);
+  flex-wrap: wrap;
+}
+.luma-report-filter {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: start;
+  gap: var(--ld-space-4);
+  padding: var(--ld-space-5);
+  margin: 0 0 var(--ld-space-5);
+}
+.luma-report-filter > .btn {
+  align-self: start;
+  margin-top: 28px;
+}
+.luma-report-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ld-space-4);
+  margin-bottom: var(--ld-space-5);
+}
+.luma-report-metrics article {
+  padding: var(--ld-space-5);
+  margin: 0;
+  display: grid;
+  gap: var(--ld-space-2);
+}
+.luma-report-metrics strong {
+  font: 760 var(--ld-type-page-size)/1 var(--ld-font-ui);
+}
+.luma-report-metrics span {
+  font-size: var(--ld-type-small-size);
+  color: var(--ld-color-ink-soft);
+  line-height: var(--ld-type-small-line);
+}
+.luma-appointments,
+.luma-reminder-list {
+  display: grid;
+  gap: var(--ld-space-3);
+}
+.luma-appointment,
+.luma-reminder {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ld-space-5);
+  padding: var(--ld-space-5);
+  margin: 0;
+  min-width: 0;
+}
+.luma-appointment > div:first-child,
+.luma-reminder > div:first-child {
+  min-width: 0;
+}
+.luma-appointment time {
+  font-size: var(--ld-type-small-size);
+  color: var(--ld-color-accent);
+  font-weight: 700;
+}
+.luma-appointment h3,
+.luma-reminder h3 {
+  font-size: var(--ld-type-subsection-size);
+  margin: var(--ld-space-2) 0;
+  overflow-wrap: anywhere;
+}
+.luma-appointment p,
+.luma-reminder p {
+  font-size: var(--ld-type-small-size);
+  color: var(--ld-color-ink-soft);
+  line-height: var(--ld-type-small-line);
+}
+.luma-appointment small {
+  display: block;
+  margin-top: var(--ld-space-2);
+}
+.luma-attendance-actions {
+  display: flex;
+  gap: var(--ld-space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.luma-work-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ld-space-3);
+  margin-top: var(--ld-space-5);
+  font-size: var(--ld-type-small-size);
+}
+.luma-work-form {
+  max-width: var(--ld-content-form-width);
+  padding: var(--ld-space-6);
+  display: grid;
+  gap: var(--ld-space-4);
+  margin: 0;
+}
+.luma-work-form > .label {
+  display: grid;
+  gap: var(--ld-space-2);
+}
+.luma-work-form textarea.input {
+  min-height: 120px;
+  line-height: var(--ld-type-body-line);
+  resize: vertical;
+}
+.luma-work-form > .btn {
+  justify-self: start;
+}
+.luma-work-empty {
+  padding: var(--ld-space-8);
+  text-align: center;
+  margin: 0;
+}
+.luma-operation-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ld-space-3);
+}
+.luma-operation-description {
+  white-space: pre-wrap;
+  font-size: var(--ld-type-body-size);
+  line-height: var(--ld-type-body-line);
+  overflow-wrap: anywhere;
+}
+.luma-credit-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ld-space-4);
+  padding: var(--ld-space-5);
+  margin: 0;
+  font-size: var(--ld-type-body-size);
+}
+.luma-context-action {
+  gap: var(--ld-space-2);
+}
+.luma-context-action svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+.has-blocking-overlay .luma34-launcher {
+  visibility: hidden;
+  pointer-events: none;
+}
+@media (max-width: 800px) {
+  .luma-report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .luma-work-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .luma-appointment,
+  .luma-reminder {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .luma-attendance-actions {
+    justify-content: flex-start;
+  }
+  .luma-context-action strong {
+    display: none;
+  }
+}
+@media (max-width: 650px) {
+  .luma-workspace {
+    gap: var(--ld-space-5);
+  }
+  .luma-workspace > .ld-agenda-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: var(--ld-space-2);
+  }
+  .luma-workspace > .ld-agenda-tabs > .ld-agenda-tab {
+    min-height: var(--ld-touch-target);
+    font-size: var(--ld-type-small-size);
+  }
+  .luma-report-filter {
+    grid-template-columns: 1fr 1fr;
+    padding: var(--ld-space-4);
+  }
+  .luma-report-filter > .btn {
+    grid-column: 1/-1;
+    margin-top: 0;
+  }
+  .luma-report-metrics {
+    gap: var(--ld-space-3);
+  }
+  .luma-report-metrics article {
+    padding: var(--ld-space-4);
+  }
+  .luma-work-form {
+    padding: var(--ld-space-5);
+  }
+  .luma-work-form > .btn,
+  .luma-quick-periods > .btn {
+    width: 100%;
+  }
+  .luma-quick-periods {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .luma-attendance-actions > .btn {
+    flex: 1;
+  }
+  .luma-operation-footer > .btn {
+    flex: 1;
+    min-width: 0;
+  }
+  .luma-credit-status {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .luma-credit-status > .btn {
+    width: 100%;
+  }
+  .luma-report-filter .ld-date-picker {
+    grid-column: 1/-1;
+  }
+  .luma-support-actions > .btn {
+    flex: 1;
+  }
+}
+
+.luma-context-action .luma-brand-mark {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+@media (max-width: 650px) {
+  .luma-report-filter {
+    grid-template-columns: 1fr;
+  }
+}
+
+.luma-credit-area{display:grid;gap:var(--ld-space-3)}.luma-credit-area>.btn{justify-self:start}.luma-credit-history{padding:var(--ld-space-5);margin:0}.luma-credit-history h3{font-size:var(--ld-type-subsection-size);margin:0 0 var(--ld-space-4)}.luma-credit-history article{display:flex;align-items:center;justify-content:space-between;gap:var(--ld-space-4);padding-block:var(--ld-space-3);border-top:1px solid var(--ld-color-line-soft);font-size:var(--ld-type-small-size)}.luma-credit-history small{display:block;margin-top:var(--ld-space-1);color:var(--ld-color-ink-soft)}

@@ -1,5 +1,2 @@
-import { LumaConversation } from './LumaConversation'
-
-export function BusinessAssistant() {
-  return <section className="luma34-page"><LumaConversation variant="page" /></section>
-}
+import { LumaWorkspace } from '../features/luma/LumaWorkspace'
+export function BusinessAssistant() { return <LumaWorkspace /> }

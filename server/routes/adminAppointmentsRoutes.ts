@@ -48,12 +48,13 @@ type AdminAppointmentsRouterOptions = {
   confirmationEvent: (input: { tenantId: string; appointmentId: string; eventType: string; channel?: string }) => void
 }
 
-const appointmentFields = (staffEnabled: boolean) => `
+const appointmentFields = (staffEnabled: boolean, attendanceEnabled = false) => `
   SELECT a.id,
          a.service_id as serviceId,
          a.starts_at as startsAt,
          a.ends_at as endsAt,
          a.status,
+         ${attendanceEnabled ? 'a.attendance_status as attendanceStatus,' : ''}
          a.confirmation_status as confirmationStatus,
          a.confirmation_sent_at as confirmationSentAt,
          a.confirmation_reminder_sent_at as confirmationReminderSentAt,
@@ -85,6 +86,7 @@ export function createAdminAppointmentsRouter(options: AdminAppointmentsRouterOp
     confirmationEvent,
   } = options
   const router = Router()
+  const attendanceEnabled = (db.prepare('PRAGMA table_info(appointments)').all() as Array<{name:string}>).some(row=>row.name==='attendance_status')
 
   router.get('/appointments', requireRole('ADMIN'), (req, res, next) => {
     try {
@@ -111,7 +113,7 @@ export function createAdminAppointmentsRouter(options: AdminAppointmentsRouterOp
         params.push(query.end)
       }
       const appointments = db.prepare(`
-        ${appointmentFields(staffEnabled)}
+        ${appointmentFields(staffEnabled,attendanceEnabled)}
         WHERE ${where.join(' AND ')}
         ORDER BY a.starts_at ASC
         LIMIT ${query.limit ?? 800}
@@ -215,7 +217,7 @@ export function createAdminAppointmentsRouter(options: AdminAppointmentsRouterOp
       }
 
       scheduleAppointmentAutomationJobs(tenantId, appointmentId)
-      const appointment = db.prepare(`${appointmentFields(staffEnabled)} WHERE a.id = ? AND a.tenant_id = ?`).get(appointmentId, tenantId)
+      const appointment = db.prepare(`${appointmentFields(staffEnabled,attendanceEnabled)} WHERE a.id = ? AND a.tenant_id = ?`).get(appointmentId, tenantId)
       res.json({ appointment })
     } catch (err) {
       next(err)
@@ -235,7 +237,7 @@ export function createAdminAppointmentsRouter(options: AdminAppointmentsRouterOp
       if (body.status === 'CANCELLED') cancelAppointmentJobs(tenantId, id)
       else scheduleAppointmentAutomationJobs(tenantId, id)
 
-      const appointment = db.prepare(`${appointmentFields(staffEnabled)} WHERE a.id = ? AND a.tenant_id = ?`).get(id, tenantId)
+      const appointment = db.prepare(`${appointmentFields(staffEnabled,attendanceEnabled)} WHERE a.id = ? AND a.tenant_id = ?`).get(id, tenantId)
       res.json({ appointment })
     } catch (err) {
       next(err)

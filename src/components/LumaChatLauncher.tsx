@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { LumaConversation } from './LumaConversation'
 import { LumaMark } from './LumaBrand'
 
-export function LumaChatLauncher() {
+export function LumaChatLauncher({ floating = true }: { floating?: boolean } = {}) {
   const [open, setOpen] = useState(false)
   const [initialPrompt, setInitialPrompt] = useState('')
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -32,10 +32,10 @@ export function LumaChatLauncher() {
 
   return (
     <>
-      <button ref={triggerRef} type="button" className="luma34-launcher" aria-label="Conversar com a Luma" aria-expanded={open} onClick={() => setOpen(true)}>
+      {floating ? <button ref={triggerRef} type="button" className="luma34-launcher" aria-label="Conversar com a Luma" aria-expanded={open} onClick={() => setOpen(true)}>
         <LumaMark className="luma34-launcher-mark" />
         <strong>Perguntar à Luma</strong>
-      </button>
+      </button> : null}
       {open && typeof document !== 'undefined'
         ? createPortal(
             <div className="luma34-layer" data-blocking-overlay="true" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false) }}>

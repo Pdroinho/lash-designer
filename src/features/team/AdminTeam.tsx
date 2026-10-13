@@ -103,6 +103,12 @@ export function AdminTeam({
     )
     refresh()
   }
+  async function remove(person:Professional) {
+    if(!(await confirmAction({title:'Remover da equipe?',message:`${person.name} será removida da lista, perderá o acesso ao painel e deixará de ocupar uma vaga. O histórico dos atendimentos será preservado. Reagende ou cancele os atendimentos futuros primeiro.`,confirmLabel:'Remover da equipe',danger:true})))return
+    setBusy(true);setError('');const res=await api(`/api/admin/professionals/${person.id}`,{method:'DELETE'});setBusy(false)
+    if(!res.ok){setError(res.error.message);return}
+    setSelectedId(null);notify('Profissional removida da equipe.','success');refresh()
+  }
   function open(
     person: Professional,
     tab: 'profile' | 'access' | 'off' = 'profile',
@@ -116,7 +122,9 @@ export function AdminTeam({
       <header className="team-heading">
         <div>
           <span className="team-eyebrow">EQUIPE DO ESTÚDIO</span>
-          <h2 id="team-title">Cada profissional, uma agenda organizada.</h2>
+          <h2 className="ld-ds-page-title" id="team-title">
+            Cada profissional, uma agenda organizada.
+          </h2>
           <p>
             Escolha quem atende, quais serviços realiza e quando está
             disponível.
@@ -147,12 +155,12 @@ export function AdminTeam({
         </div>
       ) : null}
       {loading ? (
-        <div className="team-empty" role="status">
+        <div className="card team-empty" role="status">
           Carregando sua equipe…
         </div>
       ) : data ? (
         <>
-          <div className="team-plan">
+          <div className="card team-plan">
             <Users size={22} />
             <div>
               <strong>
@@ -166,7 +174,7 @@ export function AdminTeam({
             </div>
             <button
               type="button"
-              className="team-text-button"
+              className="btn btn-ghost team-text-button"
               onClick={onBilling}
             >
               Ver meu plano
@@ -187,13 +195,17 @@ export function AdminTeam({
           ) : null}
           <div className="team-toolbar">
             <input
+              className="input"
               type="search"
               aria-label="Buscar profissional"
               placeholder="Buscar profissional pelo nome"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <div className="team-filters" aria-label="Filtrar profissionais">
+            <div
+              className="ld-agenda-tabs team-filters"
+              aria-label="Filtrar profissionais"
+            >
               {[
                 ['all', 'Todas'],
                 ['active', 'Ativas'],
@@ -202,6 +214,7 @@ export function AdminTeam({
                 <button
                   type="button"
                   key={value}
+                  className={`ld-agenda-tab ${filter === value ? 'is-active' : ''}`}
                   aria-pressed={filter === value}
                   onClick={() => setFilter(value)}
                 >
@@ -211,7 +224,7 @@ export function AdminTeam({
             </div>
           </div>
           {!shown.length ? (
-            <div className="team-empty">
+            <div className="card team-empty">
               <Users size={32} />
               <h3>
                 {data.professionals.length
@@ -227,7 +240,7 @@ export function AdminTeam({
           ) : (
             <div className="team-grid">
               {shown.map((person) => (
-                <article className="team-person" key={person.id}>
+                <article className="card team-person" key={person.id}>
                   <div className="team-person-top">
                     <span className="team-avatar" aria-hidden="true">
                       {person.name
@@ -241,7 +254,7 @@ export function AdminTeam({
                     <div>
                       <h3>{person.name}</h3>
                       <span
-                        className={`team-status ${person.active && person.bookable ? 'active' : ''}`}
+                        className={`status-badge ${person.active && person.bookable ? 'status-success' : 'status-neutral'}`}
                       >
                         {!person.active
                           ? 'Inativa'
@@ -290,7 +303,7 @@ export function AdminTeam({
                     {!person.userId && person.active && person.bookable ? (
                       <button
                         type="button"
-                        className="team-text-button"
+                        className="btn btn-ghost team-text-button"
                         onClick={() => open(person, 'access')}
                       >
                         {person.pendingInvitation
@@ -335,25 +348,27 @@ export function AdminTeam({
             role="dialog"
             aria-modal="true"
             aria-labelledby="team-detail-title"
-            className="team-dialog"
+            className="ld-dialog team-dialog"
           >
-            <header>
+            <header className="cardHeader">
               <div>
                 <span className="team-eyebrow">CONFIGURAR PROFISSIONAL</span>
-                <h2 id="team-detail-title">{selected.name}</h2>
+                <h2 className="cardTitle" id="team-detail-title">
+                  {selected.name}
+                </h2>
               </div>
               <button
                 type="button"
                 aria-label="Fechar configurações"
-                className="btn btn-ghost"
+                className="icon-btn"
                 disabled={busy}
                 onClick={() => setSelectedId(null)}
               >
                 <X size={20} />
               </button>
             </header>
-            <div
-              className="team-tabs"
+            <nav
+              className="ld-agenda-tabs team-tabs"
               aria-label="Configurações da profissional"
             >
               {(
@@ -366,6 +381,7 @@ export function AdminTeam({
                 <button
                   key={value}
                   type="button"
+                  className={`ld-agenda-tab ${panel === value ? 'is-active' : ''}`}
                   aria-pressed={panel === value}
                   disabled={busy}
                   onClick={() => setPanel(value)}
@@ -373,8 +389,8 @@ export function AdminTeam({
                   {label}
                 </button>
               ))}
-            </div>
-            <div className="team-dialog-body">
+            </nav>
+            <div className="cardBody team-dialog-body">
               {panel === 'profile' ? (
                 <>
                   <h3>Serviços e horários</h3>
@@ -417,6 +433,7 @@ export function AdminTeam({
                           ? 'Desativar profissional'
                           : 'Reativar profissional'}
                     </button>
+                    {selected.accessRole!=='ADMIN' ? <button type="button" className="btn" disabled={busy} onClick={()=>void remove(selected)}>Remover da equipe</button> : null}
                   </div>
                 </>
               ) : panel === 'access' ? (
@@ -440,7 +457,7 @@ export function AdminTeam({
                 </p>
               ) : null}
             </div>
-            <footer>
+            <footer className="modal-footer">
               <button
                 type="button"
                 className="btn"

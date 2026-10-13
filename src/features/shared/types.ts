@@ -16,7 +16,7 @@ export type AdminStats = {
 }
 
 export type AdminService = { id: string; name: string; durationMinutes: number; priceCents: number; coverUrl?: string | null }
-export type AdminAppointment = { id: string; serviceId: string; startsAt: string; endsAt: string; status: string; confirmationStatus?: AppointmentConfirmationStatus; confirmationSentAt?: string | null; confirmationReminderSentAt?: string | null; confirmationRespondedAt?: string | null; appointmentReminderSentAt?: string | null; clientEmail: string; clientName: string | null; clientPhone: string | null; serviceName: string; priceCents: number; professionalId?: string | null; professionalName?: string | null }
+export type AdminAppointment = { attendanceStatus?:string; id: string; serviceId: string; startsAt: string; endsAt: string; status: string; confirmationStatus?: AppointmentConfirmationStatus; confirmationSentAt?: string | null; confirmationReminderSentAt?: string | null; confirmationRespondedAt?: string | null; appointmentReminderSentAt?: string | null; clientEmail: string; clientName: string | null; clientPhone: string | null; serviceName: string; priceCents: number; professionalId?: string | null; professionalName?: string | null }
 export type AdminClientRow = { id: string; name: string; phone: string | null; marketingWhatsappOptIn: number | boolean; email: string; totalSpentCents: number; lastVisitAt: string | null }
 export type FinanceMonthSnapshot = { ym: string; serviceEntriesCents: number; manualIncomeCents: number; entriesCents: number; expensesCents: number; balanceCents: number; confirmedAppointments: number }
 export type AdminFinanceData = {
