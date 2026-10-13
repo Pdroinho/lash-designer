@@ -169,11 +169,13 @@ try {
   await page.goto(origin + '/admin?view=support')
   await page
     .locator('.support-center')
-    .getByRole('heading', { name: 'Suporte', exact: true })
+    .getByRole('heading', { name: 'Como podemos ajudar?', exact: true })
     .waitFor()
-  await page.getByRole('button', { name: 'Novo chamado' }).click()
+  await page.getByRole('button', { name: 'Pedir ajuda' }).click()
+  await page.getByRole('button',{name:'Enviar pedido de ajuda',exact:true}).click()
+  await page.getByRole('alert').filter({hasText:'pelo menos 5 caracteres'}).waitFor()
   await page
-    .getByLabel('Assunto', { exact: true })
+    .getByLabel('Em poucas palavras, o que você precisa?', { exact: true })
     .fill('Agendamento com erro no horário')
   await page
     .getByLabel('Descreva o problema')
@@ -189,10 +191,11 @@ try {
       buffer: image,
     })
   await page.getByRole('button', { name: 'captura.webp · remover' }).waitFor()
-  await page.getByRole('button', { name: 'Abrir chamado', exact: true }).click()
+  await page.getByRole('button', { name: 'Enviar pedido de ajuda', exact: true }).click()
   await page
     .getByRole('heading', { name: 'Agendamento com erro no horário' })
     .waitFor()
+  if(process.env.LASH_QA_SCREENSHOT_DIR) await page.screenshot({path:path.join(process.env.LASH_QA_SCREENSHOT_DIR,'support-desktop.png'),fullPage:true})
   const id = Number(new URL(page.url()).searchParams.get('ticket'))
   assert.ok(id)
   assert.equal(
@@ -203,6 +206,7 @@ try {
     db.prepare('SELECT mime_type FROM support_attachments').get().mime_type,
     'image/webp',
   )
+  pass('blank request uses a plain-language inline error, without browser validation popups')
   pass(
     'ADMIN opens real ticket with optimized screenshot through production UI',
   )
@@ -249,7 +253,7 @@ try {
   await page.goto(origin + '/admin?view=support')
   await page
     .locator('.support-center')
-    .getByRole('heading', { name: 'Suporte', exact: true })
+    .getByRole('heading', { name: 'Como podemos ajudar?', exact: true })
     .waitFor()
   const bell = page.getByRole('button', { name: /Abrir notificações/ })
   await bell.click()
@@ -299,13 +303,13 @@ try {
     .waitFor()
   pass('concurrent version conflict preserves draft and allows retry')
   await page.getByRole('button', { name: 'Marcar como resolvido' }).click()
-  await page.getByRole('button', { name: 'Reabrir chamado' }).waitFor()
-  await page.getByRole('button', { name: 'Reabrir chamado' }).click()
+  await page.getByRole('button', { name: 'Reabrir pedido' }).waitFor()
+  await page.getByRole('button', { name: 'Reabrir pedido' }).click()
   await page.getByRole('button', { name: 'Marcar como resolvido' }).waitFor()
   pass('customer resolves and reopens through real backend')
   await page.goto(origin+'/admin?view=support&ticket=999999')
   await page.getByRole('status').filter({hasText:'Não foi possível abrir este chamado'}).waitFor()
-  await page.getByRole('button',{name:'Voltar à lista'}).click()
+  await page.getByRole('button',{name:'Meus pedidos'}).click()
   await page.locator('.support-list').waitFor()
   pass('missing ticket has a clear error and a mobile return to the list')
 
@@ -316,16 +320,16 @@ try {
   await page.goto(origin + '/suporte')
   await page
     .locator('.support-center')
-    .getByRole('heading', { name: 'Suporte', exact: true })
+    .getByRole('heading', { name: 'Como podemos ajudar?', exact: true })
     .waitFor()
-  await page.getByRole('button', { name: 'Novo chamado' }).click()
+  await page.getByRole('button', { name: 'Pedir ajuda' }).click()
   await page
-    .getByLabel('Assunto', { exact: true })
+    .getByLabel('Em poucas palavras, o que você precisa?', { exact: true })
     .fill('Preciso de ajuda com minha agenda')
   await page
     .getByLabel('Descreva o problema')
     .fill('Gostaria de verificar os atendimentos da minha agenda individual.')
-  await page.getByRole('button', { name: 'Abrir chamado', exact: true }).click()
+  await page.getByRole('button', { name: 'Enviar pedido de ajuda', exact: true }).click()
   await page
     .getByRole('heading', { name: 'Preciso de ajuda com minha agenda' })
     .waitFor()
@@ -335,6 +339,7 @@ try {
       .get(users.staff).n,
     1,
   )
+  if(process.env.LASH_QA_SCREENSHOT_DIR) await page.screenshot({path:path.join(process.env.LASH_QA_SCREENSHOT_DIR,'support-mobile.png'),fullPage:true})
   pass('STAFF can create and view own tickets through mobile workspace')
   await page.setViewportSize({ width: 768, height: 1024 })
   assert.ok(

@@ -1,10 +1,10 @@
-﻿# Lash Designer
+# Lash Designer
 
 SaaS multi-tenant de agenda, clientes, serviços, finanças, equipe, suporte, billing e assistência de negócio para estúdios e profissionais de extensão de cílios.
 
-**Release atual: 5.12.12 — Planos por equipe com Appmax, indicações com compensação de estorno e Central de Suporte.**
+**Release atual: 5.12.14 — Módulo independente de Equipe, Central de Suporte simplificada para usuárias, planos por equipe com Appmax e indicações com compensação de estorno.**
 
-Consulte [Release 5.12.12](docs/RELEASE_5_12_12.md) e [Guia de Homologação de Indicações](docs/HOMOLOGACAO_INDICACOES_5_12_12.md).
+Consulte [Release 5.12.14](docs/RELEASE_5_12_14.md), [Release 5.12.13](docs/RELEASE_5_12_13.md), [Release 5.12.12](docs/RELEASE_5_12_12.md) e [Guia de Homologação de Indicações](docs/HOMOLOGACAO_INDICACOES_5_12_12.md).
 
 ## Stack
 
@@ -16,6 +16,18 @@ Consulte [Release 5.12.12](docs/RELEASE_5_12_12.md) e [Guia de Homologação de 
 - **Rede & TLS**: Caddy com certificados on-demand para subdomínios e domínios personalizados;
 - **Gateways de Pagamento**: Appmax (checkout primário com planos por equipe) e InfinitePay (webhook e fallback);
 - **Mensageria**: Evolution API para WhatsApp multi-tenant dos estúdios e instância global dedicada para a plataforma.
+
+## Gestão de Equipe & Central de Suporte (5.12.14)
+
+- **Módulo de Equipe Independente (`src/features/team/`)**:
+  - Aba e rota própria `/admin?view=team` acessível no menu da administradora e em "Mais" no mobile.
+  - Cadastro guiado em 3 etapas (dados, serviços habilitados com preços/duração e horários).
+  - Gestão de folgas com timezone explícito do estúdio e controle de acesso staff (`ProfessionalAccess.tsx`).
+  - Validação estrita no backend contra períodos sobrepostos no mesmo dia e proteção da conta ADMIN.
+- **Central de Suporte Amigável (`src/features/support/`)**:
+  - Interface simplificada com validação inline imediata sem balões nativos do navegador.
+  - Campos opcionais (categoria/urgência) em sanfona e histórico visual em formato de chat.
+  - Notas internas e controles de prioridade estritamente isolados no painel DEV.
 
 ## Planos por Equipe (Team Plans)
 
@@ -44,6 +56,8 @@ npm run dev
 npm run typecheck         # Checagem de tipos frontend e server
 npm run lint              # Análise estática ESLint
 npm run test              # Suíte completa de testes unitários e de integração
+npm run test:team-ui      # Verificação de fluxos e interface da aba de Equipe
+npm run test:support-ui   # Verificação de fluxos e interface da Central de Suporte
 npm run build             # Compilação para dist/
 npm run preflight         # Validação de variáveis de ambiente e integridade operacional
 ```
@@ -61,6 +75,8 @@ npm run check
 
 ## Documentação Técnica
 
+- `docs/RELEASE_5_12_14.md`: Release notes da versão 5.12.14 (Equipe independente e Suporte);
+- `docs/RELEASE_5_12_13.md`: Hotfix visual dos marcadores de atividade no dashboard;
 - `docs/RELEASE_5_12_12.md`: Release notes da versão 5.12.12;
 - `docs/HOMOLOGACAO_INDICACOES_5_12_12.md`: Guia de homologação e testes práticos de indicações;
 - `docs/APPMAX_INTEGRATION_5_12.md`: Contrato de integração, endpoints e webhooks da Appmax;
@@ -75,7 +91,7 @@ npm run check
 
 ```text
 src/                 Aplicação frontend (React, Vite, CSS versionado)
-src/features/        Módulos funcionais (admin, booking, staff, client, support)
+src/features/        Módulos funcionais (admin, booking, team, staff, client, support)
 server/              Backend Express, serviços de domínio e runtimes
 server/routes/       Rotas desacopladas por domínio (platform, billing, tenant)
 server/support/      Central de suporte, tickets, anexos e notificações

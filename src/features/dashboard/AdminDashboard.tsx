@@ -421,11 +421,11 @@ export function AdminDashboard({ me, stats, onRefresh, onOpenAgenda }: { me: Ses
             <div className="cardBody">
                 {activity.map((a, idx) => (
                     <div key={a.key} style={{display: 'flex', gap: 16, marginBottom: idx === activity.length - 1 ? 0 : 20, position: 'relative'}}>
-                        {idx === 0 ? (
+                        {idx < activity.length - 1 ? (
                             <div style={{position: 'absolute', left: 5, top: 10, bottom: -20, width: 2, background: 'var(--gray-100)'}}></div>
                         ) : null}
-                        <div style={{width: 12, height: 12, borderRadius: '50%', background: a.dot, marginTop: 4, zIndex: 1, border: '2px solid white', boxShadow: `0 0 0 2px color-mix(in srgb, ${a.dot} 18%, transparent)`}} />
-                        <div>
+                        <div className="ld-dashboard-activity-dot" aria-hidden="true" style={{flex: '0 0 12px', width: 12, height: 12, aspectRatio: '1', boxSizing: 'border-box', alignSelf: 'flex-start', borderRadius: '50%', background: a.dot, marginTop: 4, zIndex: 1, border: '2px solid white', boxShadow: `0 0 0 2px color-mix(in srgb, ${a.dot} 18%, transparent)`}} />
+                        <div style={{flex: 1, minWidth: 0, overflowWrap: 'anywhere'}}>
                             <div style={{fontSize: '0.9rem', fontWeight: 600, color: 'var(--gray-800)'}}>{a.title}</div>
                             <div style={{fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: 2}}>{a.desc}</div>
                             <div style={{fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 4}}>{a.when}</div>

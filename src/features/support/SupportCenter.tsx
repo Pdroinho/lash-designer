@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../api'
+import { MessageSquare, Plus, ChevronLeft } from '../../components/Icons'
 import { ProductSelect } from '../../components/ProductSelect'
 import { SupportComposer, type SupportDraft } from './SupportComposer'
 import {
@@ -45,7 +46,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
     key: string
     payload: Record<string, unknown>
   } | null>(null)
-  const [detailFailed,setDetailFailed] = useState(false)
+  const [detailFailed, setDetailFailed] = useState(false)
   const request = useRef(0)
   const open = useCallback(
     (id: number | null) => {
@@ -203,23 +204,38 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
     setRefresh((value) => value + 1)
   }
   const t = detail?.ticket
+  const statusHelp: Record<string, string> = {
+    NEW: 'Pedido recebido. Nossa equipe vai responder por aqui.',
+    OPEN: 'Nossa equipe está cuidando do seu pedido. Você pode acrescentar informações abaixo.',
+    PENDING:
+      'Precisamos de uma resposta sua para continuar. Escreva sua mensagem abaixo.',
+    ON_HOLD:
+      'Estamos analisando seu pedido. Avisaremos quando houver uma atualização.',
+    RESOLVED:
+      'Deu tudo certo? Se precisar de mais ajuda, toque em Reabrir pedido.',
+    CLOSED:
+      'Este atendimento terminou. Você pode abrir um novo pedido se precisar.',
+  }
   return (
-    <section className="support-center" aria-label="Central de suporte">
+    <section
+      className={`support-center ${dev ? 'support-dev' : 'support-friendly'} ${create ? 'is-creating' : ''}`}
+      aria-label="Central de suporte"
+    >
       <header className="support-heading">
         <div>
           <span className="support-eyebrow">
             {dev ? 'ATENDIMENTO DA PLATAFORMA' : 'ESTAMOS AQUI PARA AJUDAR'}
           </span>
           <h2 className="support-title">
-            {dev ? 'Central de atendimento' : 'Suporte'}
+            {dev ? 'Central de atendimento' : 'Como podemos ajudar?'}
           </h2>
           <p>
             {dev
               ? 'Organize a fila e acompanhe cada conversa com os estúdios.'
-              : 'Abra um chamado e acompanhe as respostas da nossa equipe aqui.'}
+              : 'Conte sua dúvida ou o que não funcionou. Nossa equipe responde aqui, e você recebe uma notificação no painel.'}
           </p>
         </div>
-        {!dev ? (
+        {!dev && !create ? (
           <button
             type="button"
             className="btn btnPrimary"
@@ -229,32 +245,50 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
             }}
             disabled={busy}
           >
-            Novo chamado
+            <Plus size={17} /> Pedir ajuda
           </button>
         ) : null}
       </header>
-      <div className="support-stats">
-        <span>
-          <strong>{stats.active ?? 0}</strong> em andamento
-        </span>
-        <span>
-          <strong>{stats.waiting ?? 0}</strong> aguardando{' '}
-          {dev ? 'estúdio' : 'resposta'}
-        </span>
-        {dev ? (
+      {dev ? (
+        <div className="support-stats">
+          <span>
+            <strong>{stats.active ?? 0}</strong> em andamento
+          </span>
+          <span>
+            <strong>{stats.waiting ?? 0}</strong> aguardando estúdio
+          </span>
           <span>
             <strong>{stats.overdue ?? 0}</strong> além da meta interna
           </span>
-        ) : null}
-        <small>As notificações são atualizadas automaticamente.</small>
-      </div>
+        </div>
+      ) : !create ? (
+        <div className="support-user-summary">
+          <span>
+            <MessageSquare size={18} /> Meus pedidos de ajuda
+          </span>
+          <button
+            type="button"
+            aria-pressed={status === 'PENDING'}
+            onClick={() => {
+              setStatus(status === 'PENDING' ? '' : 'PENDING')
+              setPage(1)
+              open(null)
+            }}
+          >
+            {stats.waiting ?? 0} aguardando sua resposta
+          </button>
+        </div>
+      ) : null}
       {error ? (
         <div className="form-error" role="alert">
           {error}
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => setRefresh((value) => value + 1)}
+            onClick={() => {
+              setError('')
+              setRefresh((value) => value + 1)
+            }}
           >
             Atualizar
           </button>
@@ -263,7 +297,12 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
       {create ? (
         <div className="support-panel">
           <div className="support-heading">
-            <h2>Novo chamado</h2>
+            <div>
+              <h2>Conte o que você precisa</h2>
+              <p>
+                Preencha abaixo. Se tiver uma imagem da tela, você pode anexar.
+              </p>
+            </div>
             <button
               type="button"
               className="btn btn-ghost"
@@ -273,13 +312,18 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
               Cancelar
             </button>
           </div>
-          <SupportComposer create busy={busy} onSubmit={submit} />
+          <SupportComposer
+            key="new-request"
+            create
+            busy={busy}
+            onSubmit={submit}
+          />
         </div>
       ) : (
         <div className={`support-layout ${selected ? 'has-selection' : ''}`}>
           <aside
             className="support-panel support-list"
-            aria-label="Lista de chamados"
+            aria-label={dev ? 'Lista de chamados' : 'Meus pedidos de ajuda'}
           >
             <div className="support-filters">
               <label>
@@ -288,7 +332,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                   type="search"
                   value={search}
                   maxLength={160}
-                  placeholder="Assunto ou protocolo"
+                  placeholder="Buscar pelo assunto"
                   onChange={(e) => {
                     setSearch(e.target.value)
                     setPage(1)
@@ -296,9 +340,9 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                 />
               </label>
               <label>
-                Estado
+                {dev ? 'Estado' : 'Mostrar'}
                 <ProductSelect
-                  ariaLabel="Filtrar estado"
+                  ariaLabel={dev ? 'Filtrar estado' : 'Mostrar pedidos'}
                   value={status}
                   options={[
                     { value: '', label: 'Todos' },
@@ -352,7 +396,19 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
             {loading ? (
               <p role="status">Carregando chamados…</p>
             ) : tickets.length === 0 ? (
-              <p className="support-empty">Nenhum chamado encontrado.</p>
+              <div className="support-empty">
+                <MessageSquare size={30} />
+                <h3>
+                  {search || status
+                    ? 'Nenhum pedido encontrado'
+                    : 'Ainda não pediu ajuda por aqui?'}
+                </h3>
+                <p>
+                  {search || status
+                    ? 'Tente outro assunto ou selecione Todos no filtro.'
+                    : 'Quando precisar, toque em Pedir ajuda. Suas conversas ficam salvas aqui.'}
+                </p>
+              </div>
             ) : (
               tickets.map((item) => (
                 <button
@@ -363,7 +419,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                   aria-pressed={item.id === selected}
                 >
                   <span className="support-ticket-meta">
-                    {item.protocol}
+                    {dev ? item.protocol : categoryLabels[item.category]}
                     <span className="support-badge">
                       {statusLabels[item.status]}
                     </span>
@@ -375,10 +431,14 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                     </small>
                   ) : null}
                   <span className="support-ticket-meta">
+                    {dev ? '' : 'Última atualização: '}
                     {date(item.updatedAt)}
                     {item.unread ? (
                       <span className="support-unread">
-                        {item.unread} nova(s)
+                        {item.unread}{' '}
+                        {item.unread === 1
+                          ? 'mensagem nova'
+                          : 'mensagens novas'}
                       </span>
                     ) : null}
                   </span>
@@ -395,7 +455,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                 Anterior
               </button>
               <small>
-                {page} / {Math.max(1, Math.ceil(total / 20))}
+                Página {page} de {Math.max(1, Math.ceil(total / 20))}
               </small>
               <button
                 type="button"
@@ -408,13 +468,16 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
             </div>
           </aside>
           <article className="support-panel support-conversation">
-            {selected ? <button
-                  type="button"
-                  className="btn btn-ghost support-back"
-                  onClick={() => open(null)}
-                >
-                  Voltar à lista
-                </button> : null}
+            {selected ? (
+              <button
+                type="button"
+                className="btn btn-ghost support-back"
+                onClick={() => open(null)}
+              >
+                <ChevronLeft size={16} />{' '}
+                {dev ? 'Voltar à lista' : 'Meus pedidos'}
+              </button>
+            ) : null}
             {!selected ? (
               <div className="support-empty">
                 <h2>Uma conversa, todo o histórico.</h2>
@@ -424,12 +487,16 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                 </p>
               </div>
             ) : !t || t.id !== selected ? (
-              <p role="status">{detailFailed ? 'Não foi possível abrir este chamado. Volte à lista ou tente atualizar.' : 'Carregando conversa…'}</p>
+              <p role="status">
+                {detailFailed
+                  ? 'Não foi possível abrir este chamado. Volte à lista ou tente atualizar.'
+                  : 'Carregando conversa…'}
+              </p>
             ) : (
               <>
                 <div className="support-ticket-meta">
                   <span>
-                    {t.protocol} · {categoryLabels[t.category]}
+                    {categoryLabels[t.category]} · {t.protocol}
                   </span>
                   <span className="support-badge">
                     {statusLabels[t.status]}
@@ -438,8 +505,36 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                 <h2>{t.subject}</h2>
                 <p className="support-muted">
                   {dev ? `${t.tenantName} · ` : ''}Aberto em {date(t.createdAt)}{' '}
-                  · Impacto {priorityLabels[t.priority].toLowerCase()}
+                  {dev
+                    ? ` · Impacto ${priorityLabels[t.priority].toLowerCase()}`
+                    : ''}
                 </p>
+                {!dev ? (
+                  <p
+                    className={`support-next-step ${t.status === 'PENDING' ? 'needs-answer' : ''}`}
+                    role="status"
+                  >
+                    {statusHelp[t.status]}
+                  </p>
+                ) : null}
+                {!dev && t.status !== 'CLOSED' && t.status !== 'RESOLVED' ? (
+                  <button
+                    type="button"
+                    className="btn btnPrimary support-reply-jump"
+                    onClick={() => {
+                      const field = document.querySelector<HTMLTextAreaElement>(
+                        '.support-conversation textarea',
+                      )
+                      field?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center',
+                      })
+                      field?.focus({ preventScroll: true })
+                    }}
+                  >
+                    Responder ao atendimento
+                  </button>
+                ) : null}
                 {dev && t.overdue ? (
                   <p className="support-warning">
                     Meta interna de primeira resposta ultrapassada.
@@ -502,7 +597,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                     }
                   >
                     {t.status === 'RESOLVED'
-                      ? 'Reabrir chamado'
+                      ? 'Reabrir pedido'
                       : 'Marcar como resolvido'}
                   </button>
                 ) : null}
@@ -513,7 +608,7 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                   {detail!.messages.map((message) => (
                     <li
                       key={message.id}
-                      className={`support-message ${message.visibility === 'INTERNAL' ? 'internal' : ''} ${message.kind === 'EVENT' ? 'event' : ''}`}
+                      className={`support-message ${message.authorRole === 'DEV' ? 'from-support' : 'from-user'} ${message.visibility === 'INTERNAL' ? 'internal' : ''} ${message.kind === 'EVENT' ? 'event' : ''}`}
                     >
                       <div className="support-ticket-meta">
                         <strong>
@@ -523,8 +618,12 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                           {message.authorRole === 'DEV'
                             ? 'Equipe de suporte'
                             : message.authorRole === 'ADMIN'
-                              ? 'Administradora'
-                              : 'Profissional'}
+                              ? dev
+                                ? 'Administradora'
+                                : 'Você'
+                              : dev
+                                ? 'Profissional'
+                                : 'Você'}
                         </strong>
                         <time dateTime={message.createdAt}>
                           {date(message.createdAt)}
@@ -545,8 +644,8 @@ export function SupportCenter({ role }: { role: 'DEV' | 'ADMIN' | 'STAFF' }) {
                 </ol>
                 {t.status === 'CLOSED' ? (
                   <p className="support-empty">
-                    Este chamado está encerrado. Para continuar, abra um novo
-                    chamado e mencione {t.protocol}.
+                    Este pedido está encerrado. Para continuar, toque em Pedir
+                    ajuda e mencione {t.protocol}.
                   </p>
                 ) : (
                   <SupportComposer

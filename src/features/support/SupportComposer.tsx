@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Paperclip } from '../../components/Icons'
 import { ProductSelect } from '../../components/ProductSelect'
 import { categoryLabels, priorityLabels, type Attachment } from './types'
 export type SupportDraft = {
@@ -24,7 +25,7 @@ export function SupportComposer({
 }) {
   const [draft, setDraft] = useState<SupportDraft>({
     subject: '',
-    category: 'BUG',
+    category: 'OTHER',
     priority: 'NORMAL',
     body: '',
     internal: false,
@@ -32,6 +33,7 @@ export function SupportComposer({
   })
   const [fileBusy, setFileBusy] = useState(false),
     [error, setError] = useState('')
+  const [more, setMore] = useState(false)
   const command = useRef({ payload: '', key: '' })
   async function images(files: FileList | null) {
     if (!files) return
@@ -93,9 +95,25 @@ export function SupportComposer({
   return (
     <form
       className="support-composer"
+      noValidate
       onSubmit={async (event) => {
         event.preventDefault()
         if (busy || fileBusy) return
+        if (create && draft.subject.trim().length < 5) {
+          setError(
+            'Escreva um assunto com pelo menos 5 caracteres. Ex.: dúvida sobre WhatsApp.',
+          )
+          return
+        }
+        if (draft.body.trim().length < (create ? 10 : 1)) {
+          setError(
+            create
+              ? 'Conte um pouco mais sobre o que aconteceu (pelo menos 10 caracteres).'
+              : 'Escreva sua mensagem antes de enviar.',
+          )
+          return
+        }
+        setError('')
         const payload = JSON.stringify(draft)
         if (command.current.payload !== payload)
           command.current = { payload, key: crypto.randomUUID() }
@@ -108,38 +126,70 @@ export function SupportComposer({
       {create ? (
         <>
           <label>
-            Assunto
+            Em poucas palavras, o que você precisa?
             <input
+              disabled={busy || fileBusy}
               required
               minLength={5}
               maxLength={160}
               value={draft.subject}
               onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
-              placeholder="Resuma o que precisa de ajuda"
+              placeholder="Ex.: não consigo conectar meu WhatsApp"
             />
           </label>
-          <div className="support-filters">
-            <label>
-              Categoria
-              <ProductSelect
-                ariaLabel="Categoria"
-                value={draft.category}
-                options={options(categoryLabels)}
-                onChange={(category) => setDraft({ ...draft, category })}
-              />
-            </label>
-            <label>
-              Impacto
-              <ProductSelect
-                ariaLabel="Impacto"
-                value={draft.priority}
-                options={options(priorityLabels).filter(
-                  (item) => item.value !== 'URGENT',
-                )}
-                onChange={(priority) => setDraft({ ...draft, priority })}
-              />
-            </label>
-          </div>
+          <button
+            type="button"
+            className="support-details-toggle"
+            aria-expanded={more}
+            onClick={() => setMore(!more)}
+          >
+            {more
+              ? 'Ocultar detalhes opcionais'
+              : 'Adicionar assunto e urgência (opcional)'}
+          </button>
+          {more ? (
+            <div className="support-filters">
+              <label>
+                Sobre o que você precisa de ajuda?
+                <ProductSelect
+                  ariaLabel="Categoria"
+                  disabled={busy || fileBusy}
+                  value={draft.category}
+                  options={options(categoryLabels)}
+                  onChange={(category) => setDraft({ ...draft, category })}
+                />
+              </label>
+              <label>
+                Quanto isso atrapalha sua rotina?
+                <ProductSelect
+                  ariaLabel="Impacto"
+                  disabled={busy || fileBusy}
+                  value={draft.priority}
+                  options={
+                    dev
+                      ? options(priorityLabels).filter(
+                          (item) => item.value !== 'URGENT',
+                        )
+                      : [
+                          {
+                            value: 'LOW',
+                            label: 'É só uma dúvida ou sugestão',
+                          },
+                          {
+                            value: 'NORMAL',
+                            label: 'Preciso de ajuda para continuar',
+                          },
+                          {
+                            value: 'HIGH',
+                            label: 'Não consigo usar a plataforma',
+                          },
+                        ]
+                  }
+                  onChange={(priority) => setDraft({ ...draft, priority })}
+                />
+              </label>
+            </div>
+          ) : null}
         </>
       ) : null}
       {dev && !create ? (
@@ -166,15 +216,24 @@ export function SupportComposer({
                 ? 'Nota para a equipe'
                 : 'Sua mensagem'
           }
+          disabled={busy || fileBusy}
           required
           minLength={create ? 10 : 1}
           maxLength={8000}
           rows={4}
           value={draft.body}
           onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-          placeholder="Conte o que aconteceu e os passos para reproduzir. Não inclua senhas ou dados de cartão."
+          placeholder={
+            create
+              ? 'Conte o que estava tentando fazer e o que aconteceu. Pode escrever do seu jeito.'
+              : 'Escreva aqui sua resposta ou mais detalhes…'
+          }
         />
       </label>
+      <p className="support-privacy-tip">
+        Não envie senhas nem dados de cartão. Se anexar uma imagem, oculte os
+        dados pessoais das clientes.
+      </p>
       <div className="support-attachments">
         {draft.attachments.map((file, index) => (
           <button
@@ -195,7 +254,8 @@ export function SupportComposer({
       </div>
       <div className="support-actions">
         <label className="btn btn-ghost support-file">
-          {fileBusy ? 'Preparando…' : 'Anexar imagem'}
+          <Paperclip size={16} />{' '}
+          {fileBusy ? 'Preparando…' : 'Adicionar imagem da tela'}
           <input
             aria-label="Anexar imagens"
             type="file"
@@ -208,7 +268,7 @@ export function SupportComposer({
             }}
           />
         </label>
-        <small>Até 3 imagens. Dados pessoais devem ser ocultados.</small>
+        <small>Opcional · até 3 imagens (PNG, JPEG ou WebP).</small>
         <button
           type="submit"
           className="btn btnPrimary"
@@ -217,7 +277,7 @@ export function SupportComposer({
           {busy
             ? 'Enviando…'
             : create
-              ? 'Abrir chamado'
+              ? 'Enviar pedido de ajuda'
               : draft.internal
                 ? 'Salvar nota interna'
                 : 'Enviar resposta'}

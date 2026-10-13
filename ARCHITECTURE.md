@@ -1,6 +1,6 @@
-﻿# Arquitetura Atual — Lash Designer 5.12.12
+# Arquitetura Atual — Lash Designer 5.12.14
 
-Este documento descreve a arquitetura técnica, os contratos de domínio e os fluxos operacionais consolidados na versão **5.12.12**.
+Este documento descreve a arquitetura técnica, os contratos de domínio e os fluxos operacionais consolidados na versão **5.12.14** (incluindo o hotfix visual **5.12.13**).
 
 ## Topologia Efetiva
 
@@ -23,10 +23,13 @@ O banco de dados SQLite opera localmente na máquina com `better-sqlite3` em mod
 ### 1. Frontend
 - `src/app/AppRoutes.tsx`: Roteador principal baseado em domínio/host, discriminando acesso à Landing Page, Painel Admin, Central de Suporte, Portal da Cliente e Booking Público.
 - `src/features/`: Módulos de domínio desacoplados:
-  - `admin/`: Painel de controle da administradora (`AdminApp.tsx`, dashboard, agenda, serviços, finanças, configurações).
+  - `admin/`: Painel de controle da administradora (`AdminApp.tsx`, roteamento por tabs com suporte a query params `view=team` e `view=support`).
+  - `dashboard/`: Painel analítico e operacional (`AdminDashboard.tsx`) com marcadores de atividade de geometria rígida (`flex: "0 0 12px"`, proporção 1:1 e `overflowWrap: "anywhere"`).
+  - `team/`: Módulo de equipe desacoplado (`AdminTeam.tsx`, `ProfessionalEditor.tsx`, `TeamHours.tsx`, `ProfessionalTimeOff.tsx`, `ProfessionalAccess.tsx`). Cadastro em 3 etapas, grade de horários, folgas por timezone e gestão de acesso STAFF. O launcher flutuante da Luma é suprimido nesta aba.
+  - `services/`: Catálogo de procedimentos e precificação (`AdminServices.tsx`), estritamente desacoplado da gestão de pessoas (legado `ProfessionalManager.tsx` removido).
   - `booking/`: Fluxo público de agendamento em 4 etapas com prioridade mobile (`BookingPage.tsx`).
   - `staff/`: Gestão de equipe multi-profissionais e controle de escala (`StaffPage.tsx`).
-  - `support/`: Central de suporte integrada (`SupportCenter.tsx`) com abertura de chamados, anexos locais e histórico.
+  - `support/`: Central de suporte humanizada (`SupportCenter.tsx`, `SupportComposer.tsx`) com validação inline imediata em português, campos avançados recolhidos, balões visuais e notas internas protegidas.
   - `client/`: Portal da cliente com autenticação passwordless por WhatsApp.
 - `src/components/`: Componentes transversais:
   - `LandingCheckout.tsx`: Modal e formulário de checkout público para planos por equipe.
@@ -43,13 +46,14 @@ A montagem de rotas em `server/index.ts` é dividida em registradores de domíni
   - Clientes e histórico de atendimentos;
   - Catálogo de serviços e precificação;
   - Fluxo financeiro e conciliação;
-  - Gestão de equipe e comissões (`professionalAccessRoutes.ts`);
+  - Gestão de profissionais e escalas (`adminProfessionalsRoutes.ts`): validação Zod contra sobreposição de horários no mesmo dia (`hoursSchema.superRefine`), proteção da conta ADMIN contra suspensão via endpoint STAFF e retorno de `businessHours` e `timezone` do estúdio;
+  - Acesso de equipe e convites (`professionalAccessRoutes.ts`);
   - WhatsApp Center e campanhas;
   - Central de Suporte (`supportRoutes.ts`);
   - Programa de indicações (`referralRoutes.ts`).
 
 ### 3. Serviços de Domínio e Infraestrutura
-- `server/appmax.ts`: Cliente HTTP para API da Appmax. Cria links de pagamento via `/v1/payment-link` utilizando array plano `payments: ['creditcard', 'pix']`.
+- `server/appmax.ts`: Cliente HTTP para API da Appmax. Cria links de pagamento via `/v1/payment-link` utilizando array plano `payments: ["creditcard", "pix"]` (nunca aninhado).
 - `server/appmaxBillingService.ts`: Orquestração de checkout, reservas de indicação, confirmação de pedidos e conciliação periódica de cobranças pendentes e estornadas.
 - `server/appmaxReferralService.ts`: Mecanismo financeiro de cotação pública, validação de tokens, deduções de dívidas de estorno e bloqueio anti-autoindicação.
 - `server/support/`: Subsistema de suporte:

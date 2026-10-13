@@ -7,7 +7,6 @@ import { confirmAction } from '../../components/FeedbackCenter'
 import { ModalRoot } from '../../components/ModalRoot'
 import { EmptyState } from '../../components/SharedUi'
 import { Edit2, Image as ImageIcon, Plus, Trash2, X } from '../../components/Icons'
-import { ProfessionalManager } from './ProfessionalManager'
 
 export function AdminServices() {
     const [services, setServices] = useState<AdminService[]>([])
@@ -191,7 +190,7 @@ export function AdminServices() {
                 </div> : null}
             </div>
 
-            <ProfessionalManager services={services} />
+            
 
             {modalOpen && (
                 <ModalRoot className="modal-overlay" onClick={() => setModalOpen(false)}>

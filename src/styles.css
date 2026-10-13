@@ -5561,3 +5561,19 @@ svg {
 @media (prefers-reduced-motion: reduce) {
   .passwordChecklistItem { transition: none; }
 }
+
+/* Product controls: retain keyboard, forms and screen-reader semantics. */
+input[type='checkbox']:not([class*='sr-only']), input[type='radio']:not([class*='sr-only']) {
+  appearance:none; -webkit-appearance:none; width:20px; height:20px; min-width:20px; flex:0 0 20px; padding:0; margin:0;
+  border:1.5px solid var(--border); border-radius:6px; background:var(--bg-card); display:inline-grid; place-content:center; cursor:pointer; vertical-align:middle;
+}
+input[type='checkbox']::before { content:''; width:9px; height:5px; border-left:2px solid var(--primary-fg); border-bottom:2px solid var(--primary-fg); transform:translateY(-1px) rotate(-45deg) scale(0); }
+input[type='checkbox']:checked { background:var(--primary); border-color:var(--primary); }
+input[type='checkbox']:checked::before { transform:translateY(-1px) rotate(-45deg) scale(1); }
+input[type='checkbox']:indeterminate { background:var(--primary); border-color:var(--primary); }
+input[type='checkbox']:indeterminate::before { width:9px; height:0; border:0; border-bottom:2px solid var(--primary-fg); transform:scale(1); }
+input[type='radio'] { border-radius:50%; }
+input[type='radio']:checked { border-color:var(--primary); background:var(--bg-card); }
+input[type='radio']:checked::before { content:''; width:10px; height:10px; border-radius:50%; background:var(--primary); }
+input[type='checkbox']:focus-visible,input[type='radio']:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
+input[type='checkbox']:disabled,input[type='radio']:disabled { opacity:.5; cursor:not-allowed; }

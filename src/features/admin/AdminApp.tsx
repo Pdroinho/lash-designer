@@ -31,6 +31,7 @@ const BillingCenter = lazy(() => import('../../components/BillingCenter').then(m
 const BusinessAssistant = lazy(() => import('../../components/BusinessAssistant').then(module => ({ default: module.BusinessAssistant })))
 const ReferralCenter = lazy(() => import('../../components/ReferralCenter').then(module => ({ default: module.ReferralCenter })))
 const WhatsAppCenter = lazy(() => import('../../components/WhatsAppCenter').then(module => ({ default: module.WhatsAppCenter })))
+const AdminTeam = lazy(() => import('../team/AdminTeam').then(module => ({ default: module.AdminTeam })))
 const AdminServices = lazy(() => import('../services/AdminServices').then(module => ({ default: module.AdminServices })))
 const AdminClients = lazy(() => import('../clients/AdminClients').then(module => ({ default: module.AdminClients })))
 const AdminDashboard = lazy(() => import('../dashboard/AdminDashboard').then(module => ({ default: module.AdminDashboard })))
@@ -100,13 +101,14 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
     if (typeof window !== 'undefined') return localStorage.getItem('lashdesigner_test_mode') === 'true'
     return false
   })
-  const [tab, setTab] = useState<'dashboard' | 'calendar' | 'services' | 'clients' | 'finance' | 'settings' | 'evolution' | 'billing' | 'assistant' | 'referrals' | 'support'>(() => {
+  const [tab, setTab] = useState<'dashboard' | 'calendar' | 'services' | 'clients' | 'finance' | 'settings' | 'evolution' | 'billing' | 'assistant' | 'referrals' | 'support' | 'team'>(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('lumaCredits') === 'return') return 'assistant'
     if (new URLSearchParams(window.location.search).get('view') === 'support') return 'support'
+    if (new URLSearchParams(window.location.search).get('view') === 'team') return 'team'
     return 'dashboard'
   })
 
-  useEffect(() => { if (new URLSearchParams(location.search).get('view') === 'support') setTab('support') }, [location.search])
+  useEffect(() => { const view = new URLSearchParams(location.search).get('view'); if (view === 'support' || view === 'team') setTab(view) }, [location.search])
 
   const [stats, setStats] = useState<AdminStats | null>(null)
   const adminTourSteps = useMemo(() => shellTourSteps('admin', tab), [tab])
@@ -193,14 +195,14 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
       return (
         <Shell
           title="Visão Geral"
-          subtitle="Gestão do Espaço"
+          subtitle="Seu estúdio"
           user={me}
           brand={tenant}
           isTestMode={isTestMode}
           sidebar={
             <div className="ld-nav-group">
               <div className="ld-nav-section">Principal</div>
-              <SidebarItem active icon={<LayoutDashboard size={18}/>} label="Dashboard" onClick={() => {}} />
+              <SidebarItem active icon={<LayoutDashboard size={18}/>} label="Início" onClick={() => {}} />
               <SidebarItem icon={<Calendar size={18}/>} label="Agenda" onClick={() => {}} />
               <SidebarItem icon={<Users size={18}/>} label="Clientes" onClick={() => {}} />
             </div>
@@ -246,10 +248,19 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
     return <LegalAcceptanceGate documents={adminLegalPreferences.currentDocuments} onAccepted={() => void loadAdminLegalPreferences()} />
   }
 
+  function goTab(next: typeof tab) {
+    setTab(next)
+    const params = new URLSearchParams(location.search)
+    params.delete('ticket')
+    if (next === 'team' || next === 'support') params.set('view', next)
+    else params.delete('view')
+    nav({ pathname: location.pathname, search: params.toString() })
+  }
+
   return (
     <Shell
-        title={subscriptionInactive && tab !== 'support' ? 'Assinatura' : ({dashboard: 'Visão Geral', calendar: 'Agenda', services: 'Serviços', clients: 'Clientes', finance: 'Financeiro', settings: 'Configurações', evolution: 'WhatsApp', billing: 'Assinatura', assistant: 'Luma', referrals: 'Indicações', support: 'Suporte'} as const)[tab]}
-        subtitle="Gestão do Espaço"
+        title={subscriptionInactive && tab !== 'support' ? 'Assinatura' : ({dashboard: 'Visão Geral', calendar: 'Agenda', services: 'Serviços', team: 'Equipe', clients: 'Clientes', finance: 'Financeiro', settings: 'Configurações', evolution: 'WhatsApp', billing: 'Assinatura', assistant: 'Luma', referrals: 'Indicações', support: 'Suporte'} as const)[tab]}
+        subtitle="Seu estúdio"
         user={me}
         brand={tenant}
         isTestMode={isTestMode}
@@ -258,10 +269,10 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
         tourEnabled={!subscriptionInactive && tab !== 'billing' && tab !== 'support'}
         autoStartTour={!subscriptionInactive && tab === 'dashboard'}
         mobileNav={subscriptionInactive ? undefined : [
-          { key: 'dashboard', label: 'Início', icon: <LayoutDashboard size={21}/>, active: tab === 'dashboard', onClick: () => setTab('dashboard') },
-          { key: 'calendar', label: 'Agenda', icon: <Calendar size={21}/>, active: tab === 'calendar', onClick: () => setTab('calendar') },
-          { key: 'clients', label: 'Clientes', icon: <Users size={21}/>, active: tab === 'clients', onClick: () => setTab('clients') },
-          { key: 'evolution', label: 'WhatsApp', icon: <MessageSquare size={21}/>, active: tab === 'evolution', onClick: () => setTab('evolution') },
+          { key: 'dashboard', label: 'Início', icon: <LayoutDashboard size={21}/>, active: tab === 'dashboard', onClick: () => goTab('dashboard') },
+          { key: 'calendar', label: 'Agenda', icon: <Calendar size={21}/>, active: tab === 'calendar', onClick: () => goTab('calendar') },
+          { key: 'clients', label: 'Clientes', icon: <Users size={21}/>, active: tab === 'clients', onClick: () => goTab('clients') },
+          { key: 'evolution', label: 'WhatsApp', icon: <MessageSquare size={21}/>, active: tab === 'evolution', onClick: () => goTab('evolution') },
         ]}
         mobileMoreActive={!subscriptionInactive && !['dashboard', 'calendar', 'clients', 'evolution'].includes(tab)}
         sidebar={
@@ -269,26 +280,27 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
                 {subscriptionInactive ? (
                   <>
                     <div className="ld-nav-section">Conta</div>
-                    <SidebarItem active icon={<CreditCard size={18}/>} label="Ativar assinatura" onClick={() => setTab('billing')} />
+                    <SidebarItem active icon={<CreditCard size={18}/>} label="Ativar assinatura" onClick={() => goTab('billing')} />
                   </>
                 ) : (
                   <>
                     <div className="ld-nav-section">Principal</div>
-                    <SidebarItem active={tab === 'dashboard'} icon={<LayoutDashboard size={18}/>} label="Dashboard" onClick={() => setTab('dashboard')} />
-                    <SidebarItem active={tab === 'calendar'} icon={<Calendar size={18}/>} label="Agenda" onClick={() => setTab('calendar')} />
-                    <SidebarItem active={tab === 'clients'} icon={<Users size={18}/>} label="Clientes" onClick={() => setTab('clients')} />
+                    <SidebarItem active={tab === 'dashboard'} icon={<LayoutDashboard size={18}/>} label="Início" onClick={() => goTab('dashboard')} />
+                    <SidebarItem active={tab === 'calendar'} icon={<Calendar size={18}/>} label="Agenda" onClick={() => goTab('calendar')} />
+                    <SidebarItem active={tab === 'clients'} icon={<Users size={18}/>} label="Clientes" onClick={() => goTab('clients')} />
                     <div className="ld-nav-section ld-nav-section--spaced">Gestão</div>
-                    <SidebarItem active={tab === 'services'} icon={<ImageIcon size={18}/>} label="Serviços" onClick={() => setTab('services')} />
-                    <SidebarItem active={tab === 'finance'} icon={<Wallet size={18}/>} label="Financeiro" onClick={() => setTab('finance')} />
-                    <SidebarItem active={tab === 'evolution'} icon={<MessageSquare size={18}/>} label="WhatsApp" onClick={() => setTab('evolution')} />
-                    <SidebarItem active={tab === 'assistant'} icon={<Sparkles size={18}/>} label="Luma" onClick={() => setTab('assistant')} />
+                    <SidebarItem active={tab === 'team'} icon={<Users size={18}/>} label="Equipe" onClick={() => goTab('team')} />
+                    <SidebarItem active={tab === 'services'} icon={<ImageIcon size={18}/>} label="Serviços" onClick={() => goTab('services')} />
+                    <SidebarItem active={tab === 'finance'} icon={<Wallet size={18}/>} label="Financeiro" onClick={() => goTab('finance')} />
+                    <SidebarItem active={tab === 'evolution'} icon={<MessageSquare size={18}/>} label="WhatsApp" onClick={() => goTab('evolution')} />
+                    <SidebarItem active={tab === 'assistant'} icon={<Sparkles size={18}/>} label="Luma" onClick={() => goTab('assistant')} />
                     <div className="ld-nav-section ld-nav-section--spaced">Sistema</div>
-                    <SidebarItem active={tab === 'referrals'} icon={<HeartHandshake size={18}/>} label="Indicações" onClick={() => setTab('referrals')} />
-                    <SidebarItem active={tab === 'billing'} icon={<CreditCard size={18}/>} label="Assinatura" onClick={() => setTab('billing')} />
-                    <SidebarItem active={tab === 'settings'} icon={<Settings size={18}/>} label="Configurações" onClick={() => setTab('settings')} />
+                    <SidebarItem active={tab === 'referrals'} icon={<HeartHandshake size={18}/>} label="Indicações" onClick={() => goTab('referrals')} />
+                    <SidebarItem active={tab === 'billing'} icon={<CreditCard size={18}/>} label="Assinatura" onClick={() => goTab('billing')} />
+                    <SidebarItem active={tab === 'settings'} icon={<Settings size={18}/>} label="Configurações" onClick={() => goTab('settings')} />
                   </>
                 )}
-                <SidebarItem active={tab === 'support'} icon={<MessageSquare size={18}/>} label="Suporte" onClick={() => setTab('support')} />
+                <SidebarItem active={tab === 'support'} icon={<MessageSquare size={18}/>} label="Suporte" onClick={() => goTab('support')} />
                 <SidebarItem icon={<LogOut size={18}/>} label="Sair" onClick={async () => {
                      await api('/api/auth/logout', {method: 'POST'})
                      window.location.href = '/'
@@ -301,11 +313,12 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
               tab === 'support' ? <SupportCenter role="ADMIN" /> : <BillingCenter locked />
           ) : (
               <>
-                {tab === 'dashboard' ? <AdminDashboard me={me} stats={stats} onRefresh={loadStats} onOpenAgenda={() => setTab('calendar')} /> : null}
+                {tab === 'dashboard' ? <AdminDashboard me={me} stats={stats} onRefresh={loadStats} onOpenAgenda={() => goTab('calendar')} /> : null}
 
                 {tab === 'support' ? <SupportCenter role="ADMIN" /> : null}
 
                 {tab === 'services' ? <AdminServices /> : null}
+                {tab === 'team' ? <AdminTeam onServices={() => goTab('services')} onBilling={() => goTab('billing')} /> : null}
 
                 {tab === 'clients' ? <AdminClients /> : null}
 
@@ -334,7 +347,7 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
                   }
                   loadStats()
                 }} /> : null}
-                {tab !== 'assistant' && tab !== 'support' && tab !== 'billing' ? <LumaChatLauncher /> : null}
+                {tab !== 'assistant' && tab !== 'support' && tab !== 'billing' && tab !== 'team' ? <LumaChatLauncher /> : null}
               </>
           )}
         </Suspense>

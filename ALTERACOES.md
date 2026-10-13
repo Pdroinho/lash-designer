@@ -1,3 +1,37 @@
+# 5.12.14 — Equipe Independente e Central de Suporte Simplificada
+
+- **Módulo de Equipe Desacoplado (`src/features/team/`)**:
+  - Remoção de `ProfessionalManager.tsx` de dentro de `AdminServices.tsx`.
+  - Nova aba e rota `/admin?view=team` integrada à navegação via `goTab("team")` em `AdminApp.tsx`.
+  - Cadastro em 3 etapas com seleção explícita de serviços (exibindo duração e preço) e horários personalizados.
+  - Gestão de folgas com timezone explícito do estúdio (`ProfessionalTimeOff.tsx`).
+  - Gestão de acesso staff com tokens de convite descartáveis e suspensão/reativação segura (`ProfessionalAccess.tsx`).
+  - Ocultação do launcher flutuante da Luma na aba de Equipe para evitar sobreposição de ações e modais.
+- **Validação e Proteção no Backend (`server/routes/adminProfessionalsRoutes.ts`)**:
+  - Rejeição no Zod (`hoursSchema.superRefine`) contra períodos de atendimento sobrepostos no mesmo dia da semana para o mesmo profissional.
+  - Proteção da conta ADMIN contra suspensão pelo endpoint de acesso STAFF (`u.role = "STAFF"`).
+  - Exposição de `businessHours` e `timezone` do estúdio em `GET /professionals`.
+- **Redesenho Amigável da Central de Suporte (`src/features/support/`)**:
+  - Formulário intuitivo ("Como podemos ajudar?") com validação inline imediata em português sem balões nativos do navegador.
+  - Categoria e urgência recolhidas em sanfona de detalhes opcionais.
+  - Diferenciação visual de balões (`.from-user` vs `.from-support`), guia contextual de próximo passo (`statusHelp`) e botão "Responder ao atendimento".
+  - Isolamento estrito de notas internas e controles de prioridade/atribuição para a equipe DEV.
+- **Controles de Formulário Acessíveis (`src/styles.css`)**:
+  - Estilização de `input[type="checkbox"]` e `input[type="radio"]` preservando foco por teclado (`:focus-visible`), acessibilidade e semântica nativa.
+- **Automação e Auditorias de QA**:
+  - Adição do script `npm run test:team-ui` (`scripts/check-team-ui.mjs`).
+  - Atualização do script `npm run test:support-ui` (`scripts/check-support-ui.mjs`).
+
+---
+
+# 5.12.13 — Hotfix Visual do Marcador de Atividades do Dashboard
+
+- **Geometria dos Marcadores de Atividade (`AdminDashboard.tsx`)**:
+  - Fixação de dimensões e proporção `flex: "0 0 12px"`, `width: 12`, `height: 12`, `aspect-ratio: 1`, `min-width: 0`.
+  - Quebra de linha segura com `overflowWrap: "anywhere"` para evitar distorção visual em descrições longas.
+
+---
+
 ﻿# 5.12.12 — Planos por Equipe com Appmax e Sistema de Indicações com Governança de Estorno
 
 - **Planos por Equipe Integrados**: Implementação completa dos planos `TEAM_3` (R$ 74,90), `TEAM_6` (R$ 99,90) e `TEAM_15` (R$ 149,00).
