@@ -101,6 +101,11 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
   const [adminLegalPreferences, setAdminLegalPreferences] = useState<LegalPreferencesState | null>(null)
   const [legalGateError, setLegalGateError] = useState<string | null>(null)
   const [tenant, setTenant] = useState<TenantPublic | null>(null)
+  useEffect(() => {
+    const refreshBrand = () => { void api<{tenant: TenantPublic}>(_slug ? `/api/public/tenant/${encodeURIComponent(_slug)}` : '/api/public/tenant').then(result => { if (result.ok) { setTenant(result.data.tenant); applyTenantTheme(result.data.tenant) } }) }
+    window.addEventListener('lashdesigner:brand-updated', refreshBrand)
+    return () => window.removeEventListener('lashdesigner:brand-updated', refreshBrand)
+  }, [_slug])
   const [isTestMode, setIsTestMode] = useState(() => {
     if (typeof window !== 'undefined') return localStorage.getItem('lashdesigner_test_mode') === 'true'
     return false

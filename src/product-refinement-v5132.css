@@ -124,3 +124,21 @@
 }
 
 .settings-brand-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+
+/* Booking identity owns a full row, so salon names never compete with progress. */
+.booking30-topbar { grid-template-columns: minmax(0,1fr) auto; }
+.booking30-topbar > .booking30-brand { grid-column: 1 / -1; justify-content: center; text-align: center; flex-wrap: nowrap; padding: 18px 20px; border-right: 0; border-bottom: 1px solid var(--b30-line); min-width: 0; }
+.booking30-brand .tenant-brand { display: inline-flex; justify-content: center; max-width: 100%; gap: 12px; }
+.booking30-brand .tenant-brand-name { display: block; overflow-wrap: normal; word-break: normal; text-wrap: balance; font-size: .95rem; line-height: 1.4; max-width: 40ch; }
+.booking30-brand .tenant-brand-image { object-fit: contain; flex-shrink: 0; }
+.booking30-brand .tenant-brand[data-layout=FULL] .tenant-brand-image { width: var(--brand-full); height: var(--brand-height); }
+.luma-logo-preview { display: grid; place-items: center; max-width: 100%; padding: 16px; margin-top: 12px; border: 1px solid var(--line); border-radius: var(--ld-radius-control); background: repeating-conic-gradient(#fff 0% 25%, #eee 0% 50%) 0 / 16px 16px; }
+.luma-logo-preview img { display: block; width: auto; height: auto; max-width: 100%; max-height: 160px; object-fit: contain; }
+@media(max-width:767px) { .booking30-topbar > .booking30-brand { min-height: 80px; padding: 16px; } .booking30-brand .tenant-brand-name { font-size: .85rem; } }
+
+.booking30-topbar > .booking30-steps { grid-column: 1 / -1; grid-row: 2; order: 0; }
+.booking30-topbar > .booking30-complete-label { grid-column: 1 / -1; justify-self: center; padding: 12px; }
+@media(max-width:767px) {
+  .booking30-topbar > .booking30-steps { grid-column: 1; align-self: center; padding-block: 12px; }
+  .booking30-topbar > .booking30-step-count { grid-column: 2; grid-row: 2; }
+}

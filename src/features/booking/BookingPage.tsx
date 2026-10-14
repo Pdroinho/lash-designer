@@ -336,7 +336,6 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
       <header className="booking30-topbar">
         <button type="button" className="booking30-brand" onClick={() => nav(withBasePath(basePath, '/'))} aria-label={`Voltar para ${tenant?.name || 'o espaço'}`}>
           <TenantBrand brand={tenant} className="tenant-brand-booking" defaultLogo="/placeholders/tenant-placeholder.png" />
-          <small className="booking30-brand-caption">Agendamento online</small>
         </button>
 
         {!confirmedAppointment ? <nav className="booking30-steps" aria-label="Etapas do agendamento">

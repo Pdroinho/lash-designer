@@ -1,3 +1,4 @@
+import { imageToolDefinitions, confirmLogoImageAction } from './lumaImageTools.js'
 import { operationalToolDefinitions, executeOperationalTool, confirmOperationalAction, type OperationType } from './lumaOperations.js'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
@@ -7,7 +8,7 @@ import { financeExpenseCategories, financeMonthSnapshot, tenantFinanceTimeZone }
 
 export type LumaPendingAction = {
   id: string
-  type: 'CREATE_SERVICE' | 'CONFIRM_APPOINTMENT' | OperationType
+  type: 'CREATE_SERVICE' | 'CONFIRM_APPOINTMENT' | 'UPDATE_BRAND_IMAGE' | OperationType
   title: string
   description: string
   confirmLabel: string
@@ -104,6 +105,7 @@ function storePendingAction(context: LumaToolContext, input: {
 
 export const lumaToolDefinitions = [
   ...operationalToolDefinitions,
+  ...imageToolDefinitions,
   {
     type: 'function',
     function: {
@@ -422,6 +424,7 @@ export function executeLumaTool(context: LumaToolContext, name: string, rawArgs:
 }
 
 export function confirmLumaAction(context: LumaToolContext, actionId: string) {
+  const image = confirmLogoImageAction(context, actionId); if (image) return image
   const operational = confirmOperationalAction(context, actionId); if (operational) return operational
   const tx = db.transaction(() => {
     const raw = db.prepare(`SELECT * FROM assistant_pending_actions WHERE id = ? AND tenant_id = ? AND user_id = ?`).get(actionId, context.tenantId, context.userId)

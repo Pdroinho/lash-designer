@@ -48,6 +48,7 @@ type Usage = {
 type PendingAction = {
   id: string
   type:
+    | 'UPDATE_BRAND_IMAGE'
     | 'CREATE_SERVICE'
     | 'CONFIRM_APPOINTMENT'
     | 'CREATE_SUPPORT_TICKET'
@@ -94,6 +95,7 @@ const starters: Starter[] = [
   {title:'Me lembre pelo WhatsApp',prompt:'Quero receber um lembrete no meu WhatsApp. Pergunte o que devo lembrar, o dia e o horário antes de preparar.'},
 ]
 const capabilities: Starter[] = [
+  {title:'Preparar minha logo',prompt:'Quero remover o fundo liso da minha logo e recortar as margens vazias. Use a logo atual ou peça que eu envie a imagem. Prepare uma prévia para eu revisar antes de aplicar.'},
   {title:'Agenda e comparecimentos',prompt:'Me ajude a conferir os atendimentos de um período e registrar quem veio ou faltou. Pergunte qual período quero consultar.'},
   {title:'Financeiro e metas',prompt:'Me ajude a registrar ou corrigir um lançamento financeiro, ou ajustar uma meta. Pergunte o que quero fazer e prepare a alteração para minha revisão.'},
   {title:'Suporte e meus chamados',prompt:'Consulte meus chamados, explique as respostas públicas da equipe e o que preciso fazer. Se necessário, me ajude a preparar uma resposta.'},
@@ -553,6 +555,7 @@ export function LumaConversation({
       body: '{}',
       timeoutMs: 25_000,
     })
+    if (result.ok && result.data.actionType === 'UPDATE_BRAND_IMAGE') window.dispatchEvent(new Event('lashdesigner:brand-updated'))
     setMessages((items) =>
       items.map((message) =>
         message.id !== messageId
@@ -1039,6 +1042,7 @@ export function LumaConversation({
                                 <div>
                                   <strong>{action.title}</strong>
                                   <span>{action.description}</span>
+                                  {action.type === 'UPDATE_BRAND_IMAGE' && typeof action.payload?.imageDataUrl === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(action.payload.imageDataUrl) ? <div className="luma-logo-preview"><img src={action.payload.imageDataUrl} alt="Prévia da logo preparada" /></div> : null}
                                   {action.feedback ? (
                                     <small>{action.feedback}</small>
                                   ) : null}
