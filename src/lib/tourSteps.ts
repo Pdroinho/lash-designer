@@ -23,7 +23,7 @@ export const shellTourSteps = (area: 'admin' | 'dev' | 'client', screen: string)
     clients: 'Consulte o histórico das clientes e identifique relacionamento, retorno e valor gerado.',
     services: 'Mantenha catálogo, duração, preço, imagem e disponibilidade dos serviços sempre atualizados.',
     team: 'Adicione profissionais, escolha os serviços que cada uma realiza e organize horários, folgas e acesso ao painel.',
-    assistant:'Converse com a Luma, consulte atendimentos por período, marque comparecimentos, acompanhe pedidos de ajuda e programe lembretes pessoais. Ajuste o jeito de conversar em Do meu jeito.',
+    assistant:'Converse com a Luma, consulte atendimentos por período, marque comparecimentos, acompanhe pedidos de ajuda e programe lembretes pessoais. Peça também para personalizar o jeito da Luma conversar.',
     billing:'Escolha a faixa que comporta sua equipe: até 3, 6 ou 15 profissionais. Confira o valor, a validade e a disponibilidade da contratação antes de pagar.',
     support:'Toque em Pedir ajuda para descrever o que aconteceu. Meus pedidos reúne as conversas; Aguardando você significa que a equipe precisa de uma resposta sua.',
     referrals:'Compartilhe seu convite e acompanhe os benefícios das indicações válidas. Descontos só são aplicados conforme as regras mostradas na assinatura.',
@@ -73,7 +73,7 @@ export const shellTourSteps = (area: 'admin' | 'dev' | 'client', screen: string)
     })
   }
   if(area === 'admin') filtered.push({selector:'[data-tour="luma-context"]',title:'Luma junto da sua rotina',description:'Peça ajuda sobre a tela em que você está. Alterações em agenda, financeiro e suporte ficam prontas para você revisar e confirmar.'})
-  if(area==='admin' && screen==='assistant') filtered.push({selector:'[data-tour="luma-tools"]',title:'Mais que uma conversa',description:'Minha rotina mostra a agenda no período escolhido. Meus pedidos acompanha o suporte; Lembretes programa mensagens para seu WhatsApp e Do meu jeito personaliza a Luma.'})
+  if(area==='admin' && screen==='assistant') filtered.push({selector:'[data-tour="luma-capabilities"]',title:'Tudo em uma conversa',description:'Peça para consultar a agenda, registrar quem veio, organizar o financeiro, acompanhar chamados, agendar lembretes ou personalizar a Luma. Os exemplos ajudam você a começar; as alterações precisam da sua confirmação.'})
   if(area==='admin' && screen==='billing') filtered.push({selector:'[data-tour="billing-summary"]',title:'Confira antes de contratar',description:'Veja o valor final, a validade e os descontos aplicados. Se sua assinatura já estiver ativa, a tela mostra a próxima ação disponível.'})
   return filtered
 }

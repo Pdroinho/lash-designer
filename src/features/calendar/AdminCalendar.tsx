@@ -4,6 +4,8 @@ import type { CalendarEvent } from '../../types'
 import type { AdminAppointment } from '../shared/types'
 import { appointmentPresenceMeta } from '../../lib/runtime'
 import { addDaysToYmd, formatDateInZone, formatTimeInZone, localDateToYmd, minutesInTimeZone, ymdInTimeZone, zonedDateTimeToUtc } from '../../dateTime'
+import { ProductDate } from '../../components/ProductDate'
+import { ProductTime } from '../../components/ProductTime'
 import { ProductSelect } from '../../components/ProductSelect'
 import { confirmAction, notify } from '../../components/FeedbackCenter'
 import { AppointmentDetailsModal, NewAppointmentModal } from './AppointmentModals'
@@ -13,6 +15,7 @@ export function AdminCalendar() {
     const [view, setView] = useState<'week' | 'month'>('week')
     const [currentDate, setCurrentDate] = useState(new Date())
     const [events, setEvents] = useState<CalendarEvent[]>([])
+    const [appointmentsError,setAppointmentsError]=useState<string|null>(null)
     const [loading, setLoading] = useState(false)
     const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false)
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
@@ -409,7 +412,8 @@ export function AdminCalendar() {
                 }
             })
             setEvents(mapped)
-        }
+            setAppointmentsError(null)
+        }else setAppointmentsError(res.error.message)
         setLoading(false)
     }
 
@@ -451,6 +455,7 @@ export function AdminCalendar() {
 
     return (
         <div ref={agendaRef} className="ld-agenda">
+            {appointmentsError ? <div className="card product-load-state" role="alert"><strong>Não foi possível atualizar a agenda.</strong><p>{appointmentsError}</p><button type="button" className="btn" onClick={()=>void fetchEvents()}>Tentar novamente</button></div> : null}
             <div className="ld-agenda-tabs" role="tablist" aria-label="Seções da agenda">
                 <button type="button"
                     className={`ld-agenda-tab ${agendaTab === 'appointments' ? 'is-active' : ''}`} role="tab" aria-selected={agendaTab === 'appointments'}
@@ -518,7 +523,7 @@ export function AdminCalendar() {
                                 </span>
                             </button>
                         })}
-                        {!loading && mobileDayEvents.length === 0 ? <div className="ld-mobile-agenda-empty"><span><Calendar size={22} /></span><strong>Um dia com espaço para respirar.</strong><p>Nenhum atendimento marcado para esta data.</p><button type="button" onClick={() => setIsNewAppointmentOpen(true)}>Criar agendamento <ArrowRight size={15} /></button></div> : null}
+                        {!loading && !appointmentsError && mobileDayEvents.length === 0 ? <div className="ld-mobile-agenda-empty"><span><Calendar size={22} /></span><strong>Um dia com espaço para respirar.</strong><p>Nenhum atendimento marcado para esta data.</p><button type="button" onClick={() => setIsNewAppointmentOpen(true)}>Criar agendamento <ArrowRight size={15} /></button></div> : null}
                     </div>
                 </section>
                 <div className="ld-calendar">
@@ -862,26 +867,14 @@ export function AdminCalendar() {
                             <h4 style={{margin: '0 0 16px', fontSize: '1rem'}}>Novo Bloqueio</h4>
                             <div className="grid grid-3" style={{gap: 12}}>
                                 <div className="agenda-input-group">
-                                    <label className="agenda-label">Início</label>
-                                    <div className="time-input-wrapper">
-                                        <input
-                                            type="datetime-local"
-                                            className="time-input"
-                                            value={timeOffAdd.startsLocal}
-                                            onChange={(e) => setTimeOffAdd(prev => ({ ...prev, startsLocal: e.target.value }))}
-                                        />
-                                    </div>
+                                    <ProductDate label="Data de início" value={timeOffAdd.startsLocal.slice(0,10)} today={ymdInTimeZone(new Date(),tenantTimeZone)!} disabled={false} onChange={day=>setTimeOffAdd(prev=>({...prev,startsLocal:`${day}T${prev.startsLocal.slice(11)}`}))}/>
+                                    <ProductTime label="Horário de início" value={Number(timeOffAdd.startsLocal.slice(11,13))*60+Number(timeOffAdd.startsLocal.slice(14,16))} onChange={minute=>setTimeOffAdd(prev=>({...prev,startsLocal:`${prev.startsLocal.slice(0,10)}T${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`}))}/>
+
                                 </div>
                                 <div className="agenda-input-group">
-                                    <label className="agenda-label">Fim</label>
-                                    <div className="time-input-wrapper">
-                                        <input
-                                            type="datetime-local"
-                                            className="time-input"
-                                            value={timeOffAdd.endsLocal}
-                                            onChange={(e) => setTimeOffAdd(prev => ({ ...prev, endsLocal: e.target.value }))}
-                                        />
-                                    </div>
+                                    <ProductDate label="Data de fim" value={timeOffAdd.endsLocal.slice(0,10)} today={ymdInTimeZone(new Date(),tenantTimeZone)!} disabled={false} onChange={day=>setTimeOffAdd(prev=>({...prev,endsLocal:`${day}T${prev.endsLocal.slice(11)}`}))}/>
+                                    <ProductTime label="Horário de fim" value={Number(timeOffAdd.endsLocal.slice(11,13))*60+Number(timeOffAdd.endsLocal.slice(14,16))} onChange={minute=>setTimeOffAdd(prev=>({...prev,endsLocal:`${prev.endsLocal.slice(0,10)}T${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`}))}/>
+
                                 </div>
                                 <div className="agenda-input-group">
                                     <label className="agenda-label">Motivo</label>

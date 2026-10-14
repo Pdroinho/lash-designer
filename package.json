@@ -1,7 +1,7 @@
 {
   "name": "lashdesigner",
   "private": true,
-  "version": "5.13.0",
+  "version": "5.13.2",
   "description": "Agenda online para lash designers",
   "type": "module",
   "main": "dist/server/index.js",
@@ -54,7 +54,9 @@
     "test:report-ux-ui": "node scripts/check-report-ux-ui.mjs",
     "test:referral-team-ui": "node scripts/check-referral-team-ui.mjs",
     "test:team-ui": "node scripts/check-team-ui.mjs",
-    "test:luma-integrated-ui": "node scripts/check-luma-integrated-ui.mjs"
+    "test:luma-integrated-ui": "node scripts/check-luma-integrated-ui.mjs",
+    "test:product-refinement-ui": "node scripts/check-product-refinement-ui.mjs",
+    "test:product-form-controls-ui": "node scripts/check-product-refinement-ui.mjs --forms"
   },
   "dependencies": {
     "@phosphor-icons/react": "2.1.10",

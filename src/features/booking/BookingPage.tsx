@@ -188,6 +188,8 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
     Promise.all([tenantPromise, servicesPromise, bookingPromise]).then(([tenantRes, servicesRes, bookingRes]) => {
       if (!mounted) return
       if (!tenantRes.ok) { setLoadError(tenantRes.error.message); return }
+      if(!servicesRes.ok){setLoadError(servicesRes.error.message);return}
+      if(!bookingRes.ok){setLoadError(bookingRes.error.message);return}
       setTenant(tenantRes.data.tenant)
       applyTenantTheme(tenantRes.data.tenant)
       if (servicesRes.ok) setServices(servicesRes.data.services)

@@ -4,6 +4,8 @@ import type { CalendarEvent } from '../../types'
 import type { AdminAppointment, AdminService } from '../shared/types'
 import { appointmentPresenceMeta } from '../../lib/runtime'
 import { formatDateInZone, formatDateTimeInZone, formatTimeInZone, localDateToYmd, zonedDateTimeToUtc } from '../../dateTime'
+import { ProductDate } from '../../components/ProductDate'
+import { ProductTime } from '../../components/ProductTime'
 import { ProductSelect } from '../../components/ProductSelect'
 import { confirmAction, notify } from '../../components/FeedbackCenter'
 import { ModalRoot } from '../../components/ModalRoot'
@@ -162,7 +164,7 @@ export function NewAppointmentModal({
         <ModalRoot className="modal-overlay" onClick={onClose}>
             <div className="ld-dialog" role="dialog" aria-modal="true" aria-labelledby="appointment-create-title" onClick={e => e.stopPropagation()}>
                 <div className="cardHeader">
-                    <h3 id="appointment-create-title" className="cardTitle">Novo Agendamento</h3>
+                    <h3 id="appointment-create-title" className="cardTitle">Novo agendamento</h3>
                     <button type="button" className="icon-btn" onClick={onClose} style={{width: 32, height: 32, border: 'none'}} aria-label="Fechar janela">
                         <X size={18} />
                     </button>
@@ -222,23 +224,13 @@ export function NewAppointmentModal({
 
                         <div className="row">
                             <div className="input-group">
-                                <label className="label">Data</label>
-                                <input
-                                    type="date"
-                                    className="input"
-                                    value={date}
-                                    onChange={e => setDate(e.target.value)}
-                                />
+                                <ProductDate label="Data do agendamento" value={date} onChange={setDate} today={localDateToYmd(new Date())} disabled={loading}/>
+
                             </div>
                             <div className="input-group">
                                 <label className="label">Horário</label>
                                 <div className="input-wrapper">
-                                    <input
-                                        type="time"
-                                        className="input"
-                                        value={time}
-                                        onChange={e => setTime(e.target.value)}
-                                    />
+                                    <ProductTime label="Horário do agendamento" value={Number(time.slice(0,2))*60+Number(time.slice(3))} disabled={loading} onChange={minute=>setTime(`${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`)}/>
                                 </div>
                             </div>
                         </div>

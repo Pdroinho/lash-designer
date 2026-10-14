@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Calendar } from './Icons'
 import { parseYmd } from '../dateTime'
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -17,6 +17,8 @@ export function ProductDate({
   disabled: boolean
   minDate?: string
 }) {
+  const triggerRef=useRef<HTMLButtonElement>(null)
+  const close=()=>{setOpen(false);triggerRef.current?.focus({preventScroll:true})}
   const [open, setOpen] = useState(false)
   const seed = parseYmd(value || today)!
   const [month, setMonth] = useState(
@@ -32,6 +34,7 @@ export function ProductDate({
       <button
         type="button"
         className="btn ld-date-trigger"
+        ref={triggerRef}
         disabled={disabled}
         aria-expanded={open}
         aria-label={label}
@@ -51,7 +54,7 @@ export function ProductDate({
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.stopPropagation()
-              setOpen(false)
+              close()
             }
           }}
         >
@@ -101,7 +104,7 @@ export function ProductDate({
                   aria-pressed={date === value}
                   onClick={() => {
                     onChange(date)
-                    setOpen(false)
+                    close()
                   }}
                 >
                   {i + 1}
@@ -112,7 +115,7 @@ export function ProductDate({
           <button
             type="button"
             className="btn btn-ghost team-text-button"
-            onClick={() => setOpen(false)}
+            onClick={close}
           >
             Fechar calendário
           </button>

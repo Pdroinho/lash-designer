@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
+import { formatBrazilPhoneInput } from '../../phone'
 import { api } from '../../api'
 import type { AdminClientRow } from '../shared/types'
 import { formatBRL } from '../../lib/runtime'
@@ -8,6 +9,8 @@ import { Search, X } from '../../components/Icons'
 export function AdminClients() {
     const [clients, setClients] = useState<AdminClientRow[]>([])
     const [loading, setLoading] = useState(true)
+    const [error,setError]=useState<string|null>(null)
+    const [revision,setRevision]=useState(0)
     const [query, setQuery] = useState('')
 
     useEffect(() => {
@@ -15,21 +18,15 @@ export function AdminClients() {
         setLoading(true)
         api<{ clients: AdminClientRow[] }>('/api/admin/clients').then(res => {
             if (!mounted) return
-            if (res.ok) setClients(res.data.clients)
+            if (res.ok){setClients(res.data.clients);setError(null)}
+            else setError(res.error.message)
             setLoading(false)
         })
         return () => {
             mounted = false
         }
-    }, [])
+    }, [revision])
 
-    const palette = [
-        { bg: undefined as string | undefined, fg: undefined as string | undefined },
-        { bg: '#e0f2fe', fg: 'var(--status-info-ink)' },
-        { bg: '#fef3c7', fg: '#b45309' },
-        { bg: '#f3e8ff', fg: '#6b21a8' },
-        { bg: '#ffe4e6', fg: '#9d174d' },
-    ]
 
     const initials = (name: string) => {
         const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -38,19 +35,16 @@ export function AdminClients() {
         return (a + b).toUpperCase()
     }
 
-    const colorFor = (name: string) => {
-        let h = 0
-        for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-        return palette[h % palette.length]
-    }
+  const colorFor = (name: string) => ({ bg: 'var(--brand-soft)', fg: 'var(--ink-strong)', name })
 
     const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR')
     const filteredClients = normalizedQuery
-        ? clients.filter((client) => [client.name, client.phone ?? '', client.email].some((value) => value.toLocaleLowerCase('pt-BR').includes(normalizedQuery)))
+        ? clients.filter((client) => [client.name, client.phone ?? '', client.email].some((value) => value.toLocaleLowerCase('pt-BR').includes(normalizedQuery)) || (/^[+()\d\s.-]+$/.test(normalizedQuery) && normalizedQuery.replace(/\D/g,'').length>=3 && (client.phone ?? '').replace(/\D/g,'').includes(normalizedQuery.replace(/\D/g,''))))
         : clients
     const topClient = clients.reduce<AdminClientRow | null>((best, client) => !best || client.totalSpentCents > best.totalSpentCents ? client : best, null)
     const visitedClients = clients.filter((client) => Boolean(client.lastVisitAt)).length
 
+    if(error)return <section className="card product-load-state" role="alert"><h2 className="cardTitle">Não foi possível carregar as clientes.</h2><p>{error}</p><button type="button" className="btn" onClick={()=>setRevision(r=>r+1)} disabled={loading}>{loading?'Carregando…':'Tentar novamente'}</button></section>
     return (
         <div className="card client-admin-page">
             <section className="client-mobile-overview" aria-label="Resumo da base de clientes">
@@ -69,7 +63,7 @@ export function AdminClients() {
             </div>
             <label className="client-search" aria-label="Buscar clientes">
                 <Search size={18} />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nome, telefone ou e-mail" />
+                <input aria-label="Buscar clientes" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nome, telefone ou e-mail" />
                 {query ? <button type="button" onClick={() => setQuery('')} aria-label="Limpar busca"><X size={15} /></button> : null}
             </label>
             {loading ? (
@@ -141,7 +135,7 @@ export function AdminClients() {
                         <div className="user-avatar-mini client-mobile-avatar" style={{ background: col.bg, color: col.fg }}>{initials(client.name)}</div>
                         <div className="client-mobile-main">
                             <strong>{client.name}</strong>
-                            <span>{client.phone || client.email || 'Sem contato informado'}</span>
+                            <span>{client.phone ? formatBrazilPhoneInput(client.phone) : client.email || 'Sem contato informado'}</span>
                             <div className="client-mobile-tags">
                                 {client.marketingWhatsappOptIn ? <em className="is-ok">Promoções autorizadas</em> : <em>Sem promoções</em>}
                                 {client.lastVisitAt ? <em>Última visita {new Date(client.lastVisitAt).toLocaleDateString('pt-BR')}</em> : <em>Primeira visita pendente</em>}

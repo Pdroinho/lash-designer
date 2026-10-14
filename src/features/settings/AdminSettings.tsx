@@ -444,7 +444,6 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
 
     return (
         <div className="settings-page">
-            <CustomDomainsSettings />
             <div className="settings-grid">
             <div className="settings-column">
                 <div className="card">
@@ -474,7 +473,7 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
                                             <button type="button" className="btn" onClick={() => logoInputRef.current?.click()} disabled={logoBusy}>Trocar logo</button>
                                             {logoUrl && <button type="button" className="icon-btn domain-delete" onClick={() => setLogoUrl('')} aria-label="Remover logo"><Trash2 size={16} /></button>}
                                         </div>
-                                        <p className="form-help">PNG, JPG ou WebP. A imagem é redimensionada e comprimida antes do envio.</p>
+                                        <p className="form-help">Use uma imagem nítida, em PNG, JPG ou WebP.</p>
                                         {logoError && <p className="form-error" role="alert">{logoError}</p>}
                                     </div>
                                     <input type="file" ref={logoInputRef} className="visually-hidden" accept="image/png,image/jpeg,image/webp" onChange={e => { const f = e.target.files?.[0]; if(f) void handleLogoFile(f); e.currentTarget.value = '' }} />
@@ -564,6 +563,7 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
                 </div>
             </div>
         </div>
+        <CustomDomainsSettings />
         </div>
     )
 }

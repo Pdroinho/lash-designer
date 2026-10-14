@@ -506,3 +506,13 @@
     align-items: stretch;
   }
 }
+
+/* Keep sections separate from the independently scrolling form body. */
+.team-dialog>.team-tabs {position:static;flex:0 0 auto;margin-bottom:var(--ld-space-4);}
+.team-dialog>.team-dialog-body {flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding-top:var(--ld-space-3);}
+.team-member-actions {display:flex;flex-wrap:wrap;gap:var(--ld-space-3);}
+.team-remove-member {margin-top:var(--ld-space-6);padding-top:var(--ld-space-5);border-top:1px solid var(--ld-color-line-soft);}
+.team-remove-member h4 {margin:0 0 var(--ld-space-2);}
+.team-dialog>.cardHeader {display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:var(--ld-space-4);}
+.team-dialog>.cardHeader>.icon-btn {flex:0 0 40px;}
+@media(max-width:480px){.team-member-actions>.btn,.team-remove-member>.btn{width:100%;}.team-dialog>.team-tabs{margin-bottom:var(--ld-space-3);}}

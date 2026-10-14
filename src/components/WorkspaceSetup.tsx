@@ -6,6 +6,7 @@ import { optimizeImageFile } from '../imageProcessing'
 import type { TenantPublic } from '../types'
 import { ArrowRight, Check, Palette, Sparkles, Upload } from './Icons'
 import { ProductSelect } from './ProductSelect'
+import { ProductTime } from './ProductTime'
 
 type SetupMode = 'ASSISTED' | 'MANUAL'
 type PaletteOption = { name: string; primary: string; secondary: string; background: string; rationale: string }
@@ -236,7 +237,7 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
             <div className="workspace-days">
               {weekdays.map(([letter, label], index) => <button type="button" key={label} className={workingDays.includes(index) ? 'is-selected' : ''} onClick={() => setWorkingDays((days) => days.includes(index) ? days.filter((day) => day !== index) : [...days, index])} aria-label={label} title={label}>{letter}<small>{label.slice(0, 3)}</small></button>)}
             </div>
-            <div className="workspace-time-grid"><label>Começo<input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label><span>até</span><label>Fim<input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label></div>
+            <div className="workspace-time-grid"><label>Começo<ProductTime label="Horário de início" value={Number(startTime.slice(0,2))*60+Number(startTime.slice(3))} onChange={minute=>setStartTime(`${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`)}/></label><span>até</span><label>Fim<ProductTime label="Horário de fim" value={Number(endTime.slice(0,2))*60+Number(endTime.slice(3))} onChange={minute=>setEndTime(`${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`)}/></label></div>
             <div className="workspace-schedule-preview"><span>Resumo</span><strong>{workingDays.length} {workingDays.length === 1 ? 'dia' : 'dias'} por semana · {startTime} às {endTime}</strong><small>Você poderá personalizar cada dia na Agenda.</small></div>
           </div> : null}
 

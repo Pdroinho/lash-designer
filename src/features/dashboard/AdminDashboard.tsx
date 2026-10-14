@@ -8,7 +8,7 @@ import { notify } from '../../components/FeedbackCenter'
 import { PortalMenu } from '../../components/PortalMenu'
 import { ArrowRight, Calendar, Check, Clock, Copy, Globe, MoreHorizontal, Users, Wallet } from '../../components/Icons'
 
-export function AdminDashboard({ me, stats, onRefresh, onOpenAgenda }: { me: SessionUser | null; stats: AdminStats | null; onRefresh?: () => void; onOpenAgenda: () => void }) {
+export function AdminDashboard({ me, stats, onRefresh, onOpenAgenda, dataError }: { me: SessionUser | null; stats: AdminStats | null; dataError?: string | null; onRefresh?: () => void; onOpenAgenda: () => void }) {
   const [updating, setUpdating] = useState(false)
 
   async function handleStatusChange(id: string, status: string) {
@@ -54,13 +54,6 @@ export function AdminDashboard({ me, stats, onRefresh, onOpenAgenda }: { me: Ses
     window.setTimeout(() => setCopied(false), 2000)
   }
 
-  const palette = [
-    { bg: undefined as string | undefined, fg: undefined as string | undefined },
-    { bg: '#e0f2fe', fg: 'var(--status-info-ink)' },
-    { bg: '#fef3c7', fg: '#b45309' },
-    { bg: '#f3e8ff', fg: '#6b21a8' },
-    { bg: '#ffe4e6', fg: '#9d174d' },
-  ]
 
   const initials = (name: string) => {
     const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -69,11 +62,7 @@ export function AdminDashboard({ me, stats, onRefresh, onOpenAgenda }: { me: Ses
     return (a + b).toUpperCase()
   }
 
-  const colorFor = (name: string) => {
-    let h = 0
-    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-    return palette[h % palette.length]
-  }
+  const colorFor = (name: string) => ({ bg: 'var(--brand-soft)', fg: 'var(--ink-strong)', name })
 
   const fmtTime = (iso: string) => formatTimeInZone(iso, dashboardTimeZone)
 
@@ -150,6 +139,8 @@ export function AdminDashboard({ me, stats, onRefresh, onOpenAgenda }: { me: Ses
   const attentionCount = (stats?.confirmationSummary?.noResponse ?? 0) + (stats?.confirmationSummary?.deliveryFailed ?? 0) + (stats?.confirmationSummary?.declined ?? 0)
   const todayLabel = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: dashboardTimeZone }).format(new Date())
 
+  if(dataError)return <section className="card product-load-state" role="alert"><h2 className="cardTitle">Não foi possível atualizar o resumo.</h2><p>{dataError}</p><button type="button" className="btn" onClick={onRefresh}>Tentar novamente</button></section>
+  if(!stats)return <section className="card product-load-state" aria-busy="true" role="status"><span className="spinner"/>Carregando o resumo do estúdio…</section>
   return (
     <div className="ld-dashboard-page">
       <section className="ld-mobile-dashboard-stage" aria-label="Resumo do dia">

@@ -114,12 +114,14 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
 
   useEffect(() => { const view = new URLSearchParams(location.search).get('view'); if (view && adminTabs.includes(view as AdminTab)) setTab(view as AdminTab) }, [location.search])
 
+  const [statsError,setStatsError]=useState<string|null>(null)
   const [stats, setStats] = useState<AdminStats | null>(null)
   const adminTourSteps = useMemo(() => shellTourSteps('admin', tab), [tab])
 
   function loadStats() {
     api<AdminStats>('/api/admin/dashboard').then(res => {
-        if(res.ok) setStats(res.data)
+        if(res.ok){setStats(res.data);setStatsError(null)}
+        else setStatsError(res.error.message)
     })
   }
 
@@ -318,7 +320,7 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
               tab === 'support' ? <SupportCenter role="ADMIN" /> : <BillingCenter locked />
           ) : (
               <>
-                {tab === 'dashboard' ? <AdminDashboard me={me} stats={stats} onRefresh={loadStats} onOpenAgenda={() => goTab('calendar')} /> : null}
+                {tab === 'dashboard' ? <AdminDashboard me={me} stats={stats} dataError={statsError} onRefresh={loadStats} onOpenAgenda={() => goTab('calendar')} /> : null}
 
                 {tab === 'support' ? <SupportCenter role="ADMIN" /> : null}
 
@@ -352,7 +354,7 @@ export function Admin(props: { tenant?: TenantPublic; tenantSlug?: string; baseP
                   }
                   loadStats()
                 }} /> : null}
-                {tab !== 'assistant' ? <LumaChatLauncher floating={!['team','support','billing'].includes(tab)} /> : null}
+                {tab !== 'assistant' ? <LumaChatLauncher floating={false} /> : null}
               </>
           )}
         </Suspense>

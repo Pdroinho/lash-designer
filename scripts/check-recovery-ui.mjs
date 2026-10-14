@@ -33,12 +33,14 @@ try {
     await page.setViewportSize(viewport)
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
+    let zoneUnavailable=true
     let oldRequest
     let markOldStarted
     const oldStarted = new Promise(resolve => { markOldStarted = resolve })
     await page.route('**/api/**', async route => {
       const url = new URL(route.request().url())
       if (url.pathname === '/api/public/tenant') return json(route, { tenant })
+      if(url.pathname==='/api/public/booking')return zoneUnavailable?json(route,{message:'Timezone unavailable'},503):json(route,{timezone:'America/Bahia'})
       if (url.pathname === '/api/auth/me') return json(route, { user: { id: 'staff-ui', role: 'STAFF', tenantId: tenant.id, tenantSlug: tenant.slug } })
       if (url.pathname === '/api/staff/appointments') {
         if (url.searchParams.get('start')?.startsWith(oldDay)) {
@@ -51,23 +53,28 @@ try {
       return json(route, { message: 'Unexpected fixture endpoint' }, 404)
     })
     await page.goto(origin + '/equipe')
+    await page.getByRole('alert').filter({hasText:'Não foi possível consultar o fuso'}).waitFor()
+    assert.equal(await page.locator('.staff-area-list').count(),0)
+    zoneUnavailable=false;await page.getByRole('button',{name:'Tentar novamente',exact:true}).click()
     await page.getByRole('heading', { name: 'Olá, Ana.' }).waitFor()
-    const date = page.locator('input[type="date"]')
-    await date.fill('')
-    await page.getByRole('alert').filter({ hasText: 'Escolha uma data válida' }).waitFor()
-    assert.equal(await page.locator('.staff-area-list').count(), 0)
     await page.getByRole('button', { name: 'Hoje', exact: true }).click()
     await page.locator('.staff-area-list').waitFor()
-    await date.fill(oldDay)
+    const selectDay=async ymd=>{
+      await page.getByRole('button',{name:'Escolha o dia',exact:true}).click()
+      const target=new Date(ymd+'T12:00:00Z').toLocaleDateString('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'})
+      for(let i=0;i<2&&(await page.locator('.ld-date-picker header strong').innerText())!==target;i++)await page.getByRole('button',{name:'Próximo mês Escolha o dia',exact:true}).click()
+      await page.getByRole('button',{name:ymd.split('-').reverse().join('/'),exact:true}).click()
+    }
+    await selectDay(oldDay)
     await Promise.race([oldStarted, new Promise((_, reject) => setTimeout(() => reject(new Error('Delayed request did not start')), 5000))])
-    await date.fill(latestDay)
+    await selectDay(latestDay)
     await page.locator('.staff-area-list').getByText('Último dia', { exact: true }).waitFor()
     await json(oldRequest, { professional: { name: 'Ana' }, appointments: [{ id: 'old', startsAt: '2026-10-12T12:00:00Z', endsAt: '2026-10-12T13:00:00Z', status: 'CONFIRMED', serviceName: 'Dia antigo', clientName: 'Cliente QA' }] }).catch(() => {})
     await page.waitForTimeout(100)
     assert.equal(await page.getByText('Dia antigo', { exact: true }).count(), 0)
     assert.deepEqual(errors, [])
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
-    console.log(`PASS STAFF date validation, return to today, stale response and no horizontal overflow ${viewport.width}x${viewport.height}`)
+    console.log(`PASS STAFF timezone recovery, shared date selection, stale response and no horizontal overflow ${viewport.width}x${viewport.height}`)
     await page.unroute('**/api/**')
   }
   await page.setViewportSize({ width: 390, height: 844 })

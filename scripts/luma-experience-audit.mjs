@@ -34,7 +34,7 @@ const checks = [
   ['ações aparecem como cards de confirmação', conversation.includes('luma35-actions') && conversation.includes('confirmAction')],
   ['histórico pesquisável permanece disponível', conversation.includes('historyQuery') && conversation.includes('Buscar conversa')],
   ['drawer e página compartilham o mesmo componente', launcher.includes('<LumaConversation variant="drawer"') && adminApp.includes('<BusinessAssistant />')],
-  ['launcher não sobrepõe Luma, suporte e assinatura', adminApp.includes("tab !== 'assistant' ? <LumaChatLauncher floating={!['team','support','billing'].includes(tab)} /> : null")],
+  ['launcher não sobrepõe Luma, suporte e assinatura', adminApp.includes("tab !== 'assistant' ? <LumaChatLauncher floating={false} /> : null")],
   ['Luma 3.5 é a folha ativa', main.includes("import './luma-v35.css'")],
   ['CSS evita 100vw/100dvw', !/100d?vw/.test(css)],
   ['histórico não é renderizado no meio da conversa', !conversation.includes("renderHistory('thread')") && !conversation.includes("renderHistory('empty')")],

@@ -88,31 +88,18 @@ type Starter = {
 }
 
 const starters: Starter[] = [
-  {
-    title: 'Como está minha agenda esta semana?',
-    prompt:
-      'Mostre minha agenda desta semana, por profissional, e destaque os atendimentos passados sem comparecimento registrado. Consulte todas as páginas necessárias.',
-  },
-  {
-    title: 'Preciso de ajuda da equipe',
-    prompt:
-      'Quero que você me ajude a descrever um problema e preparar um pedido para o suporte humano. Pergunte o que aconteceu antes de criar o pedido.',
-  },
-  {
-    title: 'Quais serviços estão mais rentáveis agora?',
-    prompt:
-      'Analise meus serviços e me diga quais estão mais rentáveis agora, quais merecem atenção e o que eu faria primeiro para melhorar margem e recorrência.',
-  },
-  {
-    title: 'Como posso atrair mais clientes?',
-    prompt:
-      'Olhe os sinais do meu espaço e me dê sugestões práticas para atrair mais clientes sem perder posicionamento e sem criar uma rotina impossível de manter.',
-  },
-  {
-    title: 'Quais são os próximos 3 movimentos?',
-    prompt:
-      'Com base nos dados do meu espaço, quais são as 3 prioridades mais importantes para eu melhorar minha operação agora?',
-  },
+  {title:'Organize minha agenda',prompt:'Mostre minha agenda desta semana por profissional e destaque atendimentos passados sem comparecimento registrado. Consulte todas as páginas necessárias.'},
+  {title:'Me ajude com o financeiro',prompt:'Consulte meu financeiro deste mês, resuma entradas, despesas e saldo, e me explique o que merece atenção.'},
+  {title:'Preciso de ajuda',prompt:'Preciso de ajuda com um problema na plataforma. Converse comigo para entender e, se precisar da equipe humana, prepare um chamado para minha revisão.'},
+  {title:'Me lembre pelo WhatsApp',prompt:'Quero receber um lembrete no meu WhatsApp. Pergunte o que devo lembrar, o dia e o horário antes de preparar.'},
+]
+const capabilities: Starter[] = [
+  {title:'Agenda e comparecimentos',prompt:'Me ajude a conferir os atendimentos de um período e registrar quem veio ou faltou. Pergunte qual período quero consultar.'},
+  {title:'Financeiro e metas',prompt:'Me ajude a registrar ou corrigir um lançamento financeiro, ou ajustar uma meta. Pergunte o que quero fazer e prepare a alteração para minha revisão.'},
+  {title:'Suporte e meus chamados',prompt:'Consulte meus chamados, explique as respostas públicas da equipe e o que preciso fazer. Se necessário, me ajude a preparar uma resposta.'},
+  {title:'Lembretes no WhatsApp',prompt:'Consulte meus lembretes pessoais. Posso pedir para agendar um novo ou cancelar um existente; pergunte o que quero fazer.'},
+  {title:'Serviços e clientes',prompt:'Consulte os dados reais do estúdio e me ajude com serviços e clientes. Pergunte o que preciso organizar.'},
+  {title:'Personalizar a Luma',prompt:'Quero personalizar como você me ajuda. Pergunte meu tom preferido, meu foco e minhas orientações, e prepare as preferências para eu confirmar.'},
 ]
 
 const followUps: Starter[] = [
@@ -967,6 +954,16 @@ export function LumaConversation({
         </div>
       ) : null}
 
+      <details className="luma-chat-capabilities" data-tour="luma-capabilities">
+        <summary>O que posso pedir à Luma?<span aria-hidden="true">+</span></summary>
+        <div className="luma-chat-capabilities-body">
+          <p>Escolha um exemplo ou escreva o que precisa. Tudo acontece nesta conversa.</p>
+          <div className="luma-chat-examples">
+            {capabilities.map(item=><button type="button" className="btn btn-ghost" key={item.title} disabled={disabled || busy} onClick={event=>{choosePrompt(item.prompt);event.currentTarget.closest('details')?.removeAttribute('open')}}>{item.title}<ArrowRight size={14} aria-hidden="true"/></button>)}
+          </div>
+          <small>Alterações são apresentadas para sua confirmação. Se faltar informação, eu pergunto.</small>
+        </div>
+      </details>
       <main className="luma34-workspace">
         {view === 'history' ? (
           renderConversationsView()
@@ -986,10 +983,9 @@ export function LumaConversation({
                   <div className="luma34-empty-main">
                     <div className="luma34-hero">
                       <span className="luma34-eyebrow">Luma AI</span>
-                      <h3>Converse com a Luma</h3>
+                      <h3>Sua rotina, em uma conversa</h3>
                       <p>
-                        Receba orientações objetivas sobre agenda, clientes e
-                        financeiro.
+                        Peça do seu jeito. Eu consulto sua agenda, ajudo com o financeiro, acompanho chamados e preparo lembretes no WhatsApp. Você revisa antes de alterar qualquer coisa.
                       </p>
                     </div>
                   </div>

@@ -105,7 +105,9 @@ export function FinanceFlowChart({ data, currentMonthYm, formatCurrency }: Finan
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        resizeDelay: 80,
+        // Chart.js does not cancel the custom debounced update on destroy.
+        // Its responsive observer already batches resize work; avoid a timer that survives navigation.
+        resizeDelay: 0,
         animation: { duration: 280 },
         interaction: { mode: 'index', intersect: false },
         layout: { padding: isMobile ? { top: 6, right: 2, bottom: 0, left: 0 } : { top: 8, right: 6, bottom: 0, left: 0 } },
@@ -185,11 +187,11 @@ export function FinanceFlowChart({ data, currentMonthYm, formatCurrency }: Finan
         <span>{movementMonths === 1 ? '1 mês com movimentação' : `${movementMonths} meses com movimentação`}</span>
         <small>{movementMonths <= 2 ? 'A leitura fica mais comparável conforme o histórico cresce.' : 'Toque ou passe o cursor pelo gráfico para ver os valores de cada mês.'}</small>
       </div>
-      <table className="finance40-chart-table sr-only">
+      <div className="sr-only"><table className="finance40-chart-table">
         <caption>Valores financeiros dos últimos seis meses</caption>
         <thead><tr><th>Mês</th><th>Entradas</th><th>Saídas</th><th>Saldo</th></tr></thead>
         <tbody>{data.map((point) => <tr key={point.ym}><th>{point.label}</th><td>{formatCurrency(point.entriesCents / 100)}</td><td>{formatCurrency(point.expensesCents / 100)}</td><td>{formatCurrency(point.balanceCents / 100)}</td></tr>)}</tbody>
-      </table>
+      </table></div>
     </div>
   )
 }

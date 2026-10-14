@@ -3,7 +3,7 @@ import { api } from '../../api'
 import { optimizeImageFile } from '../../imageProcessing'
 import { bundledServiceCover, formatBRL } from '../../lib/runtime'
 import type { AdminService } from '../shared/types'
-import { confirmAction } from '../../components/FeedbackCenter'
+import { confirmAction, notify } from '../../components/FeedbackCenter'
 import { ModalRoot } from '../../components/ModalRoot'
 import { EmptyState } from '../../components/SharedUi'
 import { Edit2, Image as ImageIcon, Plus, Trash2, X } from '../../components/Icons'
@@ -11,6 +11,8 @@ import { Edit2, Image as ImageIcon, Plus, Trash2, X } from '../../components/Ico
 export function AdminServices() {
     const [services, setServices] = useState<AdminService[]>([])
     const [loading, setLoading] = useState(true)
+    const [loadError,setLoadError]=useState<string|null>(null)
+    const [saveError,setSaveError]=useState<string|null>(null)
     const [modalOpen, setModalOpen] = useState(false)
     const [newService, setNewService] = useState({ name: '', duration: 60, price: 0, coverUrl: '' })
     const [saving, setSaving] = useState(false)
@@ -29,11 +31,13 @@ export function AdminServices() {
     async function load() {
         setLoading(true)
         const res = await api<{services: AdminService[]}>('/api/admin/services')
-        if(res.ok) setServices(res.data.services)
+        if(res.ok) {setServices(res.data.services);setLoadError(null)}
+        else setLoadError(res.error.message)
         setLoading(false)
     }
 
     function openCreateModal() {
+        setSaveError(null)
         setCoverBusy(false)
         setCoverFileName(null)
         setCoverError(null)
@@ -44,6 +48,7 @@ export function AdminServices() {
     }
 
     function openEditModal(s: AdminService) {
+        setSaveError(null)
         setCoverBusy(false)
         setCoverFileName(null)
         setCoverError(null)
@@ -61,9 +66,11 @@ export function AdminServices() {
     async function handleDelete() {
         if (!editingId || !(await confirmAction({ title: 'Excluir serviço', message: 'Este serviço deixará de aparecer para novas clientes. Agendamentos existentes serão preservados.', confirmLabel: 'Excluir serviço', danger: true }))) return
         setSaving(true)
-        await api(`/api/admin/services/${editingId}`, { method: 'DELETE' })
+        const result=await api(`/api/admin/services/${editingId}`, { method: 'DELETE' })
         setSaving(false)
+        if(!result.ok){setSaveError(result.error.message);return}
         setModalOpen(false)
+        notify('Serviço excluído.','success')
         load()
     }
 
@@ -107,20 +114,13 @@ export function AdminServices() {
         if (newService.coverUrl) payload.coverUrl = newService.coverUrl
         else if (editingId && !newService.coverUrl) payload.coverUrl = null
 
-        if (editingId) {
-            await api(`/api/admin/services/${editingId}`, {
-                method: 'PATCH',
-                body: JSON.stringify(payload)
-            })
-        } else {
-            await api('/api/admin/services', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            })
-        }
-
+        setSaveError(null)
+        if(newService.name.trim().length<2 || !Number.isInteger(payload.durationMinutes) || payload.durationMinutes<=0 || !Number.isFinite(payload.priceCents) || payload.priceCents<0){setSaving(false);setSaveError('Confira o nome, a duração e o valor do serviço.');return}
+        const result=await api(editingId ? `/api/admin/services/${editingId}` : '/api/admin/services',{method:editingId?'PATCH':'POST',body:JSON.stringify(payload)})
         setSaving(false)
+        if(!result.ok){setSaveError(result.error.message);return}
         setModalOpen(false)
+        notify(editingId?'Serviço atualizado.':'Serviço adicionado.','success')
         load()
     }
 
@@ -137,7 +137,7 @@ export function AdminServices() {
                     </button>
                 </div>
 
-                {loading ? (
+                {loadError ? <div className="product-load-state" role="alert"><strong>Não foi possível carregar os serviços.</strong><p>{loadError}</p><button type="button" className="btn" onClick={()=>void load()}>Tentar novamente</button></div> : loading ? (
                     <div style={{padding: 20}}>
                         <div className="skeleton skeleton-card" style={{height: 160}} />
                     </div>
@@ -167,7 +167,7 @@ export function AdminServices() {
                                         </td>
                                         <td style={{fontWeight: 600, color: 'var(--gray-800)'}}>{s.name}</td>
                                         <td><span className="pill" style={{fontSize: '0.8rem'}}>{s.durationMinutes} min</span></td>
-                                        <td style={{fontWeight: 500}}>R$ {(s.priceCents/100).toFixed(2)}</td>
+                                        <td style={{fontWeight: 500}}>{formatBRL(s.priceCents/100)}</td>
                                         <td>
                                             <button type="button" className="icon-btn" style={{width: 32, height: 32}} onClick={() => openEditModal(s)} aria-label={`Editar serviço ${s.name}`}><Edit2 size={16}/></button>
                                         </td>
@@ -180,10 +180,10 @@ export function AdminServices() {
                         </table>
                     </div>
                 )}
-                {!loading ? <div className="service-mobile-list" aria-label="Serviços cadastrados">
+                {!loading && !loadError ? <div className="service-mobile-list" aria-label="Serviços cadastrados">
                     {services.map((service) => <article className="service-mobile-card" key={`mobile-${service.id}`}>
                         <img decoding="async" src={service.coverUrl || bundledServiceCover(service.name)} alt="" loading="lazy" onError={(event) => { event.currentTarget.src = '/placeholders/service-placeholder.webp' }} />
-                        <div className="service-mobile-copy"><strong>{service.name}</strong><div className="service-mobile-meta"><span>{service.durationMinutes} min</span><b>R$ {(service.priceCents / 100).toFixed(2)}</b></div></div>
+                        <div className="service-mobile-copy"><strong>{service.name}</strong><div className="service-mobile-meta"><span>{service.durationMinutes} min</span><b>{formatBRL(service.priceCents/100)}</b></div></div>
                         <button type="button" className="icon-btn service-mobile-edit" onClick={() => openEditModal(service)} aria-label={`Editar serviço ${service.name}`}><Edit2 size={17}/></button>
                     </article>)}
                     {services.length === 0 ? <EmptyState compact image="/empty-states/empty-calendar.png" title="Nenhum serviço cadastrado" description="Crie o primeiro serviço para começar a receber horários." /> : null}
@@ -193,18 +193,18 @@ export function AdminServices() {
             
 
             {modalOpen && (
-                <ModalRoot className="modal-overlay" onClick={() => setModalOpen(false)}>
+                <ModalRoot className="modal-overlay" onClick={() => {if(!saving && !coverBusy)setModalOpen(false)}}>
                     <div className="ld-dialog service-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="service-dialog-title" onClick={e => e.stopPropagation()}>
                         <div className="cardHeader" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-                            <h3 id="service-dialog-title" className="cardTitle">{editingId ? 'Editar Serviço' : 'Novo Serviço'}</h3>
-                            <button type="button" className="icon-btn" onClick={() => setModalOpen(false)} style={{width: 32, height: 32, border: 'none'}} aria-label="Fechar edição de serviço">
+                            <h3 id="service-dialog-title" className="cardTitle">{editingId ? 'Editar serviço' : 'Novo serviço'}</h3>
+                            <button type="button" className="icon-btn" disabled={saving || coverBusy} onClick={() => setModalOpen(false)} style={{width: 32, height: 32, border: 'none'}} aria-label="Fechar edição de serviço">
                                 <X size={18} />
                             </button>
                         </div>
                         <div className="cardBody">
                             <div className="form-stack">
                                 <div className="input-group">
-                                    <label className="label">Capa do Serviço (Opcional)</label>
+                                    <label className="label">Capa do serviço (opcional)</label>
                                     <div
                                         className={`cover-uploader ${coverDragOver ? 'dragover' : ''}`}
                                         onDragOver={(e) => { e.preventDefault(); setCoverDragOver(true) }}
@@ -277,8 +277,6 @@ export function AdminServices() {
                                                         opacity: 0,
                                                         transition: 'opacity 0.2s',
                                                     }}
-                                                    onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                                                    onMouseLeave={e => e.currentTarget.style.opacity = '0'}
                                                 >
                                                     <button
                                                         type="button"
@@ -351,11 +349,11 @@ export function AdminServices() {
                                 </div>
 
                                 <div className="input-group">
-                                    <label className="label">Nome do Serviço</label>
+                                    <label className="label">Nome do serviço</label>
                                     <div className="input-wrapper">
                                         <input
                                             className="input"
-                                            value={newService.name}
+                                            aria-label="Nome do serviço" disabled={saving} value={newService.name}
                                             onChange={e => setNewService({...newService, name: e.target.value})}
                                             placeholder="Ex: Cílios Volume Russo"
                                             autoFocus
@@ -363,6 +361,7 @@ export function AdminServices() {
                                     </div>
                                 </div>
 
+                                {saveError ? <p className="form-error" role="alert">{saveError}</p> : null}
                                 <div className="row">
                                     <div className="input-group">
                                         <label className="label">Duração (min)</label>
@@ -370,7 +369,7 @@ export function AdminServices() {
                                             <input
                                                 className="input"
                                                 type="number"
-                                                value={newService.duration}
+                                                aria-label="Duração do serviço" disabled={saving} value={newService.duration}
                                                 onChange={e => setNewService({...newService, duration: Number(e.target.value)})}
                                                 min={1}
                                             />
@@ -402,9 +401,9 @@ export function AdminServices() {
                                             <Trash2 size={16} />
                                         </button>
                                     )}
-                                    <button type="button" className="btn" data-modal-close onClick={() => setModalOpen(false)}>Cancelar</button>
+                                    <button type="button" className="btn" data-modal-close disabled={saving || coverBusy} onClick={() => setModalOpen(false)}>Cancelar</button>
                                     <button type="button" className="btn btnPrimary" onClick={handleSave} disabled={saving}>
-                                        {saving ? 'Salvando...' : (editingId ? 'Salvar Alterações' : 'Criar')}
+                                        {saving ? 'Salvando...' : (editingId ? 'Salvar alterações' : 'Adicionar serviço')}
                                     </button>
                                 </div>
                             </div>

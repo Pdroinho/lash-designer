@@ -262,3 +262,36 @@
 }
 
 .luma-credit-area{display:grid;gap:var(--ld-space-3)}.luma-credit-area>.btn{justify-self:start}.luma-credit-history{padding:var(--ld-space-5);margin:0}.luma-credit-history h3{font-size:var(--ld-type-subsection-size);margin:0 0 var(--ld-space-4)}.luma-credit-history article{display:flex;align-items:center;justify-content:space-between;gap:var(--ld-space-4);padding-block:var(--ld-space-3);border-top:1px solid var(--ld-color-line-soft);font-size:var(--ld-type-small-size)}.luma-credit-history small{display:block;margin-top:var(--ld-space-1);color:var(--ld-color-ink-soft)}
+
+.luma-chat-capabilities { border-bottom:1px solid var(--ld-color-border); flex:none; }
+.luma-chat-capabilities summary {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;cursor:pointer;font-size:13px;font-weight:600;list-style:none;}
+.luma-chat-capabilities summary::-webkit-details-marker {display:none;}
+.luma-chat-capabilities summary:focus-visible {outline:2px solid var(--ld-color-accent);outline-offset:-3px;}
+.luma-chat-capabilities summary>span {font-size:20px;font-weight:400;}
+.luma-chat-capabilities[open] summary>span {transform:rotate(45deg);}
+.luma-chat-capabilities-body {padding:0 20px 16px;display:grid;gap:12px;font-size:13px;}
+.luma-chat-capabilities-body p {margin:0;}
+.luma-chat-examples {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.luma-chat-examples .btn {justify-content:space-between;white-space:normal;text-align:left;min-width:0;}
+.luma-chat-capabilities-body small {color:var(--ld-color-muted-foreground);}
+@media(max-width:480px){.luma-chat-examples{grid-template-columns:1fr}.luma-chat-capabilities summary{padding-inline:16px}.luma-chat-capabilities-body{padding-inline:16px}.luma34-starters{grid-template-columns:1fr}}
+/* The chat owns the available height; discovery never creates an empty grid row. */
+.luma34 {display:flex;flex-direction:column;}
+.luma34>.luma34-header,.luma34>.luma34-disabled {flex:none;}
+.luma34>.luma34-workspace {flex:1;min-height:0;height:auto;grid-row:auto;}
+.luma-credit-area>.btn {margin-left:auto;font-size:12px;min-height:36px;}
+@media(max-width:768px){.ld-shell.has-mobile-tabbar .luma-workspace .luma34--page{height:calc(100dvh - 224px);min-height:340px;}.luma34-empty{align-content:center;}.luma34-empty-main{align-self:center;}}
+
+/* Confirmation is a neutral receipt: text and icon carry success, not competing fills. */
+.luma34 .luma35-action.is-done {background:var(--ld-color-raised);border-color:var(--l34-line-strong);}
+.luma34 .luma35-action.is-done small {color:var(--l34-body);font-weight:600;}
+.luma34 .luma35-action-done {color:var(--l34-ink);}
+.luma34 .luma35-action-done svg {color:var(--l34-accent);}
+.luma34 .luma35-action.is-done .btn {background:transparent;color:var(--l34-ink);border:1px solid var(--l34-line-strong);margin-top:8px;min-height:40px;}
+.luma34 .luma35-action.is-done .btn:hover {background:var(--l34-accent-soft);}
+/* Compact fallback for surfaces without a header entry; hidden throughout ADMIN. */
+.luma34-launcher {width:48px;height:48px;min-width:48px;padding:0;justify-content:center;border-radius:50%;}
+.luma34-launcher .luma-launcher-tooltip {position:absolute;bottom:calc(100% + 10px);right:0;white-space:nowrap;padding:8px 12px;border-radius:8px;background:var(--ld-color-ink-strong);color:var(--ld-color-raised);font-size:12px;opacity:0;visibility:hidden;pointer-events:none;}
+@media(hover:hover){.luma34-launcher:hover .luma-launcher-tooltip{opacity:1;visibility:visible;}}
+.luma34-launcher:focus-visible .luma-launcher-tooltip {opacity:1;visibility:visible;}
+@media(max-width:768px){.luma-context-action {min-width:44px;min-height:44px;}.luma34-launcher{width:44px;height:44px;min-width:44px;}}

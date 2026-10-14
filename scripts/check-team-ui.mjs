@@ -399,7 +399,13 @@ try {
     .filter({ hasText: 'Camila Souza' })
     .getByRole('button', { name: 'Configurar', exact: true })
     .click()
+  await page.locator('.team-dialog-body').evaluate(el=>el.scrollTop=500)
   await page.getByRole('button', { name: 'Folgas', exact: true }).click()
+  await page.getByRole('heading',{name:'Folgas e ausências',exact:true}).waitFor()
+  await page.waitForFunction(()=>document.querySelector('.team-dialog-body')?.scrollTop===0)
+  const navBox=await page.getByRole('navigation',{name:'Configurações da profissional'}).boundingBox(), titleBox=await page.getByRole('heading',{name:'Folgas e ausências',exact:true}).boundingBox()
+  assert.ok(titleBox.y>=navBox.y+navBox.height,'tabs never overlap the first form field')
+  pass('switching section resets scroll and keeps fields below tabs')
   await page.getByText('Nenhum período bloqueado por enquanto.').waitFor()
   const future = new Date(Date.now() + 2 * 86400000),
     ymd = new Intl.DateTimeFormat('en-CA', {

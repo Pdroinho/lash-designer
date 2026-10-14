@@ -3,14 +3,16 @@ import { createPortal } from 'react-dom'
 import { LumaConversation } from './LumaConversation'
 import { LumaMark } from './LumaBrand'
 
-export function LumaChatLauncher({ floating = true }: { floating?: boolean } = {}) {
+export function LumaChatLauncher({ floating = false }: { floating?: boolean } = {}) {
   const [open, setOpen] = useState(false)
   const [initialPrompt, setInitialPrompt] = useState('')
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const openerRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     const onOpen = (event: Event) => {
       const detail = (event as CustomEvent<{ prompt?: string }>).detail
+      openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
       setInitialPrompt(String(detail?.prompt ?? ''))
       setOpen(true)
     }
@@ -26,15 +28,15 @@ export function LumaChatLauncher({ floating = true }: { floating?: boolean } = {
     window.addEventListener('keydown', onEscape)
     return () => {
       window.removeEventListener('keydown', onEscape)
-      window.requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }))
+      window.requestAnimationFrame(() => (openerRef.current ?? triggerRef.current)?.focus({ preventScroll: true }))
     }
   }, [open])
 
   return (
     <>
-      {floating ? <button ref={triggerRef} type="button" className="luma34-launcher" aria-label="Conversar com a Luma" aria-expanded={open} onClick={() => setOpen(true)}>
+      {floating ? <button ref={triggerRef} type="button" className="luma34-launcher" aria-label="Conversar com a Luma" title="Conversar com a Luma" aria-expanded={open} onClick={() => setOpen(true)}>
         <LumaMark className="luma34-launcher-mark" />
-        <strong>Perguntar à Luma</strong>
+        <span className="luma-launcher-tooltip" role="tooltip">Conversar com a Luma</span>
       </button> : null}
       {open && typeof document !== 'undefined'
         ? createPortal(

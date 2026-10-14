@@ -39,6 +39,7 @@ try{
    assert.deepEqual(prices.map(v=>v.replace(/\s/g,'')),['R$74,90/mês','R$99,90/mês','R$149,00/mês'])
    assert.ok(await page.locator('.sales-skip').evaluate(el=>el.getBoundingClientRect().bottom<0))
    assert.ok(await page.locator('.skip-link').evaluate(el=>el.getBoundingClientRect().bottom<0))
+   if(state==='on'&&process.env.LASH_QA_SCREENSHOT_DIR){await page.screenshot({path:path.join(process.env.LASH_QA_SCREENSHOT_DIR,`review-landing-${viewport.width}.png`),fullPage:true})}
    const text=await page.locator('body').innerText();assert.ok(!/39,90|59,90|49,90|598,80|Trimestral|Semestral|InfinitePay/.test(text))
    await page.locator('#equipe').scrollIntoViewIfNeeded()
    assert.equal(await page.locator('#equipe article').count(),3)

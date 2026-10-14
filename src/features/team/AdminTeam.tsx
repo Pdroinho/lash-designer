@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
 import { Users, Plus, Settings, X } from '../../components/Icons'
 import { ModalRoot } from '../../components/ModalRoot'
@@ -27,6 +27,8 @@ export function AdminTeam({
     [selectedId, setSelectedId] = useState<string | null>(null),
     [panel, setPanel] = useState<'profile' | 'access' | 'off'>('profile'),
     [busy, setBusy] = useState(false)
+  const detailBodyRef=useRef<HTMLDivElement>(null)
+  useEffect(()=>{detailBodyRef.current?.scrollTo({top:0,left:0,behavior:'auto'})},[panel,selectedId])
   useEffect(() => {
     const controller = new AbortController()
     void Promise.all([
@@ -390,7 +392,7 @@ export function AdminTeam({
                 </button>
               ))}
             </nav>
-            <div className="cardBody team-dialog-body">
+            <div className="cardBody team-dialog-body" ref={detailBodyRef}>
               {panel === 'profile' ? (
                 <>
                   <h3>Serviços e horários</h3>
@@ -421,6 +423,7 @@ export function AdminTeam({
                           ? 'Libere uma vaga ou altere o plano antes de reativar.'
                           : 'Ela voltará a receber novos agendamentos e ocupará uma vaga do plano.'}
                     </p>
+                    <div className="team-member-actions">
                     <button
                       type="button"
                       className="btn"
@@ -433,7 +436,8 @@ export function AdminTeam({
                           ? 'Desativar profissional'
                           : 'Reativar profissional'}
                     </button>
-                    {selected.accessRole!=='ADMIN' ? <button type="button" className="btn" disabled={busy} onClick={()=>void remove(selected)}>Remover da equipe</button> : null}
+                    </div>
+                    {selected.accessRole!=='ADMIN' ? <div className="team-remove-member"><h4>Remover da equipe</h4><p className="team-help">Retira esta profissional da lista e encerra seu acesso ao painel. Os atendimentos anteriores continuam no histórico.</p><button type="button" className="btn" disabled={busy} onClick={()=>void remove(selected)}>Remover da equipe</button></div> : null}
                   </div>
                 </>
               ) : panel === 'access' ? (

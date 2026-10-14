@@ -58,7 +58,7 @@ const faqItems = [
   ['Vou precisar abandonar o WhatsApp?', 'Não. O WhatsApp continua sendo seu canal de relacionamento. O Lash Designer organiza confirmações, lembretes e conversas junto da rotina do atendimento.'],
   ['Preciso saber mexer com sistemas?', 'Não. Depois da compra, um setup guiado ajuda a organizar marca, horários e serviços. O objetivo é deixar a operação clara desde o primeiro acesso.'],
   ['Como a cliente escolhe a profissional?', 'Pelo link do estúdio, ela encontra o serviço, escolhe entre as profissionais disponíveis e vê os horários daquela agenda. Tudo pelo navegador, sem instalar aplicativo.'],
-  ['A Luma é obrigatória?', 'Não. Ela é uma assistente opcional para interpretar indicadores e sugerir próximos passos. Agenda, clientes, financeiro e gestão continuam funcionando sem IA.'],
+  ['A Luma é obrigatória?', 'Não. Ela é uma assistente opcional. Você pode pedir ajuda pelo chat com agenda, financeiro, chamados e lembretes. Alterações precisam da sua confirmação. A gestão do estúdio continua funcionando sem IA.'],
   ['Quem acessa o WhatsApp do estúdio?', 'A conexão é compartilhada pelo estúdio e gerenciada pela administradora. Cada profissional tem seu próprio acesso à agenda, sem precisar compartilhar a senha da administração.'],
   ['Como peço ajuda?', 'Abra um chamado na central de suporte da plataforma, envie uma captura de tela se precisar e acompanhe as respostas e notificações no seu painel.'],
 ] as const
@@ -417,7 +417,7 @@ export function LandingPage() {
           <div className="ld53-luma-copy">
             <span className="ld53-kicker ld53-kicker-light">E ainda tem a Luma</span>
             <h2>E quando você quiser entender <em>o que está acontecendo, é só perguntar.</em></h2>
-            <p>A Luma lê os indicadores do seu espaço e devolve respostas simples sobre agenda, movimento e pontos de atenção. Sem montar relatório para conseguir uma resposta.</p>
+            <p>A Luma lê os indicadores do seu espaço e ajuda a conferir a agenda, organizar o financeiro, acompanhar chamados e preparar lembretes no seu WhatsApp. Tudo em uma conversa, com sua confirmação antes de alterar dados. Sem montar relatório para conseguir uma resposta.</p>
             <div className="ld53-luma-prompts"><span>“Como foi meu mês?”</span><span>“Onde minha agenda está ociosa?”</span><span>“O que merece atenção agora?”</span></div>
             <small>Recurso opcional, com limites de uso exibidos no painel. Agenda e gestão continuam funcionando sem IA.</small>
           </div>

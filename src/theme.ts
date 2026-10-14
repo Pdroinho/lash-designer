@@ -238,7 +238,8 @@ export function applyPrimaryColor(hexColor: string) {
   }
 
   const primary = normalizeHex(hexColor)
-  const primaryText = luminance(primary) > 0.62 ? '#0b0d12' : '#ffffff'
+  const primaryLuminance=luminance(primary)
+  const primaryText=1.05/(primaryLuminance+.05)>=4.5?'#ffffff':(primaryLuminance+.05)/(luminance('#0b0d12')+.05)>=4.5?'#0b0d12':'#000000'
   const primaryRgb = hexToRgb(primary)
   const primaryRgbStr = `${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}`
 
@@ -247,10 +248,11 @@ export function applyPrimaryColor(hexColor: string) {
   const primary200 = mix(primary, '#ffffff', 0.72)
   const primary300 = mix(primary, '#ffffff', 0.56)
   const primary400 = mix(primary, '#ffffff', 0.38)
-  const primary600 = mix(primary, '#000000', 0.12)
-  const primary700 = mix(primary, '#000000', 0.24)
-  const primary800 = mix(primary, '#000000', 0.36)
-  const primary900 = mix(primary, '#000000', 0.5)
+  let primary600 = mix(primary, '#000000', 0.12)
+  for(let shade=.14;1.05/(luminance(primary600)+.05)<4.5 && shade<=1;shade+=.02)primary600=mix(primary,'#000000',shade)
+  const primary700 = mix(primary600, '#000000', 0.12)
+  const primary800 = mix(primary600, '#000000', 0.24)
+  const primary900 = mix(primary600, '#000000', 0.42)
 
   const primary900Rgb = hexToRgb(primary900)
   const primary900RgbStr = `${primary900Rgb.r}, ${primary900Rgb.g}, ${primary900Rgb.b}`

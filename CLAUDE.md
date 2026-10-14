@@ -1,13 +1,13 @@
-﻿# CLAUDE.md — Guia para IAs e Desenvolvedores
+# CLAUDE.md — Guia para IAs e Desenvolvedores
 
 > Este arquivo orienta qualquer IA (Claude, GPT, Trae, etc) ou dev novo a navegar
-> e modificar o código do LashDesigner 5.13.0 com confiança.
+> e modificar o código do LashDesigner 5.13.2 com confiança.
 
 ---
 
-## Homologação 5.13.0 — Fable 5.1 e Opus 5
+## Homologação 5.13.2 — Fable 5.1 e Opus 5
 
-Leia `docs/RELEASE_5_13_0.md`. Faça backup SQLite e teste a migração 45→47 antes do deploy. Rode `npm run check`, os testes de navegador de equipe, suporte, billing e Luma integrada, e o teste HTTP local. Os provedores de IA, Appmax e Evolution dos testes integrados são simulados: homologue separadamente credenciais, compra real, webhook duplicado, estorno, entrega WhatsApp e resposta do modelo em ambiente de testes. Após publicar, valide com uma conta de teste todo o fluxo na produção: login, setup, equipe, reserva pública, presença, financeiro, chamados ADMIN/DEV, notificações, preferências, lembretes e créditos. Verifique logs e isolamento entre estúdios; mantenha rollback de aplicação e banco. Registre evidências e limitações. A capacidade desses modelos não substitui execução dos testes nem garante 100% de integridade.
+Leia `docs/RELEASE_5_13_2.md`, `docs/RELEASE_5_13_1.md` e `docs/RELEASE_5_13_0.md`. Rode também `npm run test:product-refinement-ui` e `npm run test:product-form-controls-ui`. A Luma tem um único chat; as ferramentas são acionadas pela conversa, sem abas internas. Faça backup SQLite e teste a migração 45→47 antes do deploy. Rode `npm run check`, os testes de navegador de equipe, suporte, billing e Luma integrada, e o teste HTTP local. Os provedores de IA, Appmax e Evolution dos testes integrados são simulados: homologue separadamente credenciais, compra real, webhook duplicado, estorno, entrega WhatsApp e resposta do modelo em ambiente de testes. Após publicar, valide com uma conta de teste todo o fluxo na produção: login, setup, equipe, reserva pública, presença, financeiro, chamados ADMIN/DEV, notificações, preferências, lembretes e créditos. Verifique logs e isolamento entre estúdios; mantenha rollback de aplicação e banco. Registre evidências e limitações. A capacidade desses modelos não substitui execução dos testes nem garante 100% de integridade.
 
 ## Atualização 5.12.12
 
@@ -261,7 +261,8 @@ curl -sf http://127.0.0.1:3000/api/ready
 | Assets | `docs/ASSET_CATALOG.md` |
 | Deploy VPS | `DEPLOY_VPS.md` |
 
-Release atual: `docs/RELEASE_5_13_0.md`; histórico recente em `docs/RELEASE_5_12_14.md` e `docs/RELEASE_5_12_12.md`. O esquema segue na migração 47.
+Release atual: `docs/RELEASE_5_13_2.md`; histórico recente em `docs/RELEASE_5_13_1.md` e `docs/RELEASE_5_13_0.md`. O esquema segue na migração 47.
+
 
 
 ## Equipe e suporte — 5.12.14
@@ -271,4 +272,3 @@ Leia `docs/RELEASE_5_12_14.md`. A Equipe está em `src/features/team/`, separada
 Na interface da usuária, suporte é “Pedir ajuda” e “Meus pedidos”; o DEV mantém os controles operacionais e as notas internas. Preserve idempotência, versão concorrente, anexos, isolamento e notificações ao modificar a apresentação. Caixas de seleção conservam semântica nativa e navegação pelo teclado, com aparência da plataforma.
 
 Homologação final com Claude Code (Fable 5.1 e Opus 5): execute as suítes locais, teste cadastro/edição/horários/folgas/convite e aceite/login STAFF, suporte com imagem/resposta/notificações/reabertura e permissões. Em homologação externa, valide Evolution, códigos WhatsApp e Appmax com as credenciais corretas. Antes do deploy autorizado, faça backup e confira as duas VPS e seus serviços; após o deploy, repita os fluxos com contas de teste, desktop/celular e outros estúdios para verificar isolamento. Registre resultados reais e falhas. Este ZIP não contém prova de produção nem garantia de integridade absoluta.
-

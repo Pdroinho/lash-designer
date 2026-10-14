@@ -171,7 +171,7 @@ try {
     .locator('.support-center')
     .getByRole('heading', { name: 'Como podemos ajudar?', exact: true })
     .waitFor()
-  await page.getByRole('button', { name: 'Pedir ajuda' }).click()
+  await page.getByRole('button', { name: 'Pedir ajuda', exact:true }).click()
   await page.getByRole('button',{name:'Enviar pedido de ajuda',exact:true}).click()
   await page.getByRole('alert').filter({hasText:'pelo menos 5 caracteres'}).waitFor()
   await page
@@ -322,7 +322,7 @@ try {
     .locator('.support-center')
     .getByRole('heading', { name: 'Como podemos ajudar?', exact: true })
     .waitFor()
-  await page.getByRole('button', { name: 'Pedir ajuda' }).click()
+  await page.getByRole('button', { name: 'Pedir ajuda', exact:true }).click()
   await page
     .getByLabel('Em poucas palavras, o que você precisa?', { exact: true })
     .fill('Preciso de ajuda com minha agenda')

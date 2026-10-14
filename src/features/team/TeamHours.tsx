@@ -1,37 +1,8 @@
 import { X } from '../../components/Icons'
 import { Switch } from '../../components/SharedUi'
-import { ProductSelect } from '../../components/ProductSelect'
 import { clock, weekdays, type Hours } from './teamTypes'
-export function TeamTime({
-  value,
-  onChange,
-  label,
-  end = false,
-  disabled = false,
-}: {
-  value: number
-  onChange: (value: number) => void
-  label: string
-  end?: boolean
-  disabled?: boolean
-}) {
-  const values = Array.from({ length: end ? 97 : 96 }, (_, i) => i * 15)
-  if (!values.includes(value)) values.push(value)
-  return (
-    <ProductSelect
-      ariaLabel={label}
-      value={String(value)}
-      disabled={disabled}
-      options={values
-        .sort((a, b) => a - b)
-        .map((n) => ({
-          value: String(n),
-          label: n === 1440 ? '00:00 (dia seguinte)' : clock(n),
-        }))}
-      onChange={(v) => onChange(Number(v))}
-    />
-  )
-}
+import { ProductTime as TeamTime } from '../../components/ProductTime'
+export { TeamTime }
 export function TeamHours({
   custom,
   onCustom,

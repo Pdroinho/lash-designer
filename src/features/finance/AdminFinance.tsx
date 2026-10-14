@@ -5,6 +5,7 @@ import { financeMonthLabel, formatBRL } from '../../lib/runtime'
 import { confirmAction, notify } from '../../components/FeedbackCenter'
 import { EmptyState } from '../../components/SharedUi'
 import { FinanceFlowChart } from '../../components/FinanceFlowChart'
+import { ProductDate } from '../../components/ProductDate'
 import { ProductSelect } from '../../components/ProductSelect'
 import { ModalRoot } from '../../components/ModalRoot'
 import { ArrowRight, BarChart3, Download, Edit2, Plus, Sparkles, Trash2, Wallet, X } from '../../components/Icons'
@@ -18,10 +19,12 @@ export function AdminFinance() {
     const [showGoalsModal, setShowGoalsModal] = useState(false)
     const filters = ['all', 'income', 'expense'] as const
 
+    const [loadError,setLoadError]=useState<string|null>(null)
     const loadData = () => {
         setLoading(true)
         api<AdminFinanceData>('/api/admin/finance').then(res => {
-            if (res.ok) setFinance(res.data)
+            if (res.ok){setFinance(res.data);setLoadError(null)}
+            else setLoadError(res.error.message)
             setLoading(false)
         })
     }
@@ -41,7 +44,7 @@ export function AdminFinance() {
     }
 
     if (!finance) {
-        return <EmptyState image="/empty-states/empty-finance.png" title="Financeiro indisponível" description="Não foi possível carregar os dados financeiros agora." />
+        return <section className="card product-load-state" role="alert"><EmptyState image="/empty-states/empty-finance.png" title="Financeiro indisponível" description={loadError ?? "Não foi possível carregar os dados financeiros agora."} /><button type="button" className="btn" onClick={loadData}>Tentar novamente</button></section>
     }
 
     const current = finance.currentMonth
@@ -111,6 +114,7 @@ export function AdminFinance() {
 
     return (
         <div className="finance36">
+            {loadError ? <div className="card product-load-state" role="alert"><strong>Os dados abaixo podem estar desatualizados.</strong><p>{loadError}</p><button type="button" className="btn" onClick={loadData}>Tentar novamente</button></div> : null}
             <section className="finance36-hero">
                 <div className="finance36-hero-copy">
                     <span className="finance36-eyebrow">Controle financeiro · {activeMonthLabel}</span>
@@ -133,17 +137,17 @@ export function AdminFinance() {
             <section className="finance36-kpis" aria-label="Resumo financeiro do mês">
                 <article className="finance36-kpi is-income">
                     <span>Entradas do mês</span>
-                    <strong>{formatBRL(current.entriesCents / 100)}</strong>
+                    <strong data-money-size={formatBRL(current.entriesCents / 100).length>14?'long':formatBRL(current.entriesCents / 100).length>11?'medium':'normal'}>{formatBRL(current.entriesCents / 100)}</strong>
                     <small className={growth === null || growth >= 0 ? 'is-positive' : 'is-negative'}>{growth === null ? 'Mês anterior sem entradas para comparar' : `${growth >= 0 ? '+' : ''}${growth}% vs. ${financeMonthLabel(previous.ym)}`}</small>
                 </article>
                 <article className="finance36-kpi is-expense">
                     <span>Saídas do mês</span>
-                    <strong>{formatBRL(current.expensesCents / 100)}</strong>
+                    <strong data-money-size={formatBRL(current.expensesCents / 100).length>14?'long':formatBRL(current.expensesCents / 100).length>11?'medium':'normal'}>{formatBRL(current.expensesCents / 100)}</strong>
                     <small>{expenseRatio.toFixed(1).replace('.', ',')}% das entradas registradas</small>
                 </article>
                 <article className="finance36-kpi is-balance">
                     <span>Saldo do mês</span>
-                    <strong>{formatBRL(current.balanceCents / 100)}</strong>
+                    <strong data-money-size={formatBRL(current.balanceCents / 100).length>14?'long':formatBRL(current.balanceCents / 100).length>11?'medium':'normal'}>{formatBRL(current.balanceCents / 100)}</strong>
                     <small>Entradas registradas − saídas registradas</small>
                 </article>
                 <article className="finance36-kpi is-goal">
@@ -391,15 +395,8 @@ function NewTransactionModal({ isOpen, onClose, onSuccess, todayYmd }: { isOpen:
                         />
                     </div>
                     <div className="input-group">
-                        <label className="label">Data</label>
-                        <input
-                            className="input finance40-control"
-                            type="date"
-                            value={date}
-                            onChange={e => setDate(e.target.value)}
-                            required
-                            lang="pt-BR"
-                        />
+                        <ProductDate label="Data da movimentação" value={date} onChange={setDate} today={todayYmd} disabled={loading}/>
+
                     </div>
                 </div>
                 <div className="input-group">
@@ -407,8 +404,8 @@ function NewTransactionModal({ isOpen, onClose, onSuccess, todayYmd }: { isOpen:
                     <input className="input finance40-control" inputMode="decimal" autoComplete="off" value={amount} onChange={handleAmountChange} placeholder="0,00" required />
                 </div>
                 <div className="input-group">
-                    <label className="label">Categoria ou método</label>
-                    <input className="input finance40-control" value={method} onChange={e => setMethod(e.target.value)} placeholder="Ex.: Pix, aluguel, produtos" />
+                    <label className="label">{type==='EXPENSE'?'Categoria da despesa':'Forma de pagamento'}</label>
+                    <input className="input finance40-control" value={method} onChange={e => setMethod(e.target.value)} placeholder={type==='EXPENSE'?'Ex.: materiais, aluguel':'Ex.: Pix, dinheiro, cartão'} />
                 </div>
                 <div className="input-group">
                     <label className="label">Descrição <span className="text-muted">(opcional)</span></label>
@@ -509,12 +506,10 @@ function ExtractModal({ isOpen, onClose, todayYmd, currentMonthYm, timeZone }: {
         <div className="modal-body">
             <div className="finance40-extract-filters">
                 <div className="input-group">
-                    <label className="label">Início</label>
-                    <input className="input finance40-control is-compact" type="date" value={start} onChange={e => setStart(e.target.value)} />
+                    <ProductDate label="Início do extrato" value={start} onChange={setStart} today={todayYmd} disabled={loading}/>
                 </div>
                 <div className="input-group">
-                    <label className="label">Fim</label>
-                    <input className="input finance40-control is-compact" type="date" value={end} onChange={e => setEnd(e.target.value)} />
+                    <ProductDate label="Fim do extrato" value={end} onChange={setEnd} today={todayYmd} disabled={loading}/>
                 </div>
                 <div className="input-group">
                     <label className="label">Tipo</label>
