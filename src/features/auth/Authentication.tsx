@@ -1,3 +1,4 @@
+import { TenantBrand } from '../../components/TenantBrand'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api } from '../../api'
@@ -35,7 +36,6 @@ export function UnifiedLogin(props: { hostTenant?: TenantPublic | null; isDevHos
 
   const isTenant = !!props.hostTenant
   const accent = props.hostTenant?.primaryColor ?? 'var(--primary-600)'
-  const brandName = props.hostTenant?.name ?? 'Lash Designer'
   const brandHandle = props.hostTenant?.slug ? `@${props.hostTenant.slug}` : 'Sua cliente agenda. Você continua atendendo.'
   const pageStyle: CssVarStyle = { '--auth-accent': accent }
   const supportUrl = configuredExternalLink(import.meta.env.VITE_SUPPORT_URL)
@@ -187,17 +187,9 @@ export function UnifiedLogin(props: { hostTenant?: TenantPublic | null; isDevHos
       <div className="authRefCard">
         <div className="authRefLeft">
           <div className="authRefBrand">
-            <div className="authRefMark">
-              {props.hostTenant?.logoUrl ? (
-                <img decoding="async" className="authRefLogo" src={props.hostTenant.logoUrl} alt={brandName} />
-              ) : (
-                <img decoding="async" className="authRefDefaultLogo" src="/brand/logo-symbol.png" alt="" aria-hidden="true" />
-              )}
-            </div>
-            <div className="authRefBrandText">
-              <div className="authRefBrandName">{brandName}</div>
-              <div className="authRefBrandSub">{brandHandle}</div>
-            </div>
+            <TenantBrand brand={props.hostTenant} className="tenant-brand-auth" />
+            <div className="authRefBrandSub">{brandHandle}</div>
+
           </div>
 
           <div className="authRefQuote">

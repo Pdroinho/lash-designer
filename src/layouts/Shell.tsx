@@ -1,3 +1,4 @@
+import { TenantBrand } from '../components/TenantBrand'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { SessionUser, TenantPublic } from '../types'
 import { ProductTour, shouldAutoStartTour, type ProductTourStep } from '../components/ProductTour'
@@ -21,7 +22,7 @@ export function Shell(props: {
   tourSteps?: ProductTourStep[]
   tourEnabled?: boolean
   autoStartTour?: boolean
-  brand?: Pick<TenantPublic, 'name' | 'logoUrl'> | null
+  brand?: Pick<TenantPublic, 'name' | 'logoUrl' | 'logoLayout' | 'logoSize'> | null
   mobileNav?: Array<{ key: string; label: string; icon: ReactNode; active: boolean; onClick: () => void }>
   mobileMoreActive?: boolean
 }) {
@@ -99,14 +100,7 @@ export function Shell(props: {
     <div className={`ld-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''} ${props.mobileNav?.length ? 'has-mobile-tabbar' : ''}`}>
       <aside ref={sidebarRef} className={`ld-sidebar ${mobileOpen ? 'is-open' : ''}`} data-tour="sidebar" aria-label="Navegação principal" onClick={(event) => { if ((event.target as HTMLElement).closest('.ld-nav-item')) setMobileOpen(false) }}>
         <div className="ld-sidebar-brand" data-tour="brand">
-          <img
-            decoding="async"
-            className={`logo-icon ${props.brand?.logoUrl ? 'is-tenant-logo' : ''}`}
-            src={props.brand?.logoUrl || '/brand/logo-symbol.png'}
-            alt=""
-            aria-hidden="true"
-          />
-          <span className="ld-sidebar-brand-name">{props.brand?.name || 'Lash Designer'}</span>
+          <TenantBrand brand={props.brand} className="tenant-brand-sidebar" />
           <button type="button" className="ld-sidebar-mobile-close" onClick={() => setMobileOpen(false)} aria-label="Fechar menu lateral">
             <X size={18} />
           </button>
@@ -164,12 +158,7 @@ export function Shell(props: {
               <Menu size={20} />
             </button>
             {props.mobileNav?.length ? (
-              <img
-                className={`ld-mobile-topbar-brand ${props.brand?.logoUrl ? 'is-tenant-logo' : ''}`}
-                src={props.brand?.logoUrl || '/brand/logo-symbol.png'}
-                alt=""
-                aria-hidden="true"
-              />
+              <TenantBrand brand={props.brand} className="tenant-brand-mobile" />
             ) : null}
             <div className="ld-page-heading">
               <div className="ld-breadcrumb" aria-hidden="true">

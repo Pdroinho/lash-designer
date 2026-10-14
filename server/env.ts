@@ -63,7 +63,8 @@ const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(20).optional(),
   OPENROUTER_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
   OPENROUTER_MODEL: z.string().min(2).default('deepseek/deepseek-v4-flash-0731'),
-  OPENROUTER_SETUP_MODEL: z.string().min(2).default('google/gemini-3.1-flash-lite'),
+  LUMA_SETUP_USE_PRIMARY_MODEL: envBoolean(true),
+  OPENROUTER_SETUP_MODEL: z.string().min(2).optional(),
   OPENROUTER_VISION_MODEL: z.string().min(2).default('google/gemini-3.1-flash-lite'),
   OPENROUTER_BATCH_MODEL: z.string().min(2).default('deepseek/deepseek-v4-flash-0731'),
   // Legacy aliases kept for installations upgrading from an OpenAI-compatible setup.

@@ -147,6 +147,8 @@ app.use(
 app.get('/api/admin/onboarding', (_req, res) =>
   res.json({ onboarding: { status: 'COMPLETED' } }),
 )
+const { createPublicProfessionalsRouter } = await import('../dist/server/routes/publicProfessionalsRoutes.js')
+app.use('/api/public', createPublicProfessionalsRouter(db))
 app.use('/api/public', createPublicRouter({ db }))
 app.use(
   '/api/client',
@@ -582,6 +584,40 @@ try {
   assert.ok(db.prepare('SELECT consumed_at FROM professional_invitations WHERE professional_id=?').get(camila).consumed_at)
   assert.equal((await apiCall(`/api/admin/professionals/${camila}`,'PATCH',{active:true})).status,404)
   pass('confirmed removal hides member, frees seat, invalidates invitation and preserves historical identity')
+  await page.getByRole('button',{name:'Todas',exact:true}).click()
+  const photoPerson = db.prepare('SELECT id,name FROM professionals WHERE id=?').get(professional)
+  await page.locator('.team-person').filter({hasText:photoPerson.name}).getByRole('button',{name:'Configurar',exact:true}).click()
+  await page.getByRole('button',{name:'Editar cadastro',exact:true}).click()
+  await page.getByLabel('Selecionar foto da profissional').setInputFiles({name:'portrait.webp',mimeType:'image/webp',buffer:readFileSync('public/placeholders/service-placeholder.webp')})
+  await page.getByRole('button',{name:'Trocar foto',exact:true}).waitFor()
+  await page.getByText('Redes sociais (opcional)',{exact:true}).click()
+  await page.getByLabel('Instagram',{exact:true}).fill('@ana.lashes')
+  await page.getByLabel('TikTok',{exact:true}).fill('ana_lashes')
+  assert.equal(await page.locator('.team-photo-editor img').evaluate(el=>el.naturalWidth > 0),true)
+  await page.getByRole('button',{name:'Continuar',exact:true}).click()
+  await page.getByRole('button',{name:'Continuar',exact:true}).click()
+  await page.getByRole('button',{name:'Salvar profissional',exact:true}).click()
+  await page.getByText('Alterações salvas.',{exact:true}).waitFor()
+  const photo=db.prepare('SELECT photo_url FROM professionals WHERE id=?').get(professional).photo_url
+  assert.ok(photo.startsWith('data:image/'))
+  const publicPeople=await apiCall(`/api/public/professionals?serviceId=${serviceId}`)
+  assert.equal(publicPeople.status,200)
+  const publicPerson=publicPeople.data.professionals.find(p=>p.id===professional)
+  assert.deepEqual(Object.keys(publicPerson).sort(),['id','instagram','name','photoUrl','tiktok'])
+  assert.equal(publicPerson.photoUrl,photo)
+  assert.equal(publicPerson.instagram,'ana.lashes')
+  assert.equal(publicPerson.tiktok,'ana_lashes')
+  assert.equal((await apiCall(`/api/admin/professionals/${professional}`,'PATCH',{instagram:'https://tracker.invalid/'})).status,400)
+  pass('optional photo uploads through browser, persists in SQLite and public DTO contains only professional identity and public social handles')
+  for(const invalid of ['https://tracker.invalid/face.jpg','data:image/svg+xml;base64,PHN2Zz4=','data:image/png;base64,YmFk','data:image/png;base64,'+'A'.repeat(180000)]) {
+    assert.equal((await apiCall(`/api/admin/professionals/${professional}`,'PATCH',{photoUrl:invalid})).status,400)
+  }
+  assert.equal((await apiCall(`/api/admin/professionals/${randomUUID()}`,'PATCH',{photoUrl:photo})).status,404)
+  assert.equal(db.prepare('SELECT photo_url FROM professionals WHERE id=?').get(professional).photo_url,photo)
+  pass('invalid/oversized/external images and unknown identities cannot replace stored portrait')
+  assert.equal((await apiCall(`/api/admin/professionals/${professional}`,'PATCH',{photoUrl:null})).status,200)
+  assert.equal(db.prepare('SELECT photo_url FROM professionals WHERE id=?').get(professional).photo_url,null)
+  pass('optional portrait can be removed without changing availability or historical identity')
   assert.deepEqual(errors, [])
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])
   console.log(

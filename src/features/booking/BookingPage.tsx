@@ -1,3 +1,5 @@
+import { TenantBrand } from '../../components/TenantBrand'
+import { ProfessionalAvatar } from '../../components/ProfessionalAvatar'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api'
@@ -155,7 +157,7 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
     bookingRules: { minNoticeMinutes: number; maxFutureDays: number; slotStepMinutes: number }
     businessHours: Array<{ weekday: number; startMinute: number; endMinute: number }>
   } | null>(null)
-  type BookablePerson = { id: string; name: string }
+  type BookablePerson = { id: string; name: string; photoUrl?: string | null; instagram?: string | null; tiktok?: string | null }
   type AvailablePerson = BookablePerson & { businessHours: Array<{ weekday: number; startMinute: number; endMinute: number }>; blocks: Array<{ startsAt: string; endsAt: string; kind: 'appointment' | 'time_off' }> }
   const [professionals, setProfessionals] = useState<BookablePerson[]>([])
   const [professionalsLoading, setProfessionalsLoading] = useState(false)
@@ -328,12 +330,13 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
     return Boolean(selectedService && selectedDate && selectedTime)
   }
 
+  const socialPerson = professionals.find(person => person.id === selectedProfessionalId) ?? (professionals.length === 1 ? professionals[0] : null)
   return <main className="booking30">
     <div className="booking30-shell">
       <header className="booking30-topbar">
         <button type="button" className="booking30-brand" onClick={() => nav(withBasePath(basePath, '/'))} aria-label={`Voltar para ${tenant?.name || 'o espaço'}`}>
-          {tenant?.logoUrl ? <img src={tenant.logoUrl} alt="" /> : <img src="/placeholders/tenant-placeholder.png" alt="" />}
-          <span><strong>{tenant?.name}</strong><small>Agendamento online</small></span>
+          <TenantBrand brand={tenant} className="tenant-brand-booking" defaultLogo="/placeholders/tenant-placeholder.png" />
+          <small className="booking30-brand-caption">Agendamento online</small>
         </button>
 
         {!confirmedAppointment ? <nav className="booking30-steps" aria-label="Etapas do agendamento">
@@ -385,10 +388,21 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
             </div> : null}
 
             {step === 2 ? <div className="booking30-date">
-              {professionals.length > 1 ? <fieldset className="booking30-professionals"><legend>Escolha quem vai atender</legend>
-                <label><input type="radio" name="book-professional" checked={!selectedProfessionalId} onChange={() => { setSelectedProfessionalId(null); setSelectedDate('') }} /><span>Qualquer profissional disponível</span></label>
-                {professionals.map(person => <label key={person.id}><input type="radio" name="book-professional" checked={selectedProfessionalId === person.id} onChange={() => { setSelectedProfessionalId(person.id); setSelectedDate('') }} /><span>{person.name}</span></label>)}
-              </fieldset> : null}
+              {professionals.length > 1 ? <fieldset className="booking30-professionals">
+                <legend>Quem você prefere?</legend>
+                <label className="booking30-professional-any">
+                  <input type="radio" name="book-professional" checked={!selectedProfessionalId} onChange={() => { setSelectedProfessionalId(null); setSelectedDate('') }} />
+                  <span><strong>Qualquer profissional disponível</strong><small>Veja mais opções de horário para este serviço.</small></span>
+                </label>
+                <div className="booking30-professional-grid">
+                  {professionals.map(person => <label key={person.id}>
+                    <ProfessionalAvatar name={person.name} photoUrl={person.photoUrl} />
+                    <span><strong>{person.name}</strong><small>Atende este serviço</small></span>
+                    <input type="radio" name="book-professional" aria-label={person.name} checked={selectedProfessionalId === person.id} onChange={() => { setSelectedProfessionalId(person.id); setSelectedDate('') }} />
+                  </label>)}
+                </div>
+              </fieldset> : professionals.length === 1 ? <div className="booking30-single-professional"><ProfessionalAvatar name={professionals[0].name} photoUrl={professionals[0].photoUrl} /><span><small>Você será atendida por</small><strong>{professionals[0].name}</strong></span></div> : null}
+              {socialPerson && (socialPerson.instagram || socialPerson.tiktok) ? <details className="booking30-professional-social" key={socialPerson.id}><summary>Conheça o trabalho de {socialPerson.name.split(' ')[0]}</summary><div>{socialPerson.instagram ? <a href={`https://www.instagram.com/${encodeURIComponent(socialPerson.instagram)}/`} target="_blank" rel="noopener noreferrer">Instagram · @{socialPerson.instagram}<span className="sr-only"> (abre em outra aba)</span></a> : null}{socialPerson.tiktok ? <a href={`https://www.tiktok.com/@${encodeURIComponent(socialPerson.tiktok)}`} target="_blank" rel="noopener noreferrer">TikTok · @{socialPerson.tiktok}<span className="sr-only"> (abre em outra aba)</span></a> : null}</div></details> : null}
               {professionalsLoading ? <p role="status">Consultando profissionais…</p> : professionals.length ? <DateScroller value={selectedDate} min={dateLimits.min} max={dateLimits.max} onChange={(value) => { setSelectedDate(value); setSelectedTime(null); setStep(3) }} getDateStatus={dateStatusFor} /> : <p role="status">{actionError ?? 'Este serviço ainda não tem uma profissional disponível. Escolha outro serviço.'}</p>}
             </div> : null}
 

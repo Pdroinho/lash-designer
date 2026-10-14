@@ -1,3 +1,4 @@
+import { ProfessionalAvatar } from '../../components/ProfessionalAvatar'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
 import { Users, Plus, Settings, X } from '../../components/Icons'
@@ -244,15 +245,7 @@ export function AdminTeam({
               {shown.map((person) => (
                 <article className="card team-person" key={person.id}>
                   <div className="team-person-top">
-                    <span className="team-avatar" aria-hidden="true">
-                      {person.name
-                        .trim()
-                        .split(/\s+/)
-                        .slice(0, 2)
-                        .map((n) => n[0])
-                        .join('')
-                        .toUpperCase()}
-                    </span>
+                    <ProfessionalAvatar name={person.name} photoUrl={person.photoUrl} className="team-avatar" />
                     <div>
                       <h3>{person.name}</h3>
                       <span

@@ -127,11 +127,11 @@ const TENANT_SURFACE_KEYS = [
   '--ld-color-line-strong',
 ] as const
 
-function applyTenantSurfaces() {
+function applyTenantSurfaces(backgroundColor?: string | null) {
   const root = document.documentElement
   const values: Record<(typeof TENANT_SURFACE_KEYS)[number], string> = {
     '--gray-50': 'var(--surface-canvas)',
-    '--surface-canvas': 'color-mix(in srgb, var(--primary) 4.5%, #f8f9f8 95.5%)',
+    '--surface-canvas': backgroundColor && /^#[0-9a-f]{6}$/i.test(backgroundColor) ? `color-mix(in srgb, ${backgroundColor} 12%, #ffffff 88%)` : 'color-mix(in srgb, var(--primary) 4.5%, #f8f9f8 95.5%)',
     '--surface-panel': 'color-mix(in srgb, var(--primary) 1.4%, #ffffff 98.6%)',
     '--surface-raised': 'color-mix(in srgb, var(--primary) .7%, #ffffff 99.3%)',
     '--surface-soft': 'color-mix(in srgb, var(--primary) 7.5%, #f8f9f8 92.5%)',
@@ -286,5 +286,6 @@ export function applyPrimaryColor(hexColor: string) {
 export function applyTenantTheme(tenant: TenantPublic | null) {
   if (!tenant) return
   applyPrimaryColor(tenant.primaryColor)
-  applyTenantSurfaces()
+  applyTenantSurfaces(tenant.backgroundColor)
+  if (tenant.secondaryColor && /^#[0-9a-f]{6}$/i.test(tenant.secondaryColor)) document.documentElement.style.setProperty('--accent2', `color-mix(in srgb, ${tenant.secondaryColor} 20%, #ffffff 80%)`)
 }

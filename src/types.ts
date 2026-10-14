@@ -15,6 +15,10 @@ export type TenantPublic = {
   name: string
   primaryColor: string
   logoUrl: string | null
+  logoLayout?: 'SYMBOL_NAME' | 'FULL'
+  logoSize?: 'S' | 'M' | 'L'
+  backgroundColor?: string | null
+  secondaryColor?: string | null
   publicBaseUrl?: string | null
   billingRecovery?: boolean
 }

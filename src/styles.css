@@ -3447,14 +3447,7 @@ textarea.input {
   border-color: var(--auth-accent, #6366f1);
 }
 
-.authRefCheckbox input:checked::after {
-  content: '';
-  width: 5px;
-  height: 9px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg) translate(-1px, -1px);
-}
+
 
 .authRefCheckbox span {
   font-size: 0.9rem;
@@ -5572,7 +5565,7 @@ input[type='checkbox']:checked { background:var(--primary); border-color:var(--p
 input[type='checkbox']:checked::before { transform:translateY(-1px) rotate(-45deg) scale(1); }
 input[type='checkbox']:indeterminate { background:var(--primary); border-color:var(--primary); }
 input[type='checkbox']:indeterminate::before { width:9px; height:0; border:0; border-bottom:2px solid var(--primary-fg); transform:scale(1); }
-input[type='radio'] { border-radius:50%; }
+input[type='radio']:not([class*='sr-only']) { border-radius:50%; }
 input[type='radio']:checked { border-color:var(--primary); background:var(--bg-card); }
 input[type='radio']:checked::before { content:''; width:10px; height:10px; border-radius:50%; background:var(--primary); }
 input[type='checkbox']:focus-visible,input[type='radio']:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }

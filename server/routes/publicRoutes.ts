@@ -1,3 +1,4 @@
+import { brandColumns } from '../brandPresentation.js'
 import express from 'express'
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
@@ -17,7 +18,7 @@ export function createPublicRouter({ db }: PublicRouterOptions) {
       const tenant = db
         .prepare(
           `
-            SELECT t.id, t.slug, t.name, t.primary_color as primaryColor, t.logo_url as logoUrl,
+            SELECT t.id, t.slug, t.name, t.primary_color as primaryColor, t.logo_url as logoUrl${brandColumns(db, 't')},
                    (
                      SELECT 'https://' || d.domain
                      FROM tenant_domains d
@@ -48,7 +49,7 @@ export function createPublicRouter({ db }: PublicRouterOptions) {
       const tenant = db
         .prepare(
           `
-            SELECT t.id, t.slug, t.name, t.primary_color as primaryColor, t.logo_url as logoUrl,
+            SELECT t.id, t.slug, t.name, t.primary_color as primaryColor, t.logo_url as logoUrl${brandColumns(db, 't')},
                    (
                      SELECT 'https://' || d.domain
                      FROM tenant_domains d

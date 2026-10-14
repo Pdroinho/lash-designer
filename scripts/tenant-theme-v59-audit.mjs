@@ -12,16 +12,16 @@ const setup = read('src/setup.css')
 const workspace = read('src/components/WorkspaceSetup.tsx')
 
 const checks = [
-  ['tema do tenant deriva superfícies da cor principal', theme.includes('function applyTenantSurfaces()') && theme.includes("'--surface-canvas'") && theme.includes("'--surface-soft'") && theme.includes("'--surface-muted'")],
+  ['tema do tenant deriva superfícies da cor principal', theme.includes('function applyTenantSurfaces(backgroundColor?') && theme.includes("'--surface-canvas'") && theme.includes("'--surface-soft'") && theme.includes("'--surface-muted'")],
   ['tema do tenant propaga superfícies para o Product Design System', theme.includes("'--ld-color-canvas': 'var(--surface-canvas)'") && theme.includes("'--ld-color-soft': 'var(--surface-soft)'") && theme.includes("'--ld-color-line-soft': 'var(--line-soft)'")],
   ['legado gray-50 segue a superfície temática', theme.includes("'--gray-50': 'var(--surface-canvas)'")],
   ['clearTenantTheme remove tokens de superfície', theme.includes('...TENANT_SURFACE_KEYS')],
-  ['applyTenantTheme aplica accent e superfícies', /applyTenantTheme[\s\S]{0,220}applyPrimaryColor\(tenant\.primaryColor\)[\s\S]{0,120}applyTenantSurfaces\(\)/.test(theme)],
+  ['applyTenantTheme aplica accent e superfícies', /applyTenantTheme[\s\S]{0,220}applyPrimaryColor\(tenant\.primaryColor\)[\s\S]{0,120}applyTenantSurfaces\(tenant\.backgroundColor\)/.test(theme)],
   ['dashboard não possui mais gradiente vinho fixo', dashboard.includes('var(--primary-900)') && dashboard.includes('var(--primary-600)') && !/#321f2a|#5a193a|#7d2450|#571a38/i.test(dashboard)],
   ['transição foto/banner do dashboard é derivada do tenant', dashboard.includes('color-mix(in srgb, var(--primary-700)')],
   ['booking usa as superfícies globais do tenant', booking.includes('--b30-canvas: var(--surface-canvas') && booking.includes('--b30-panel: var(--surface-soft') && booking.includes('--b30-paper: var(--ld-color-paper')],
   ['booking remove acentos rosa hardcoded das interações', !/rgba\(139\s*,\s*23\s*,\s*71/i.test(booking) && booking.includes('color-mix(in srgb, var(--b30-wine)')],
-  ['sidebar aceita logo e nome do espaço', shellComponent.includes("brand?: Pick<TenantPublic, 'name' | 'logoUrl'>") && shellComponent.includes("props.brand?.logoUrl || '/brand/logo-symbol.png'") && shellComponent.includes("props.brand?.name || 'Lash Designer'")],
+  ['sidebar aceita logo e nome do espaço', shellComponent.includes("'logoLayout' | 'logoSize'") && shellComponent.includes('<TenantBrand brand={props.brand}')],
   ['painel admin envia tenant ao shell', (adminApp.match(/brand=\{tenant\}/g) || []).length >= 2],
   ['salvar identidade atualiza shell sem refetch obrigatório', settingsPage.includes('onUpdate?.(res.data.tenant)') && adminApp.includes('onUpdate={(updatedTenant) =>') && adminApp.includes('setTenant(updatedTenant)')],
   ['logo de tenant recebe tratamento próprio no shell', shell.includes('.logo-icon.is-tenant-logo') && shell.includes('object-fit: contain')],

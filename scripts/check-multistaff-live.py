@@ -110,6 +110,22 @@ with tempfile.TemporaryDirectory(prefix='lashdesigner-qa-') as temp:
             service_id=created['body']['service']['id']
             listed=request(port,'GET','/api/admin/professionals',host=host_a,cookie=admins[0])
             expect('default professional and 3-seat legacy limit',(len(listed['body']['professionals']),listed['body']['seatLimit']),(1,3))
+            owner=listed['body']['professionals'][0]['id']
+            import base64
+            portrait='data:image/webp;base64,'+base64.b64encode((PROJECT/'public/placeholders/service-placeholder.webp').read_bytes()).decode()
+            updated=request(port,'PATCH',f'/api/admin/professionals/{owner}',host=host_a,cookie=admins[0],payload={'photoUrl':portrait,'instagram':'studio.lashes','tiktok':'studio_lashes'})
+            expect('professional profile photo and social handles save through real server',updated['status'],200)
+            visible=request(port,'GET',f'/api/public/professionals?serviceId={service_id}',host=host_a)['body']['professionals'][0]
+            expect('public professional exposes saved portrait and Instagram',(visible['photoUrl'],visible['instagram']),(portrait,'studio.lashes'))
+            expect('public profile does not leak phone/email/userId',set(visible),{'id','name','photoUrl','instagram','tiktok'})
+            expect('social URL injection rejected',request(port,'PATCH',f'/api/admin/professionals/{owner}',host=host_a,cookie=admins[0],payload={'instagram':'https://tracker.invalid/'})['status'],400)
+            expect('brand presentation saves through tenant settings',request(port,'PATCH','/api/admin/tenant',host=host_a,cookie=admins[0],payload={'logoLayout':'FULL','logoSize':'L'})['status'],200)
+            brand=request(port,'GET','/api/public/tenant',host=host_a)['body']['tenant']
+            expect('saved brand presentation reaches public client',(brand['logoLayout'],brand['logoSize']),('FULL','L'))
+            foreign=request(port,'GET','/api/public/tenant',host=host_b)['body']['tenant']
+            expect('brand customization remains isolated from other tenant',(foreign['logoLayout'],foreign['logoSize']),('SYMBOL_NAME','M'))
+            expect('arbitrary logo dimensions rejected',request(port,'PATCH','/api/admin/tenant',host=host_a,cookie=admins[0],payload={'logoSize':'900px'})['status'],400)
+
             primary_id=listed['body']['professionals'][0]['id']
             added=request(port,'POST','/api/admin/professionals',host=host_a,cookie=admins[0],payload={'name':'Bianca','serviceIds':[service_id]})
             expect('ADMIN creates second bookable professional',added['status'],201)

@@ -1,3 +1,5 @@
+import { BrandPresentationControls } from './BrandPresentationControls'
+import { TenantBrand } from './TenantBrand'
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -38,6 +40,11 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
   const [step, setStep] = useState(0)
   const [businessName, setBusinessName] = useState(tenant?.name ?? '')
   const [logoUrl, setLogoUrl] = useState(tenant?.logoUrl ?? '')
+  const [logoLayout, setLogoLayout] = useState<'SYMBOL_NAME' | 'FULL'>(tenant?.logoLayout ?? 'SYMBOL_NAME')
+  const [logoSize, setLogoSize] = useState<'S' | 'M' | 'L'>(tenant?.logoSize ?? 'M')
+  const [logoAdvice, setLogoAdvice] = useState('')
+  const [logoBusy, setLogoBusy] = useState(false)
+  const analysisRequest = useRef(0)
   const [preferences, setPreferences] = useState('elegante, acolhedora e moderna')
   const [palettes, setPalettes] = useState(defaultPalettes)
   const [selectedPalette, setSelectedPalette] = useState(0)
@@ -59,6 +66,8 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
     if (tenant) {
       setBusinessName(tenant.name)
       setLogoUrl(tenant.logoUrl ?? '')
+      setLogoLayout(tenant.logoLayout ?? 'SYMBOL_NAME')
+      setLogoSize(tenant.logoSize ?? 'M')
     }
   }, [tenant])
 
@@ -72,20 +81,29 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
     const file = event.target.files?.[0]
     if (!file) return
     setError('')
-    try { setLogoUrl(await optimizeLogo(file)) }
+    analysisRequest.current++
+    setLogoBusy(true)
+    setLogoAdvice('')
+    let prepared = ''
+    try { prepared = await optimizeLogo(file); setLogoUrl(prepared); setLogoLayout('SYMBOL_NAME'); setLogoSize('M') }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível processar a logo.') }
-    finally { event.target.value = '' }
+    finally { event.target.value = ''; setLogoBusy(false) }
+    if (prepared && mode === 'ASSISTED' && businessName.trim().length >= 2) void analyzeBrand(prepared)
   }
 
-  async function analyzeBrand() {
+  async function analyzeBrand(selectedLogo = logoUrl) {
+    if (analyzing || logoBusy) return
+    const request = ++analysisRequest.current
     setAnalyzing(true)
     setError('')
     try {
-      const result = await api<{ palettes: PaletteOption[]; source: 'VISION' | 'CURATED' }>('/api/admin/onboarding/brand-suggestions', {
+      const result = await api<{ palettes: PaletteOption[]; source: 'VISION' | 'CURATED'; logoPresentation?: {layout:'SYMBOL_NAME'|'FULL'; size:'S'|'M'|'L'; rationale:string} }>('/api/admin/onboarding/brand-suggestions', {
         method: 'POST',
-        body: JSON.stringify({ businessName, preferences, logoDataUrl: logoUrl.startsWith('data:image/') ? logoUrl : null }),
+        body: JSON.stringify({ businessName, preferences, logoDataUrl: selectedLogo.startsWith('data:image/') ? selectedLogo : null }),
       })
       if (!result.ok) throw new Error(result.error.message)
+      if (request !== analysisRequest.current) return
+      if (result.data.logoPresentation && selectedLogo) {setLogoLayout(result.data.logoPresentation.layout); setLogoSize(result.data.logoPresentation.size); setLogoAdvice(result.data.logoPresentation.rationale)}
       setPalettes(result.data.palettes)
       setSelectedPalette(0)
       setAnalysisSource(result.data.source)
@@ -98,6 +116,7 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
   }
 
   async function finish() {
+    if (busy || analyzing || logoBusy) return
     const palette = palettes[selectedPalette]
     if (!palette) return
     const normalizedServices = services.filter((service) => service.name.trim()).map((service) => ({
@@ -115,8 +134,8 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
       const result = await api<{ tenant: TenantPublic }>('/api/admin/onboarding/complete', {
         method: 'POST',
         body: JSON.stringify({
-          mode, businessName, primaryColor: palette.primary, secondaryColor: palette.secondary,
-          logoUrl: logoUrl || null, workingDays, startMinute: timeToMinutes(startTime), endMinute: timeToMinutes(endTime),
+          mode, businessName, primaryColor: palette.primary, secondaryColor: palette.secondary, backgroundColor: palette.background,
+          logoUrl: logoUrl || null, logoLayout, logoSize, workingDays, startMinute: timeToMinutes(startTime), endMinute: timeToMinutes(endTime),
           services: normalizedServices, answers: { preferences, palette: palette.name },
         }),
       })
@@ -141,6 +160,7 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
   }
 
   function advance() {
+    if (busy || analyzing || logoBusy) return
     setError('')
     if (step === 1 && businessName.trim().length < 2) {
       setError('Informe o nome que suas clientes verão para continuar.')
@@ -183,8 +203,8 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
               </li>
             ))}
           </ol>
-          <button type="button" className="workspace-setup-later" onClick={skip} disabled={busy}>Prefiro configurar depois</button>
-          <button type="button" className="workspace-back" disabled={busy} onClick={() => { setVisible(false); navigate('/admin?view=support') }}>Preciso de ajuda</button>
+          <button type="button" className="workspace-setup-later" onClick={skip} disabled={busy || analyzing || logoBusy}>Prefiro configurar depois</button>
+          <button type="button" className="workspace-back" disabled={busy || analyzing || logoBusy} onClick={() => { setVisible(false); navigate('/admin?view=support') }}>Preciso de ajuda</button>
         </aside>
 
         <div className="workspace-setup-main">
@@ -207,17 +227,17 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
             <h3>{mode === 'ASSISTED' ? 'Vamos partir da sua marca.' : 'Escolha a direção da sua marca.'}</h3>
             <div className="workspace-brand-grid">
               <div className="workspace-logo-upload">
-                <button type="button" onClick={() => fileRef.current?.click()}>
+                <button type="button" disabled={logoBusy || analyzing} onClick={() => fileRef.current?.click()}>
                   {logoUrl ? <img src={logoUrl} alt="Prévia da logo enviada" /> : <><Upload size={23} /><strong>Enviar minha logo</strong><small>PNG, JPG ou WebP</small></>}
                 </button>
-                {logoUrl ? <button type="button" className="workspace-remove-logo" onClick={() => setLogoUrl('')}>Remover imagem</button> : null}
-                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogo} hidden />
+                {logoUrl ? <button type="button" className="workspace-remove-logo" disabled={analyzing || logoBusy} onClick={() => {setLogoUrl(''); setLogoAdvice(''); setLogoLayout('SYMBOL_NAME')}}>Remover imagem</button> : null}
+                <input ref={fileRef} type="file" disabled={logoBusy || analyzing} accept="image/png,image/jpeg,image/webp" onChange={handleLogo} hidden />
               </div>
               <div className="workspace-brand-fields">
-                <label>Nome que suas clientes veem<input value={businessName} onChange={(event) => setBusinessName(event.target.value)} maxLength={120} /></label>
-                <label>Como sua marca deve parecer?<textarea value={preferences} onChange={(event) => setPreferences(event.target.value)} rows={3} maxLength={280} /></label>
-                {mode === 'ASSISTED' ? <button type="button" className="workspace-analyze" onClick={analyzeBrand} disabled={analyzing || businessName.trim().length < 2}>
-                  <Sparkles size={17} />{analyzing ? 'Lendo sua identidade…' : logoUrl ? 'Analisar logo e sugerir paletas' : 'Sugerir paletas pelo meu estilo'}
+                <label>Nome que suas clientes veem<input value={businessName} disabled={analyzing || logoBusy} onChange={(event) => setBusinessName(event.target.value)} maxLength={120} /></label>
+                <label>Como sua marca deve parecer?<textarea value={preferences} disabled={analyzing || logoBusy} onChange={(event) => setPreferences(event.target.value)} rows={3} maxLength={280} /></label>
+                {mode === 'ASSISTED' ? <button type="button" className="workspace-analyze" onClick={() => void analyzeBrand()} disabled={analyzing || logoBusy || businessName.trim().length < 2}>
+                  <Sparkles size={17} />{analyzing ? 'Lendo sua identidade…' : logoUrl ? 'Analisar minha marca e sugerir o visual' : 'Sugerir paletas pelo meu estilo'}
                 </button> : null}
               </div>
             </div>
@@ -227,6 +247,7 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
                 <strong>{option.name}</strong><small>{option.rationale}</small>{selectedPalette === index ? <Check size={16} /> : null}
               </button>)}
             </div>
+          <div className="workspace-brand-review"><BrandPresentationControls brand={{name:businessName,logoUrl,logoLayout,logoSize}} onLayout={setLogoLayout} onSize={setLogoSize} disabled={analyzing || logoBusy} />{logoAdvice ? <p className="form-help">Sugestão da Luma: {logoAdvice}</p> : null}</div>
             {analysisSource ? <p className="workspace-analysis-note">{analysisSource === 'VISION' ? 'Sugestões criadas a partir da sua identidade visual. Você continua no controle da escolha.' : 'Sugestões seguras da curadoria Lash Designer.'}</p> : null}
           </div> : null}
 
@@ -256,14 +277,14 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
             </div>
             {services.length < 8 ? <button type="button" className="workspace-add-service" onClick={() => setServices((current) => [...current, { name: '', durationMinutes: 90, price: '' }])}>+ Adicionar outro serviço</button> : null}
             <div className="workspace-finish-preview" style={{ '--setup-primary': palette.primary, '--setup-background': palette.background } as CSSProperties}>
-              <div>{logoUrl ? <img src={logoUrl} alt="" /> : <span>{businessName.slice(0, 1).toUpperCase()}</span>}<strong>{businessName}</strong></div><small>Seu espaço ficará pronto com marca, agenda e {services.filter((service) => service.name.trim()).length} serviços.</small>
+              <TenantBrand brand={{name:businessName,logoUrl,logoLayout,logoSize}} /><small>Seu espaço ficará pronto com marca, agenda e {services.filter((service) => service.name.trim()).length} serviços.</small>
             </div>
           </div> : null}
 
           {error ? <div className="workspace-setup-error" role="alert">{error}</div> : null}
           <footer className="workspace-setup-actions">
-            {step > 0 ? <button type="button" className="workspace-back" onClick={() => { setStep((current) => current - 1); setError('') }} disabled={busy}>Voltar</button> : <span />}
-            {step < 3 ? <button type="button" className="workspace-next" data-setup-next onClick={advance}>Continuar <ArrowRight size={17} /></button> : <button type="button" className="workspace-next" onClick={finish} disabled={busy}>{busy ? 'Preparando seu espaço…' : 'Entrar no meu espaço'} <ArrowRight size={17} /></button>}
+            {step > 0 ? <button type="button" className="workspace-back" onClick={() => { setStep((current) => current - 1); setError('') }} disabled={busy || analyzing || logoBusy}>Voltar</button> : <span />}
+            {step < 3 ? <button type="button" className="workspace-next" data-setup-next disabled={busy || analyzing || logoBusy} onClick={advance}>Continuar <ArrowRight size={17} /></button> : <button type="button" className="workspace-next" onClick={finish} disabled={busy || analyzing || logoBusy}>{busy ? 'Preparando seu espaço…' : 'Entrar no meu espaço'} <ArrowRight size={17} /></button>}
           </footer>
         </div>
       </section>

@@ -18,7 +18,7 @@ const billing = fs.readFileSync('src/components/BillingCenter.tsx', 'utf8')
 const compactServer=server.replace(/\s+/g,'')
 const checks = [
   ['confirm action não duplica a propriedade ok', !server.includes('res.json({ ok: true, ...result })')],
-  ['DeepSeek é o modelo padrão de chat e Gemini 3.1 atende setup/visão', env.includes("default('deepseek/deepseek-v4-flash-0731')") && env.includes("OPENROUTER_SETUP_MODEL") && env.includes("google/gemini-3.1-flash-lite")],
+  ['Setup permite herdar modelo principal com override opcional de visão', env.includes("OPENROUTER_SETUP_MODEL: z.string().min(2).optional()") && env.includes("OPENROUTER_VISION_MODEL")],
   ['runtime trata tool_calls sem exigir content', provider.includes('modelMessage?.tool_calls') && provider.includes('content: modelMessage?.content ?? null')],
   ['runtime possui recovery limitado para saída vazia', provider.includes('recoveredEmptyOutput') && provider.includes('ASSISTANT_MAX_AGENT_STEPS')],
   ['reasoning é desabilitado no OpenRouter', provider.includes('reasoning: { enabled: false, exclude: true }')],

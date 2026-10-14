@@ -1256,5 +1256,14 @@ export function migrate() {
   apply(45, () => createAppmaxReferralSchema(db))
   apply(46, () => createLumaOperationsSchema(db))
   apply(47, () => db.exec('ALTER TABLE professionals ADD COLUMN removed_at TEXT'))
+  apply(48, () => db.exec(`
+    ALTER TABLE professionals ADD COLUMN photo_url TEXT;
+    ALTER TABLE professionals ADD COLUMN instagram TEXT;
+    ALTER TABLE professionals ADD COLUMN tiktok TEXT;
+    ALTER TABLE tenants ADD COLUMN logo_layout TEXT NOT NULL DEFAULT 'SYMBOL_NAME';
+    ALTER TABLE tenants ADD COLUMN logo_size TEXT NOT NULL DEFAULT 'M';
+    ALTER TABLE tenants ADD COLUMN brand_background TEXT;
+    ALTER TABLE tenants ADD COLUMN brand_secondary TEXT;
+  `))
 
 }

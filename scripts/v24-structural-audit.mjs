@@ -52,7 +52,7 @@ check('Image uploads enforce pre- and post-processing limits', images.includes('
 check('Image decode honors EXIF orientation where supported', images.includes("imageOrientation: 'from-image'"))
 check('OpenRouter chat stays server-side', assistant.includes('OPENROUTER_API_KEY') && assistant.includes('/chat/completions'))
 check('OpenRouter chat defaults to DeepSeek V4 Flash', env.includes("default('deepseek/deepseek-v4-flash-0731')"))
-check('Luma routes setup/vision to Gemini 3.1 Flash Lite', env.includes("OPENROUTER_SETUP_MODEL") && env.includes("OPENROUTER_VISION_MODEL") && (env.match(/google\/gemini-3\.1-flash-lite/g) || []).length >= 2)
+check('Luma setup inherits principal model or explicit override', env.includes("OPENROUTER_SETUP_MODEL: z.string().min(2).optional()") && read('server/assistant.ts').includes('env.OPENROUTER_SETUP_MODEL || env.OPENROUTER_MODEL'))
 check('Luma absence does not define platform availability', !adminApp.includes('OPENROUTER_API_KEY'))
 check('Landing publishes current team catalog without legacy cycles', landing.includes('PUBLIC_TEAM_PLANS') && landing.includes('teamPlans.map') && !landing.includes('fallbackPlans'))
 check('Landing does not publish demonstrative social proof as customer evidence', !landing.includes('Apresentação demonstrativa') && !landing.includes('Demonstração para apresentação') && !landing.includes('demoFeedback'))

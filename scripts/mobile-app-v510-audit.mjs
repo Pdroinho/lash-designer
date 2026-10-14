@@ -10,7 +10,7 @@ const checks = [
   ['CSS mobile 5.10 importado', main.includes("import './mobile-app-v510.css'")],
   ['Shell aceita navegação mobile', shell.includes('mobileNav?: Array<{ key: string; label: string; icon: ReactNode; active: boolean; onClick: () => void }>')],
   ['Shell marca presença da tabbar', shell.includes("props.mobileNav?.length ? 'has-mobile-tabbar' : ''")],
-  ['Topbar mobile usa marca do tenant', shell.includes('ld-mobile-topbar-brand') && shell.includes("props.brand?.logoUrl || '/brand/logo-symbol.png'")],
+  ['Topbar mobile usa marca do tenant', shell.includes('<TenantBrand brand={props.brand} className="tenant-brand-mobile"') && fs.readFileSync('src/components/TenantBrand.tsx','utf8').includes("'/brand/logo-symbol.png'")],
   ['Bottom bar possui navegação acessível', shell.includes('ld-mobile-tabbar') && shell.includes('Navegação principal mobile')],
   ['Bottom bar tem Mais para drawer completo', shell.includes('Abrir mais áreas') && shell.includes('<MoreHorizontal size={21} />')],
   ['Admin expõe Início na barra mobile', adminApp.includes("key: 'dashboard', label: 'Início'")],

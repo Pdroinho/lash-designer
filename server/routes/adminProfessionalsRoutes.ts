@@ -1,3 +1,4 @@
+import { professionalPhotoSchema, professionalSocialSchema } from '../professionalPhoto.js'
 import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import { Router } from 'express'
@@ -40,6 +41,9 @@ const hoursSchema = z
 const patchSchema = z
   .object({
     name: z.string().trim().min(2).max(120).optional(),
+    photoUrl: professionalPhotoSchema.optional(),
+    instagram: professionalSocialSchema.optional(),
+    tiktok: professionalSocialSchema.optional(),
     active: z.boolean().optional(),
     bookable: z.boolean().optional(),
     serviceIds: z.array(z.string().uuid()).max(100).optional(),
@@ -52,16 +56,21 @@ export function createAdminProfessionalsRouter(db: Database.Database) {
   const router = Router()
   const hasRemoval = (db.prepare('PRAGMA table_info(professionals)').all() as Array<{name:string}>).some(c=>c.name==='removed_at')
 
+  const hasPhoto = (db.prepare('PRAGMA table_info(professionals)').all() as Array<{name:string}>).some(c=>c.name==='photo_url')
+
   const detail = (tenantId: string, id: string) => {
     const professional = db
       .prepare(
-        `SELECT p.id, p.name, p.active, p.bookable, p.user_id as userId, u.staff_access_disabled_at as accessDisabledAt, u.role as accessRole, u.phone as accessPhone
+        `SELECT p.id, p.name, ${hasPhoto ? 'p.photo_url' : 'NULL'} as photoUrl, ${hasPhoto ? 'p.instagram' : 'NULL'} as instagram, ${hasPhoto ? 'p.tiktok' : 'NULL'} as tiktok, p.active, p.bookable, p.user_id as userId, u.staff_access_disabled_at as accessDisabledAt, u.role as accessRole, u.phone as accessPhone
       FROM professionals p LEFT JOIN users u ON u.id = p.user_id AND u.tenant_id = p.tenant_id WHERE p.tenant_id = ? AND p.id = ? ${hasRemoval ? 'AND p.removed_at IS NULL' : ''}`,
       )
       .get(tenantId, id) as
       | {
           id: string
           name: string
+          photoUrl: string | null
+          instagram: string | null
+          tiktok: string | null
           active: number
           bookable: number
           userId: string | null
@@ -167,6 +176,9 @@ export function createAdminProfessionalsRouter(db: Database.Database) {
       const body = z
         .object({
           name: z.string().trim().min(2).max(120),
+          photoUrl: professionalPhotoSchema.optional(),
+    instagram: professionalSocialSchema.optional(),
+    tiktok: professionalSocialSchema.optional(),
           serviceIds: z.array(z.string().uuid()).max(100),
           hours: hoursSchema.optional(),
         })
@@ -189,6 +201,14 @@ export function createAdminProfessionalsRouter(db: Database.Database) {
         db.prepare(
           'INSERT INTO professionals (id, tenant_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
         ).run(id, tenantId, body.name, now, now)
+        if (body.photoUrl !== undefined) {
+          if (!hasPhoto) throw badRequest('Atualize o banco antes de salvar fotos.', 'MIGRATION_REQUIRED')
+          db.prepare('UPDATE professionals SET photo_url = ? WHERE tenant_id = ? AND id = ?').run(body.photoUrl, tenantId, id)
+        }
+        if (body.instagram !== undefined || body.tiktok !== undefined) {
+          if (!hasPhoto) throw badRequest('Atualize o banco para salvar redes sociais.', 'MIGRATION_REQUIRED')
+          db.prepare('UPDATE professionals SET instagram = ?, tiktok = ? WHERE tenant_id = ? AND id = ?').run(body.instagram ?? null, body.tiktok ?? null, tenantId, id)
+        }
         for (const serviceId of body.serviceIds)
           db.prepare(
             'INSERT INTO professional_services (tenant_id, professional_id, service_id) VALUES (?, ?, ?)',
@@ -260,6 +280,15 @@ export function createAdminProfessionalsRouter(db: Database.Database) {
           tenantId,
           id,
         )
+        if (body.photoUrl !== undefined) {
+          if (!hasPhoto) throw badRequest('Atualize o banco antes de salvar fotos.', 'MIGRATION_REQUIRED')
+          db.prepare('UPDATE professionals SET photo_url = ? WHERE tenant_id = ? AND id = ?').run(body.photoUrl, tenantId, id)
+        }
+        if (body.instagram !== undefined || body.tiktok !== undefined) {
+          if (!hasPhoto) throw badRequest('Atualize o banco para salvar redes sociais.', 'MIGRATION_REQUIRED')
+          const current = db.prepare('SELECT instagram, tiktok FROM professionals WHERE tenant_id = ? AND id = ?').get(tenantId, id) as {instagram:string|null; tiktok:string|null}
+          db.prepare('UPDATE professionals SET instagram = ?, tiktok = ? WHERE tenant_id = ? AND id = ?').run(body.instagram === undefined ? current.instagram : body.instagram, body.tiktok === undefined ? current.tiktok : body.tiktok, tenantId, id)
+        }
         if (!nextActive && existing.userId && existing.accessRole === 'STAFF')
           revokeSessionsForUser(db, existing.userId)
         if (body.serviceIds) {

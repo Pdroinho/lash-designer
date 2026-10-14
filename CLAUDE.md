@@ -1,13 +1,13 @@
 # CLAUDE.md — Guia para IAs e Desenvolvedores
 
 > Este arquivo orienta qualquer IA (Claude, GPT, Trae, etc) ou dev novo a navegar
-> e modificar o código do LashDesigner 5.13.2 com confiança.
+> e modificar o código do LashDesigner 5.13.3 com confiança.
 
 ---
 
-## Homologação 5.13.2 — Fable 5.1 e Opus 5
+## Homologação 5.13.3 — Fable 5.1 e Opus 5
 
-Leia `docs/RELEASE_5_13_2.md`, `docs/RELEASE_5_13_1.md` e `docs/RELEASE_5_13_0.md`. Rode também `npm run test:product-refinement-ui` e `npm run test:product-form-controls-ui`. A Luma tem um único chat; as ferramentas são acionadas pela conversa, sem abas internas. Faça backup SQLite e teste a migração 45→47 antes do deploy. Rode `npm run check`, os testes de navegador de equipe, suporte, billing e Luma integrada, e o teste HTTP local. Os provedores de IA, Appmax e Evolution dos testes integrados são simulados: homologue separadamente credenciais, compra real, webhook duplicado, estorno, entrega WhatsApp e resposta do modelo em ambiente de testes. Após publicar, valide com uma conta de teste todo o fluxo na produção: login, setup, equipe, reserva pública, presença, financeiro, chamados ADMIN/DEV, notificações, preferências, lembretes e créditos. Verifique logs e isolamento entre estúdios; mantenha rollback de aplicação e banco. Registre evidências e limitações. A capacidade desses modelos não substitui execução dos testes nem garante 100% de integridade.
+Leia `docs/RELEASE_5_13_3.md`, `docs/RELEASE_5_13_2.md`, `docs/RELEASE_5_13_1.md` e `docs/RELEASE_5_13_0.md`. Rode também `npm run test:brand-presentation-ui`, `npm run test:product-refinement-ui` e `npm run test:product-form-controls-ui`. A Luma tem um único chat; as ferramentas são acionadas pela conversa, sem abas internas. Faça backup SQLite e teste a migração 47→48 antes do deploy. Rode `npm run check`, os testes de navegador de equipe, suporte, billing e Luma integrada, e o teste HTTP local. Os provedores de IA, Appmax e Evolution dos testes integrados são simulados: homologue separadamente credenciais, compra real, webhook duplicado, estorno, entrega WhatsApp e resposta do modelo em ambiente de testes. No ambiente de testes, confirme que o setup usa o identificador real do modelo principal configurado, aceita imagem e responde com os enums de apresentação da marca. Teste logos com símbolo, logos completas e marcas verticais, transparência, proporções extremas e falha do provedor. Confirme upload, troca e remoção de fotos e redes sociais das profissionais, agendamento específico e qualquer disponível. Após publicar, valide com uma conta de teste todo o fluxo na produção: login, setup, equipe, reserva pública, presença, financeiro, chamados ADMIN/DEV, notificações, preferências, lembretes e créditos. Verifique logs e isolamento entre estúdios; mantenha rollback de aplicação e banco. Registre evidências e limitações. A capacidade desses modelos não substitui execução dos testes nem garante 100% de integridade.
 
 ## Atualização 5.12.12
 
@@ -261,8 +261,9 @@ curl -sf http://127.0.0.1:3000/api/ready
 | Assets | `docs/ASSET_CATALOG.md` |
 | Deploy VPS | `DEPLOY_VPS.md` |
 
-Release atual: `docs/RELEASE_5_13_2.md`; histórico recente em `docs/RELEASE_5_13_1.md` e `docs/RELEASE_5_13_0.md`. O esquema segue na migração 47.
+Release atual: `docs/RELEASE_5_12_14.md`; executar `docs/HOMOLOGACAO_INDICACOES_5_12_12.md` para validar provedor externo.
 
+Hotfix visual 5.12.13: `docs/RELEASE_5_12_13.md`. O esquema segue em 45.
 
 
 ## Equipe e suporte — 5.12.14

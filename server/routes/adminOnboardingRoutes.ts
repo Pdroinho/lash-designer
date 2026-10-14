@@ -1,3 +1,4 @@
+import { brandColumns, logoLayoutSchema, logoSizeSchema, saveBrandPresentation, logoSuggestionSchema } from '../brandPresentation.js'
 import { randomUUID } from 'node:crypto'
 import Database from 'better-sqlite3'
 import { Router, type RequestHandler } from 'express'
@@ -21,6 +22,7 @@ type BrandPalette = {
 
 type BrandSuggestionResult = {
   palettes: BrandPalette[]
+  logoPresentation?: {layout: 'SYMBOL_NAME' | 'FULL'; size: 'S' | 'M' | 'L'; rationale: string}
   inputTokens: number
   outputTokens: number
   costUsd: number
@@ -31,7 +33,7 @@ type AdminOnboardingRouterOptions = {
   db: Database.Database
   onboardingAssistantLimiter: RequestHandler
   assistantEnabled: boolean
-  assistantProvider: { apiKey: string | undefined; visionModel: string }
+  assistantProvider: { apiKey: string | undefined; visionModel: string; setupModel?: string }
   generateBrandSetupSuggestions: (input: BrandSuggestionInput) => Promise<BrandSuggestionResult>
   now?: () => Date
 }
@@ -78,7 +80,7 @@ export function createAdminOnboardingRouter({
           ? { ...onboarding, answers: JSON.parse(onboarding.answersJson || '{}'), answersJson: undefined }
           : { status: 'COMPLETED', mode: null, currentStep: 4, answers: {}, aiAttempts: 0, completedAt: null },
         assistantEnabled: Boolean(assistantEnabled && assistantProvider.apiKey),
-        visionModel: assistantProvider.visionModel,
+        visionModel: assistantProvider.setupModel || assistantProvider.visionModel,
       })
     } catch (err) {
       next(err)
@@ -117,7 +119,8 @@ export function createAdminOnboardingRouter({
           answer.inputTokens, answer.outputTokens, answer.costUsd, body.logoDataUrl ? 1 : 0,
           answer.model, timestamp,
         )
-        return res.json({ palettes: answer.palettes, source: 'VISION' })
+        const logo = logoSuggestionSchema.safeParse(answer.logoPresentation)
+        return res.json({ palettes: answer.palettes, logoPresentation: logo.success ? logo.data : undefined, source: 'VISION' })
       } catch (error) {
         console.warn('[Onboarding visual]', error instanceof Error ? error.message : error)
         return res.json({ palettes: fallback, source: 'CURATED', fallback: true })
@@ -140,6 +143,9 @@ export function createAdminOnboardingRouter({
         businessName: z.string().trim().min(2).max(120),
         primaryColor: z.string().regex(/^#[0-9a-f]{6}$/i),
         secondaryColor: z.string().regex(/^#[0-9a-f]{6}$/i),
+        backgroundColor: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
+        logoLayout: logoLayoutSchema.optional(),
+        logoSize: logoSizeSchema.optional(),
         logoUrl: imageUrl.nullable().optional(),
         workingDays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
         startMinute: z.number().int().min(0).max(1380),
@@ -156,6 +162,7 @@ export function createAdminOnboardingRouter({
       }).parse(req.body ?? {})
       const timestamp = now().toISOString()
       db.transaction(() => {
+        saveBrandPresentation(db, tenantId, body.logoLayout, body.logoSize, body.backgroundColor, body.backgroundColor ? body.secondaryColor : undefined)
         db.prepare(`UPDATE tenants SET name = ?, primary_color = ?, logo_url = ? WHERE id = ?`)
           .run(body.businessName, body.primaryColor.toUpperCase(), body.logoUrl || null, tenantId)
         db.prepare(`UPDATE tenant_settings SET secondary_color = ?, updated_at = ? WHERE tenant_id = ?`)
@@ -188,7 +195,7 @@ export function createAdminOnboardingRouter({
         `).run(body.mode, JSON.stringify(body.answers), timestamp, timestamp, tenantId)
       })()
       const tenant = db.prepare(`
-        SELECT id, slug, name, primary_color as primaryColor, logo_url as logoUrl
+        SELECT id, slug, name, primary_color as primaryColor, logo_url as logoUrl${brandColumns(db)}
         FROM tenants WHERE id = ?
       `).get(tenantId)
       res.json({ onboarding: { status: 'COMPLETED' }, tenant })

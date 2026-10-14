@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { ProfessionalAvatar } from '../../components/ProfessionalAvatar'
+import { optimizeImageFile } from '../../imageProcessing'
+import { useRef, useState } from 'react'
 import { api } from '../../api'
 import { ModalRoot } from '../../components/ModalRoot'
 import { X, Check } from '../../components/Icons'
@@ -27,16 +29,37 @@ export function ProfessionalEditor({
     [search, setSearch] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('')
+  const [instagram, setInstagram] = useState(person?.instagram ?? '')
+  const [tiktok, setTiktok] = useState(person?.tiktok ?? '')
+  const photoInput = useRef<HTMLInputElement>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(person?.photoUrl ?? null)
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const photoRequest = useRef(0)
+  async function uploadPhoto(file: File) {
+    const request = ++photoRequest.current
+    setPhotoBusy(true)
+    setError('')
+    try {
+      const result = await optimizeImageFile(file, {maxBytes: 125_000, maxDimension: 480, quality: .85})
+      if (photoRequest.current === request) setPhotoUrl(result)
+    } catch (cause) {
+      if (photoRequest.current === request) setError(cause instanceof Error ? cause.message : 'Não foi possível preparar a foto.')
+    } finally {
+      if (photoRequest.current === request) setPhotoBusy(false)
+    }
+  }
   const labels = ['Nome', 'Serviços', 'Horários']
   function validate() {
     if (step === 0 && name.trim().length < 2)
       return 'Informe o nome da profissional, com pelo menos 2 letras.'
+    if (step === 0 && [instagram, tiktok].some(value => value.trim() && !/^[a-zA-Z0-9_]+(?:[.][a-zA-Z0-9_]+)*$/.test(value.trim().replace(/^@/,'')))) return 'Nas redes sociais, informe somente o usuário, sem o link.'
     if (step === 1 && !ids.length)
       return 'Escolha pelo menos um serviço que ela realiza.'
     if (step === 2 && custom) return hoursError(hours)
     return ''
   }
   async function next() {
+    if (busy || photoBusy) return
     const message = validate()
     setError(message)
     if (message) return
@@ -53,6 +76,9 @@ export function ProfessionalEditor({
         method: person ? 'PATCH' : 'POST',
         body: JSON.stringify({
           name: name.trim(),
+          photoUrl,
+          instagram: instagram.trim().replace(/^@/,'') || null,
+          tiktok: tiktok.trim().replace(/^@/,'') || null,
           serviceIds: ids,
           hours: custom ? hours : [],
         }),
@@ -74,7 +100,7 @@ export function ProfessionalEditor({
   return (
     <ModalRoot
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && !busy) {
+        if (event.key === 'Escape' && !busy && !photoBusy) {
           event.stopPropagation()
           onClose()
         }
@@ -99,7 +125,7 @@ export function ProfessionalEditor({
             type="button"
             className="icon-btn"
             aria-label="Fechar cadastro"
-            disabled={busy}
+            disabled={busy || photoBusy}
             onClick={onClose}
           >
             <X size={20} />
@@ -128,6 +154,19 @@ export function ProfessionalEditor({
                   Este nome aparece para as clientes na página de agendamento. O
                   acesso ao painel pode ser criado depois.
                 </p>
+                <div className="team-photo-editor">
+                  <ProfessionalAvatar name={name} photoUrl={photoUrl} />
+                  <div>
+                    <strong>Foto da profissional <span className="team-help">(opcional)</span></strong>
+                    <p className="team-help">Ajuda a cliente a reconhecer quem vai atendê-la. Sem foto, mostramos as iniciais.</p>
+                    <div className="team-photo-actions">
+                      <button type="button" className="btn btn-ghost" disabled={busy || photoBusy} onClick={() => photoInput.current?.click()}>{photoBusy ? 'Preparando foto…' : photoUrl ? 'Trocar foto' : 'Adicionar foto'}</button>
+                      {photoUrl ? <button type="button" className="btn btn-ghost" disabled={busy || photoBusy} onClick={() => setPhotoUrl(null)}>Remover foto</button> : null}
+                    </div>
+                    <input ref={photoInput} type="file" className="sr-only" tabIndex={-1} aria-label="Selecionar foto da profissional" accept="image/png,image/jpeg,image/webp" disabled={busy || photoBusy} onChange={event => {const file = event.target.files?.[0]; event.target.value = ''; if(file) void uploadPhoto(file)}} />
+                    <small className="team-help">JPG, PNG ou WebP · até 12 MB</small>
+                  </div>
+                </div>
                 <label className="team-field">
                   Nome da profissional
                   <input
@@ -138,9 +177,10 @@ export function ProfessionalEditor({
                     maxLength={120}
                     autoComplete="off"
                     placeholder="Ex.: Mariana Souza"
-                    disabled={busy}
+                    disabled={busy || photoBusy}
                   />
                 </label>
+                <details className="team-social-editor"><summary>Redes sociais (opcional)</summary><p className="team-help">A cliente pode conhecer o trabalho dela antes de agendar. Informe o usuário, sem o link.</p><label className="team-field">Instagram<input className="input" value={instagram} onChange={e=>setInstagram(e.target.value)} placeholder="Ex.: camila.lashes" maxLength={31} disabled={busy || photoBusy} autoCapitalize="none" /></label><label className="team-field">TikTok<input className="input" value={tiktok} onChange={e=>setTiktok(e.target.value)} placeholder="Ex.: camila.lashes" maxLength={31} disabled={busy || photoBusy} autoCapitalize="none" /></label></details>
               </>
             ) : null}
             {step === 1 ? (
@@ -163,7 +203,7 @@ export function ProfessionalEditor({
                   <button
                     type="button"
                     className="btn btn-ghost team-text-button"
-                    disabled={busy}
+                    disabled={busy || photoBusy}
                     onClick={() =>
                       setIds(services.map((service) => service.id))
                     }
@@ -173,7 +213,7 @@ export function ProfessionalEditor({
                   <button
                     type="button"
                     className="btn btn-ghost team-text-button"
-                    disabled={busy}
+                    disabled={busy || photoBusy}
                     onClick={() => setIds([])}
                   >
                     Limpar
@@ -194,7 +234,7 @@ export function ProfessionalEditor({
                         <input
                           type="checkbox"
                           checked={ids.includes(service.id)}
-                          disabled={busy}
+                          disabled={busy || photoBusy}
                           onChange={() =>
                             setIds((current) =>
                               current.includes(service.id)
@@ -236,7 +276,7 @@ export function ProfessionalEditor({
                   hours={hours}
                   onChange={setHours}
                   inherited={inherited}
-                  disabled={busy}
+                  disabled={busy || photoBusy}
                 />
               </>
             ) : null}
@@ -250,7 +290,7 @@ export function ProfessionalEditor({
             <button
               type="button"
               className="btn"
-              disabled={busy}
+              disabled={busy || photoBusy}
               onClick={() => {
                 if (step) {
                   setStep(step - 1)
@@ -260,7 +300,7 @@ export function ProfessionalEditor({
             >
               {step ? 'Voltar' : 'Cancelar'}
             </button>
-            <button type="submit" className="btn btnPrimary" disabled={busy}>
+            <button type="submit" className="btn btnPrimary" disabled={busy || photoBusy}>
               {busy
                 ? 'Salvando…'
                 : step === 2

@@ -18,13 +18,14 @@ export function createPublicProfessionalsRouter(db: Database.Database) {
     return row.id
   }
 
+  const hasPhoto = (db.prepare('PRAGMA table_info(professionals)').all() as Array<{name:string}>).some(c=>c.name==='photo_url')
   const qualified = (id: string, serviceId: string) => db.prepare(`
-    SELECT p.id, p.name FROM professionals p
+    SELECT p.id, p.name, ${hasPhoto ? 'p.photo_url' : 'NULL'} as photoUrl, ${hasPhoto ? 'p.instagram' : 'NULL'} as instagram, ${hasPhoto ? 'p.tiktok' : 'NULL'} as tiktok FROM professionals p
     JOIN professional_services ps ON ps.tenant_id = p.tenant_id AND ps.professional_id = p.id
     JOIN services s ON s.tenant_id = ps.tenant_id AND s.id = ps.service_id
     WHERE p.tenant_id = ? AND p.active = 1 AND p.bookable = 1 AND s.active = 1 AND s.id = ?
     ORDER BY p.created_at, p.id
-  `).all(id, serviceId) as Array<{ id: string; name: string }>
+  `).all(id, serviceId) as Array<{ id: string; name: string; photoUrl: string | null }>
 
   const professionals = (req: Request, res: Response, explicitSlug?: string) => {
     const id = tenantId(req, explicitSlug)

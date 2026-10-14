@@ -2,6 +2,9 @@ export type Hours = { weekday: number; startMinute: number; endMinute: number }
 export type Professional = {
   id: string
   name: string
+  photoUrl?: string | null
+  instagram?: string | null
+  tiktok?: string | null
   active: boolean
   bookable: boolean
   userId: string | null

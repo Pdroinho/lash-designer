@@ -1,3 +1,4 @@
+import { brandColumns, logoLayoutSchema, logoSizeSchema } from '../brandPresentation.js'
 import Database from 'better-sqlite3'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { Router, type RequestHandler } from 'express'
@@ -40,6 +41,8 @@ export function createAdminTenantSettingsRouter(options: AdminTenantSettingsRout
       const body = z.object({
         name: z.string().min(2).optional(),
         primaryColor: z.string().min(4).optional(),
+        logoLayout: logoLayoutSchema.optional(),
+        logoSize: logoSizeSchema.optional(),
         logoUrl: z.string().max(450_000).nullable().optional().refine((value) => {
           if (typeof value === 'undefined' || value === null) return true
           const normalized = value.trim()
@@ -57,12 +60,17 @@ export function createAdminTenantSettingsRouter(options: AdminTenantSettingsRout
         const nextLogo = body.logoUrl === null ? null : (body.logoUrl ?? '').trim()
         updates.push({ sql: 'logo_url = ?', params: [nextLogo || null] })
       }
+      if (body.logoLayout !== undefined || body.logoSize !== undefined) {
+        if (!brandColumns(db)) throw badRequest('Atualize o banco para personalizar a marca.', 'MIGRATION_REQUIRED')
+        if (body.logoLayout !== undefined) updates.push({sql:'logo_layout = ?', params:[body.logoLayout]})
+        if (body.logoSize !== undefined) updates.push({sql:'logo_size = ?', params:[body.logoSize]})
+      }
       if (updates.length === 0) return next(badRequest('Nada para atualizar', 'NO_UPDATES'))
 
       db.prepare(`UPDATE tenants SET ${updates.map(update => update.sql).join(', ')} WHERE id = ?`)
         .run(...updates.flatMap(update => update.params), tenantId)
       const tenant = db.prepare(`
-        SELECT id, slug, name, primary_color as primaryColor, logo_url as logoUrl
+        SELECT id, slug, name, primary_color as primaryColor, logo_url as logoUrl${brandColumns(db)}
         FROM tenants
         WHERE id = ?
       `).get(tenantId)

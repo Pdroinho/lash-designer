@@ -66,7 +66,7 @@ test('onboarding ADMIN preserva fallback, IA, transação, skip e isolamento', a
     generatorCalls += 1
     generatorInputs.push(input)
     if (generatorFails) throw new Error('falha visual simulada')
-    return { palettes: visionPalettes, inputTokens: 21, outputTokens: 34, costUsd: 0.012, model: 'vision-test' }
+    return { palettes: visionPalettes, logoPresentation: {layout:'FULL' as const,size:'L' as const,rationale:'Logo completa com nome legível.'}, inputTokens: 21, outputTokens: 34, costUsd: 0.012, model: 'vision-test' }
   }
 
   const app = express()
@@ -169,7 +169,7 @@ test('onboarding ADMIN preserva fallback, IA, transação, skip e isolamento', a
       method: 'POST', headers: tenantOneHeaders,
       body: JSON.stringify({ businessName: 'Studio Aurora', preferences: 'marcante', logoDataUrl }),
     }).then(response => response.json())
-    assert.deepEqual(vision, { palettes: visionPalettes, source: 'VISION' })
+    assert.deepEqual(vision, { palettes: visionPalettes, logoPresentation:{layout:'FULL',size:'L',rationale:'Logo completa com nome legível.'}, source: 'VISION' })
     assert.deepEqual(generatorInputs[0], { businessName: 'Studio Aurora', preferences: 'marcante', logoDataUrl })
     assert.deepEqual(db.prepare(`
       SELECT tenant_id as tenantId, user_id as userId, request_day as requestDay,
@@ -261,6 +261,16 @@ test('onboarding ADMIN preserva fallback, IA, transação, skip e isolamento', a
     })
     assert.equal((db.prepare(`SELECT COUNT(*) as count FROM services WHERE tenant_id = ?`).get(tenantOne) as { count: number }).count, serviceCount)
     assert.equal(limiterCalls, 5)
+    db.exec("ALTER TABLE tenants ADD COLUMN logo_layout TEXT DEFAULT 'SYMBOL_NAME'; ALTER TABLE tenants ADD COLUMN logo_size TEXT DEFAULT 'M'; ALTER TABLE tenants ADD COLUMN brand_background TEXT; ALTER TABLE tenants ADD COLUMN brand_secondary TEXT;")
+    const branded = await fetch(`${baseUrl}/api/admin/onboarding/complete`, {method:'POST',headers:tenantOneHeaders,body:JSON.stringify({...completionBody,logoLayout:'FULL',logoSize:'L',backgroundColor:'#FAF8F1'})}).then(response=>response.json())
+    assert.equal(branded.tenant.logoLayout,'FULL')
+    assert.equal(branded.tenant.logoSize,'L')
+    assert.equal(branded.tenant.backgroundColor,'#FAF8F1')
+    assert.equal(branded.tenant.secondaryColor,completionBody.secondaryColor)
+    assert.deepEqual(db.prepare('SELECT logo_layout,logo_size,brand_background FROM tenants WHERE id=?').get(tenantTwo),{logo_layout:'SYMBOL_NAME',logo_size:'M',brand_background:null})
+    for(const invalid of [{logoLayout:'CUSTOM_CSS'},{logoSize:'900px'}]) assert.equal((await fetch(`${baseUrl}/api/admin/onboarding/complete`,{method:'POST',headers:tenantOneHeaders,body:JSON.stringify({...completionBody,...invalid})})).status,400)
+    assert.equal((db.prepare('SELECT logo_size FROM tenants WHERE id=?').get(tenantOne) as {logo_size:string}).logo_size,'L')
+
   } finally {
     server.close()
     await once(server, 'close')

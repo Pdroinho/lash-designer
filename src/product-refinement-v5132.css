@@ -47,3 +47,66 @@
 .ld-dialog>.cardHeader>.icon-btn {flex:0 0 44px;min-width:44px;min-height:44px;}
 .ld-dialog>.cardHeader>h3,.ld-dialog>.cardHeader>div {min-width:0;}
 @media(max-width:768px){.finance36-kpi>strong[data-money-size="medium"]{font-size:1.125rem;}.finance36-kpi>strong[data-money-size="long"]{font-size:.875rem;white-space:normal;overflow-wrap:anywhere;}}
+
+/* Shared identity across team cards, profile editor and public booking. */
+.professional-avatar { width: 44px; height: 44px; min-width: 44px; flex: 0 0 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; background: var(--surface-muted); color: var(--ink-strong); font: 700 .85rem/1 var(--font-ui); }
+.professional-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.team-photo-editor { display: flex; align-items: flex-start; gap: 16px; margin: 20px 0; }
+.team-photo-editor .professional-avatar { width: 64px; height: 64px; min-width: 64px; flex-basis: 64px; }
+.team-photo-editor > div { min-width: 0; }
+.team-photo-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.booking30-consent input[type=checkbox] { width: 20px; height: 20px; min-width: 20px; flex-basis: 20px; }
+.booking30-consent input::before, .authRefCheckbox input::before { border-color: var(--ld-color-on-accent); }
+@media(prefers-reduced-motion: reduce) { .booking30-professionals label { transition: none; } }
+
+/* Bounded brand presentation: original image stays intact and proportional. */
+.tenant-brand { --brand-symbol: 40px; --brand-full: 180px; --brand-height: 48px; display: inline-flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; }
+.tenant-brand[data-size=S] { --brand-symbol: 32px; --brand-full: 140px; --brand-height: 40px; }
+.tenant-brand[data-size=L] { --brand-symbol: 48px; --brand-full: 220px; --brand-height: 60px; }
+.tenant-brand .tenant-brand-image { width: var(--brand-symbol); height: var(--brand-symbol); flex: 0 0 auto; object-fit: contain; border: 0; border-radius: 0; background: transparent; padding: 0; }
+.tenant-brand[data-layout=FULL] .tenant-brand-image { width: var(--brand-full); height: var(--brand-height); max-width: 100%; object-fit: contain; }
+.tenant-brand-name { min-width: 0; overflow-wrap: anywhere; font: 700 .86rem/1.3 var(--font-ui); color: inherit; }
+.ld-sidebar-brand .tenant-brand-sidebar { grid-column: 1 / 3; max-width: 100%; }
+.ld-shell.is-sidebar-collapsed .tenant-brand-sidebar { grid-column: 1; max-width: 44px; }
+.ld-shell.is-sidebar-collapsed .tenant-brand-sidebar .tenant-brand-name { display: none; }
+.tenant-brand-sidebar[data-layout=FULL] .tenant-brand-image { width: min(var(--brand-full), 168px); }
+.tenant-brand-mobile { display: none; }
+.booking30-brand { flex-wrap: wrap; }
+.booking30-brand .tenant-brand { gap: 10px; }
+.booking30-brand .tenant-brand-image { border-radius: 0; }
+.booking30-brand .tenant-brand-name { font-size: .8rem; }
+.booking30-brand-caption { color: var(--b30-muted); font-size: .6rem; }
+.authRefBrand { flex-direction: column; align-items: flex-start; gap: 8px; }
+.tenant-brand-auth { --brand-full: 240px; --brand-height: 72px; }
+.tenant-brand-auth[data-size=S] { --brand-full: 180px; --brand-height: 52px; }
+.tenant-brand-auth[data-size=L] { --brand-full: 280px; --brand-height: 84px; }
+.brand-presentation-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; margin-block: 16px; }
+.brand-preview { grid-column: 1 / -1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: var(--ld-radius-control); background: var(--surface-raised); }
+.brand-preview > small { color: var(--ink-muted); font-size: .75rem; }
+.team-social-editor { margin-top: 16px; }
+.team-social-editor summary, .booking30-professional-social summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: .8rem; }
+.team-social-editor summary::before, .booking30-professional-social summary::before { content: '+'; font-size: 1rem; }
+.team-social-editor[open] summary::before, .booking30-professional-social[open] summary::before { content: '−'; }
+.team-social-editor summary:focus-visible, .booking30-professional-social summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.team-social-editor .team-field { margin-top: 12px; }
+.booking30-professional-social { margin: -12px 0 18px; color: var(--b30-body); }
+.booking30-professional-social > div { display: flex; flex-wrap: wrap; gap: 8px 16px; padding-bottom: 8px; }
+.booking30-professional-social a { color: var(--b30-wine); overflow-wrap: anywhere; font-size: .78rem; min-height: 44px; display: inline-flex; align-items: center; }
+@media(max-width: 767px) {
+  .tenant-brand-mobile { display: inline-flex; flex-shrink: 1; max-width: 104px; }
+  .tenant-brand-mobile .tenant-brand-name { display: none; }
+  .tenant-brand-mobile[data-layout=FULL] .tenant-brand-image { width: 96px; height: 32px; }
+  .tenant-brand-mobile .tenant-brand-image { width: 32px; height: 32px; }
+  .booking30-brand .tenant-brand[data-layout=FULL] .tenant-brand-image { width: min(var(--brand-full), 160px); height: 42px; }
+  .brand-presentation-controls { grid-template-columns: 1fr; }
+}
+
+.booking30-brand .tenant-brand { display: inline-flex; }
+.booking30-brand .tenant-brand-image { flex-basis: auto; }
+.workspace-summary .tenant-brand { display: inline-flex; }
+@media(max-width:767px) { .tenant-brand-sidebar[data-layout=FULL] .tenant-brand-image { width: min(var(--brand-full), 168px); } }
+
+/* Help remains a readable action instead of inheriting the narrow icon column. */
+.workspace-setup-aside > .workspace-back { align-self: flex-start; white-space: nowrap; font-family: var(--font-ui); font-size: .78rem; }
+@media(max-width:767px) { .workspace-setup-aside > .workspace-back { grid-column: 2 / -1; justify-self: start; min-height: 36px; padding: 0; border: 0; background: transparent; } }
+.settings-logo-preview img { object-fit: contain; padding: 5px; }

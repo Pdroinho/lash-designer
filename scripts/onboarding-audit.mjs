@@ -27,7 +27,7 @@ const checks = [
   ['landing comunica o setup pós-compra sem prometer dependência de IA', landing.includes('setup guiado ajuda a organizar marca, horários e serviços') && landing.includes('assistente opcional')],
   ['OpenRouter usa modelos síncronos separados para conversa e visão', assistant.includes('assistantProvider') && env.includes('OPENROUTER_MODEL') && env.includes('OPENROUTER_VISION_MODEL')],
   ['modelo batch fica reservado fora do fluxo síncrono', env.includes("OPENROUTER_BATCH_MODEL") && assistant.includes('batchModel: env.OPENROUTER_BATCH_MODEL') && !assistant.includes('model: assistantProvider.batchModel')],
-  ['avanço inicial não depende da análise de IA', setup.includes('function advance()') && setup.includes('data-setup-next onClick={advance}') && !setup.match(/function advance\(\)[\s\S]{0,500}analyz/)],
+  ['setup mantém caminho manual e fallback sem exigir resultado de IA', setup.includes('function advance()') && setup.includes('data-setup-next') && setup.includes('onClick={advance}') && setup.includes("'CURATED'") && setup.includes("setMode('MANUAL')")],
 ]
 
 let failed = 0

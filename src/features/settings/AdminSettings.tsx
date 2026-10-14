@@ -1,3 +1,4 @@
+import { BrandPresentationControls } from '../../components/BrandPresentationControls'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
 import type { TenantPublic } from '../../types'
@@ -337,6 +338,8 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
     const [name, setName] = useState(tenant?.name ?? '')
     const [primaryColor, setPrimaryColor] = useState(tenant?.primaryColor ?? '#b43a68')
     const [logoUrl, setLogoUrl] = useState(tenant?.logoUrl ?? '')
+    const [logoLayout, setLogoLayout] = useState<'SYMBOL_NAME'|'FULL'>(tenant?.logoLayout ?? 'SYMBOL_NAME')
+    const [logoSize, setLogoSize] = useState<'S'|'M'|'L'>(tenant?.logoSize ?? 'M')
     const [saving, setSaving] = useState(false)
 
     // Logo state
@@ -372,6 +375,8 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
             setName(tenant.name)
             setPrimaryColor(tenant.primaryColor)
             setLogoUrl(tenant.logoUrl || '')
+            setLogoLayout(tenant.logoLayout ?? 'SYMBOL_NAME')
+            setLogoSize(tenant.logoSize ?? 'M')
         }
     }, [tenant])
 
@@ -422,6 +427,8 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
             const currentLogo = (tenant?.logoUrl ?? '') || ''
             if (!tenant || nextLogo !== currentLogo) payload.logoUrl = nextLogo ? nextLogo : null
 
+            if (logoLayout !== (tenant?.logoLayout ?? 'SYMBOL_NAME')) payload.logoLayout = logoLayout
+            if (logoSize !== (tenant?.logoSize ?? 'M')) payload.logoSize = logoSize
             if (Object.keys(payload).length === 0) return
 
             const res = await api<{ tenant: TenantPublic }>('/api/admin/tenant', {
@@ -480,6 +487,7 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
                                 </div>
                             </div>
 
+                            <BrandPresentationControls brand={{name,logoUrl,logoLayout,logoSize}} onLayout={setLogoLayout} onSize={setLogoSize} disabled={saving || logoBusy} />
                             <div className="input-group">
                                 <label className="label">Cor Principal</label>
                                 <ColorPicker

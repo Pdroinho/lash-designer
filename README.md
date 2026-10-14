@@ -2,9 +2,9 @@
 
 SaaS multi-tenant de agenda, clientes, serviços, finanças, billing e assistência de negócio para profissionais de extensão de cílios.
 
-**Release atual: 5.13.2 — Revisão final de interface e fluxos.**
+**Release atual: 5.13.3 — Marca inteligente no setup e perfis profissionais.**
 
-Veja [as correções e a validação](docs/RELEASE_5_13_2.md). O ambiente Appmax é configurável; esta execução local não homologa cobrança real, WhatsApp externo ou a VPS de produção.
+Veja [as correções e a validação](docs/RELEASE_5_13_3.md). O ambiente Appmax é configurável; esta execução local não homologa cobrança real, WhatsApp externo ou a VPS de produção.
 
 ## Stack
 
