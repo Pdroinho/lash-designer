@@ -11,6 +11,7 @@ const server=app.listen(0,'127.0.0.1');await once(server,'listening');const orig
 const tenant={id:'studio',slug:'studio',name:'Studio QA',primaryColor:'#972d57'}
 const plans=[{code:'TEAM_3',seats:3,minProfessionals:1,label:'1 a 3 profissionais',amountCents:7490},{code:'TEAM_6',seats:6,minProfessionals:4,label:'4 a 6 profissionais',amountCents:9990},{code:'TEAM_15',seats:15,minProfessionals:7,label:'7 a 15 profissionais',amountCents:14900}]
 const snapshot={ym:'2026-10',entriesCents:20000,expensesCents:10000,balanceCents:10000,serviceEntriesCents:20000,manualIncomeCents:0,confirmedAppointments:2}
+let statusHold=null
 const omitted = new Set()
 let browser,page,role=null,waState='disconnected',waError=false,domainMode='empty',refError=false,otpRequests=0,otpVerifications=0,inboxRequests=0,count=0
 const json=(route,body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)})
@@ -19,8 +20,9 @@ async function cleanLayout(){assert.ok(await page.evaluate(()=>document.document
 async function shot(name){if(await page.locator('.ld-sidebar').count() && await page.evaluate(()=>window.innerWidth<768))await page.waitForFunction(()=>document.querySelector('.ld-sidebar').getBoundingClientRect().right<=1);if(process.env.LASH_QA_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.LASH_QA_SCREENSHOT_DIR,name+'.png'),fullPage:true})}
 async function tab(label){await page.setViewportSize({width:1440,height:900});await page.locator('.ld-sidebar').getByRole('button',{name:label,exact:true}).click()}
 try{
- browser=await chromium.launch({headless:true,...(process.env.LASH_QA_CHROMIUM_PATH?{executablePath:process.env.LASH_QA_CHROMIUM_PATH}:{}),args:['--host-resolver-rules=MAP *.localhost 127.0.0.1','--no-sandbox','--disable-dev-shm-usage','--single-process','--no-zygote','--disable-gpu']})
+ browser=await chromium.launch({headless:true,...(process.env.LASH_QA_CHROMIUM_PATH?{executablePath:process.env.LASH_QA_CHROMIUM_PATH}:{}),args:['--host-resolver-rules=MAP *.localhost 127.0.0.1','--no-sandbox','--disable-dev-shm-usage','--disable-gpu']})
  const context=await browser.newContext({timezoneId:'America/Bahia'});page=await context.newPage();page.setDefaultTimeout(10000)
+ await page.addInitScript(()=>{window.__waConnectionFrames=0;new window.MutationObserver(()=>{if(document.querySelector('.wa39-connection-grid'))window.__waConnectionFrames++}).observe(document,{childList:true,subtree:true})})
  await page.addInitScript(()=>{for(const tab of ['dashboard','settings','evolution','referrals','finance','assistant','billing'])window.localStorage.setItem(`lashdesigner:tour:admin-${tab}:v3`,'qa');window.localStorage.setItem('lashdesigner:tour:client-appointments:v3','qa')})
  const errors=[];page.on('pageerror',error=>errors.push(error.message))
  await page.route('**/api/**',async route=>{
@@ -35,7 +37,7 @@ try{
   if(p==='/api/admin/onboarding')return json(route,{onboarding:{status:'DONE'}})
   if(p==='/api/support/notifications')return json(route,{unreadCount:0,notifications:[]})
   if(p==='/api/admin/whatsapp')return json(route,{instance:{id:'wa',status:waState,baseUrl:'https://example.com',instanceName:'studio',hasApiKey:true,platformManaged:true}})
-  if(p==='/api/admin/whatsapp/status')return waError?json(route,{message:'Status indisponível'},503):json(route,{state:waState})
+  if(p==='/api/admin/whatsapp/status'){const state=waState,failed=waError,hold=statusHold;if(hold){hold.requested();await hold.promise}return failed?json(route,{message:'Status indisponível'},503):json(route,{state})}
   if(p==='/api/admin/whatsapp/diagnostics')return json(route,{providerWebhookConfigured:false,lastInboundAt:null,lastOutboundAt:null,optedInClients:0,totalClients:0})
   if(p==='/api/admin/whatsapp/settings')return json(route,{settings:{}})
   if(p==='/api/admin/whatsapp/qrcode')return json(route,{qrCode:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD1cAAAAASUVORK5CYII=',state:'connecting'})
@@ -62,6 +64,18 @@ try{
  }
  assert.equal(otpRequests,2);assert.equal(otpVerifications,2)
  role='ADMIN';await page.setViewportSize({width:1440,height:900});await page.goto(origin+'/admin');await page.locator('.ld-sidebar').waitFor()
+ for(const width of [1440,390,320]) for(const state of ['open','disconnected']) {
+  waState=state;let release,requested;const requestedPromise=new Promise(resolve=>{requested=resolve});statusHold={promise:new Promise(resolve=>{release=resolve}),requested};
+  await page.setViewportSize({width,height:900});await page.goto(origin+'/admin?view=evolution');await requestedPromise;
+  await page.getByRole('status',{name:'Consultando conexão do WhatsApp',exact:true}).waitFor();
+  assert.equal(await page.locator('.wa39-connection-grid,.wa39-tabs,.wa39-inbox,.wa39-empty-inbox').count(),0);
+  assert.equal(await page.evaluate(()=>window.__waConnectionFrames),0);await cleanLayout();await shot(`whatsapp-pending-${state}-${width}`);
+  release();statusHold=null;await page.locator('.wa39-health').filter({hasText:state==='open'?'Conectado':'Desconectado'}).waitFor();
+  await page.getByRole('status',{name:'Consultando conexão do WhatsApp',exact:true}).waitFor({state:'detached'});
+  if(state==='open'){await page.getByRole('navigation',{name:'Seções do WhatsApp',exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.__waConnectionFrames),0)}else await page.locator('.wa39-connection-grid').waitFor();
+  await cleanLayout();pass(`WhatsApp initial status ${state} at ${width}px never paints premature connection UI`)
+ }
+ inboxRequests=0;
  for(const state of ['disconnected','not_connected','open']){
   waState=state;await tab('WhatsApp');await page.locator('.wa39-health').filter({hasText:state==='open'?'Conectado':'Desconectado'}).waitFor()
   if(state!=='open'){assert.equal(await page.locator('.wa39-tabs').count(),0);assert.equal(inboxRequests,0);assert.equal(await page.getByText('Precisa de atenção',{exact:true}).count(),0);await page.getByRole('button',{name:'Conectar via QR Code'}).click();await page.getByRole('img',{name:'QR Code para conectar o WhatsApp'}).waitFor()}
@@ -70,7 +84,7 @@ try{
  }
  waError=true;await tab('WhatsApp');await page.getByRole('alert').filter({hasText:'Status indisponível'}).waitFor();assert.equal(await page.locator('.wa39-tabs').count(),0);assert.equal(await page.getByRole('button',{name:'Conectar via QR Code'}).isDisabled(),true);waError=false;waState='open';await page.getByRole('button',{name:'Verificar',exact:true}).click();await page.getByRole('navigation',{name:'Seções do WhatsApp'}).waitFor();pass('WhatsApp status failure blocks access and retry recovers')
  for(const mode of ['empty','error','active']){
-  domainMode=mode;await tab('Configurações');const card=page.locator('.custom-domains-card');await card.locator('.domain-security-pill').filter({hasText:mode==='active'?'Domínio verificado':mode==='error'?'Verificação indisponível':'Verificação após cadastro'}).waitFor()
+  domainMode=mode;await tab('Configurações');await page.getByRole('tab',{name:'Endereço',exact:true}).click();const card=page.locator('.custom-domains-card');await card.locator('.domain-security-pill').filter({hasText:mode==='active'?'Domínio verificado':mode==='error'?'Verificação indisponível':'Verificação após cadastro'}).waitFor()
   if(mode==='error'){assert.equal(await card.getByText('Nenhum domínio conectado',{exact:true}).count(),0);domainMode='empty';await card.getByRole('button',{name:'Tentar novamente'}).click();await card.getByText('Nenhum domínio conectado',{exact:true}).waitFor()}
   await page.setViewportSize({width:390,height:844});await cleanLayout();await shot('domains-'+mode);pass(`domain ${mode}: status reflects actual data`);await tab('Assinatura')
  }

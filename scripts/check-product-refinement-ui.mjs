@@ -13,6 +13,7 @@ const server=app.listen(0,'127.0.0.1');await once(server,'listening');const orig
 const tenant={id:'studio',slug:'studio',name:'Studio QA',primaryColor:'#972d57'}
 const plans=[{code:'TEAM_3',seats:3,minProfessionals:1,label:'1 a 3 profissionais',amountCents:7490},{code:'TEAM_6',seats:6,minProfessionals:4,label:'4 a 6 profissionais',amountCents:9990},{code:'TEAM_15',seats:15,minProfessionals:7,label:'7 a 15 profissionais',amountCents:14900}]
 const snapshot={ym:'2026-10',entriesCents:20000,expensesCents:10000,balanceCents:10000,serviceEntriesCents:20000,manualIncomeCents:0,confirmedAppointments:2}
+const requestedPaths=[]
 const omitted = new Set()
 const setupAnalyses=[],setupCompletions=[]
 let aiSetupMode='vision'
@@ -33,12 +34,13 @@ async function cleanLayout(){const fits=await page.evaluate(()=>document.documen
 async function shot(name){if(await page.locator('.ld-sidebar').count() && await page.evaluate(()=>window.innerWidth<768))await page.waitForFunction(()=>document.querySelector('.ld-sidebar').getBoundingClientRect().right<=1);if(process.env.LASH_QA_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.LASH_QA_SCREENSHOT_DIR,name+'.png'),fullPage:true})}
 
 try{
- browser=await chromium.launch({headless:true,...(process.env.LASH_QA_CHROMIUM_PATH?{executablePath:process.env.LASH_QA_CHROMIUM_PATH}:{}),args:['--host-resolver-rules=MAP *.localhost 127.0.0.1','--no-sandbox','--disable-dev-shm-usage','--single-process','--no-zygote','--disable-gpu']})
+ browser=await chromium.launch({headless:true,...(process.env.LASH_QA_CHROMIUM_PATH?{executablePath:process.env.LASH_QA_CHROMIUM_PATH}:{}),args:['--host-resolver-rules=MAP *.localhost 127.0.0.1','--no-sandbox','--disable-dev-shm-usage','--disable-gpu']})
  const context=await browser.newContext({timezoneId:'America/Bahia'});page=await context.newPage();page.setDefaultTimeout(10000)
  await page.addInitScript(()=>{for(const tab of ['dashboard','settings','evolution','referrals','finance','assistant','billing','calendar','services','clients','team'])window.localStorage.setItem(`lashdesigner:tour:admin-${tab}:v3`,'qa');window.localStorage.setItem('lashdesigner:tour:client-appointments:v3','qa')})
  const errors=[];page.on('pageerror',error=>{errors.push(error.message);console.error('BROWSER ERROR',error.stack)})
  await page.route('**/api/**',async route=>{
   const url=new URL(route.request().url()), p=url.pathname.replace('/api/public/tenant/studio/','/api/public/').replace(/^\/api\/public\/tenant\/studio$/,'/api/public/tenant')
+  requestedPaths.push(p)
   if(p==='/api/public/tenant')return json(route,{tenant})
   if(p==='/api/auth/security')return json(route,{phone:null,whatsappMfaReady:false,devices:[],sessions:[]})
   if(p==='/api/auth/me')return json(route,{user:role?{id:'user',email:'qa@example.com',role,tenantId:'studio',tenantSlug:'studio',subscriptionStatus:'ACTIVE'}:null,isTestMode:false})
@@ -81,7 +83,16 @@ try{
   return json(route,{message:'Auxiliary fixture not supplied'},403)
  })
  role='ADMIN'
- if(process.argv.includes('--branding')){
+ if(process.argv.includes('--settings')){
+ for(const width of [1440,768,390,320]) {
+  requestedPaths.length=0;await page.setViewportSize({width,height:900});await page.goto(origin+'/admin?view=settings');const nav=page.getByRole('tablist',{name:'Áreas das configurações',exact:true});await nav.waitFor();assert.equal(await nav.getByRole('tab').count(),4);assert.equal(await page.getByRole('tabpanel').count(),1);assert.equal(await nav.getByRole('tab',{name:'Seu espaço',exact:true}).getAttribute('aria-selected'),'true');assert.equal(requestedPaths.includes('/api/auth/security'),false);assert.equal(requestedPaths.includes('/api/admin/domains'),false);assert.equal(requestedPaths.includes('/api/admin/subscription/team-plans'),false);await cleanLayout();await shot(`settings-brand-${width}`);pass(`settings ${width}px opens one subject without loading hidden sections`);
+  await page.getByLabel('Nome do Espaço',{exact:true}).fill('Meu estúdio editado');await nav.getByRole('tab',{name:'Segurança',exact:true}).click();await page.getByRole('heading',{name:'Segurança da conta',exact:true}).waitFor();await page.locator('#security-current-password').fill('draft-not-submitted');await cleanLayout();await shot(`settings-security-${width}`);
+  await nav.getByRole('tab',{name:'Endereço',exact:true}).click();await page.getByRole('heading',{name:'Domínio personalizado',exact:true}).waitFor();await cleanLayout();await shot(`settings-address-${width}`);
+  await nav.getByRole('tab',{name:'Pagamentos',exact:true}).click();await page.locator('.settings-panel-payments .billing-shell').waitFor();await page.getByText('R$ 74,90',{exact:false}).first().waitFor();assert.equal(await page.locator('.settings-panel-payments').getByText('ANUAL',{exact:true}).count(),0);await cleanLayout();await shot(`settings-payments-${width}`);
+  await nav.getByRole('tab',{name:'Seu espaço',exact:true}).click();assert.equal(await page.getByLabel('Nome do Espaço',{exact:true}).inputValue(),'Meu estúdio editado');await nav.getByRole('tab',{name:'Segurança',exact:true}).click();assert.equal(await page.locator('#security-current-password').inputValue(),'draft-not-submitted');assert.equal(await page.getByRole('tabpanel').count(),1);assert.equal(await page.locator('.settings-panel-payments .billing-mobile-cta').isVisible(),false);pass(`settings ${width}px tabs keep drafts, hide inactive controls and use current team billing`);
+  const security=nav.getByRole('tab',{name:'Segurança',exact:true});await security.focus();await page.keyboard.press('ArrowRight');assert.equal(await nav.getByRole('tab',{name:'Endereço',exact:true}).getAttribute('aria-selected'),'true');await page.keyboard.press('Home');assert.equal(await nav.getByRole('tab',{name:'Seu espaço',exact:true}).getAttribute('aria-selected'),'true');await page.keyboard.press('End');assert.equal(await nav.getByRole('tab',{name:'Pagamentos',exact:true}).getAttribute('aria-selected'),'true');assert.equal(await nav.locator('[tabindex="0"]').count(),1);await nav.getByRole('tab',{name:'Seu espaço',exact:true}).click();pass(`settings ${width}px keyboard arrows, Home/End and roving focus work`);
+ }
+ }else if(process.argv.includes('--branding')){
  for(const width of [1440,768,390,320]) {
   await page.setViewportSize({width,height:900});role='ADMIN';setupMode=true;tenant.logoUrl=null;tenant.logoLayout='SYMBOL_NAME';tenant.logoSize='M';
   await page.goto(origin+'/admin');await page.getByRole('heading',{name:'Como quer começar?',exact:true}).waitFor();await page.getByRole('button',{name:'Continuar',exact:true}).click();

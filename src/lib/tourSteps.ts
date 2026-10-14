@@ -67,9 +67,9 @@ export const shellTourSteps = (area: 'admin' | 'dev' | 'client', screen: string)
   const filtered = area === 'dev' && screen === 'tenants' ? steps : steps.filter((step) => step.selector !== '[data-tour="search"]')
   if (area === 'admin' && screen === 'settings') {
     filtered.splice(3, 0, {
-      selector: '[data-tour="custom-domains"]',
-      title: 'Seu endereço profissional',
-      description: 'Conecte um domínio próprio com verificação DNS e HTTPS automático. O painel mostra cada registro e o estado da propagação.',
+      selector: '[data-tour="settings-tabs"]',
+      title: 'Cada assunto em seu lugar',
+      description: 'Use as abas para personalizar seu espaço, cuidar da segurança, configurar seu endereço e consultar planos e pagamentos. As alterações digitadas ficam preservadas enquanto você troca de aba.',
     })
   }
   if(area === 'admin') filtered.push({selector:'[data-tour="luma-context"]',title:'Luma junto da sua rotina',description:'Peça ajuda sobre a tela em que você está. Alterações em agenda, financeiro e suporte ficam prontas para você revisar e confirmar.'})

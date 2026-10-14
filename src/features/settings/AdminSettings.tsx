@@ -1,5 +1,6 @@
+import { BillingCenter } from '../../components/BillingCenter'
 import { BrandPresentationControls } from '../../components/BrandPresentationControls'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { api } from '../../api'
 import type { TenantPublic } from '../../types'
 import { applyTenantTheme } from '../../theme'
@@ -7,9 +8,8 @@ import { ColorPicker } from '../../components/ColorPicker'
 import { CustomDomainsSettings } from '../../components/CustomDomainsSettings'
 import { PasswordChecklist } from '../../components/PasswordChecklist'
 import { formatBrazilPhoneInput, normalizeBrazilPhone } from '../../phone'
-import { configuredExternalLink, fileToOptimizedDataUrl, formatBRL } from '../../lib/runtime'
+import { fileToOptimizedDataUrl } from '../../lib/runtime'
 import { confirmAction, notify } from '../../components/FeedbackCenter'
-import { EmptyState } from '../../components/SharedUi'
 import { BellRing, Image as ImageIcon, Lock, ShieldCheck, Smartphone, Trash2 } from '../../components/Icons'
 
 type SecurityDevice = {
@@ -347,27 +347,16 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
     const [logoError, setLogoError] = useState<string | null>(null)
     const logoInputRef = useRef<HTMLInputElement>(null)
 
-    const [billingLoading, setBillingLoading] = useState(true)
-    type BillingOrder = {
-        orderNsu: string
-        amountCents: number
-        status: string
-        receiptUrl: string | null
-        createdAt: string
-        paidAt: string | null
+    const settingsTabs = [{id:'brand',label:'Seu espaço'},{id:'security',label:'Segurança'},{id:'address',label:'Endereço'},{id:'payments',label:'Pagamentos'}] as const
+    type SettingsTab = (typeof settingsTabs)[number]['id']
+    const [activeTab, setActiveTab] = useState<SettingsTab>('brand')
+    const [visitedTabs, setVisitedTabs] = useState<SettingsTab[]>(['brand'])
+    const tabsId = useId()
+    const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+    function selectTab(tab: SettingsTab) {
+        setActiveTab(tab)
+        setVisitedTabs(current=>current.includes(tab)?current:[...current,tab])
     }
-    const [billingOrders, setBillingOrders] = useState<BillingOrder[]>([])
-    const [subscription, setSubscription] = useState<
-        | null
-        | {
-              id: string
-              externalId: string | null
-              status: string
-              currentPeriodEnd: string | null
-              createdAt: string
-              updatedAt: string
-          }
-    >(null)
 
     // Update state when tenant changes
     useEffect(() => {
@@ -379,22 +368,6 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
             setLogoSize(tenant.logoSize ?? 'M')
         }
     }, [tenant])
-
-    useEffect(() => {
-        let mounted = true
-        setBillingLoading(true)
-        api<{ subscription: typeof subscription; orders: BillingOrder[] }>('/api/admin/billing/overview').then((res) => {
-            if (!mounted) return
-            if (res.ok) {
-                setSubscription(res.data.subscription)
-                setBillingOrders(res.data.orders ?? [])
-            }
-            setBillingLoading(false)
-        })
-        return () => {
-            mounted = false
-        }
-    }, [])
 
     async function handleLogoFile(file: File) {
         setLogoBusy(true)
@@ -451,8 +424,19 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
 
     return (
         <div className="settings-page">
-            <div className="settings-grid">
-            <div className="settings-column">
+            <nav className="ld-agenda-tabs settings-tabs" role="tablist" aria-label="Áreas das configurações" data-tour="settings-tabs">
+                {settingsTabs.map((tab,index)=><button type="button" key={tab.id} ref={node=>{tabRefs.current[index]=node}} role="tab" id={`${tabsId}-tab-${tab.id}`} aria-controls={`${tabsId}-panel-${tab.id}`} aria-selected={activeTab===tab.id} tabIndex={activeTab===tab.id?0:-1} className={`ld-agenda-tab ${activeTab===tab.id?'is-active':''}`} onClick={()=>selectTab(tab.id)} onKeyDown={event=>{
+                    let next=index
+                    if(event.key==='ArrowRight')next=(index+1)%settingsTabs.length
+                    else if(event.key==='ArrowLeft')next=(index+settingsTabs.length-1)%settingsTabs.length
+                    else if(event.key==='Home')next=0
+                    else if(event.key==='End')next=settingsTabs.length-1
+                    else return
+                    event.preventDefault();selectTab(settingsTabs[next].id);tabRefs.current[next]?.focus()
+                }}>{tab.label}</button>)}
+            </nav>
+            <section className="settings-panel" role="tabpanel" id={`${tabsId}-panel-brand`} aria-labelledby={`${tabsId}-tab-brand`} hidden={activeTab!=='brand'}>
+            <div className="settings-grid"><div className="settings-column">
                 <div className="card">
                     <div className="cardHeader settings-card-header">
                         <div><h2 className="cardTitle">Identidade visual</h2><p className="cardDesc">Personalize a aparência do seu espaço.</p></div>
@@ -460,8 +444,8 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
                     <div className="cardBody">
                         <div className="form-stack">
                             <div className="input-group">
-                                <label className="label">Nome do Espaço</label>
-                                <input className="input" value={name} onChange={e => setName(e.target.value)} />
+                                <label className="label" htmlFor={`${tabsId}-name`}>Nome do Espaço</label>
+                                <input id={`${tabsId}-name`} className="input" value={name} onChange={e => setName(e.target.value)} />
                             </div>
 
                             <div className="input-group">
@@ -506,72 +490,10 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
                 </div>
             </div>
 
-            <div className="settings-column">
-                <SecuritySettingsCard />
-                <div className="card">
-                    <div className="cardHeader">
-                        <h2 className="cardTitle">Assinatura</h2>
-                        {billingLoading ? (
-                            <span className="status-badge skeleton skeleton-pill" style={{width: 80}} />
-                        ) : subscription?.status?.toUpperCase?.() === 'ACTIVE' ? (
-                            <span className="status-badge status-success">Ativa</span>
-                        ) : subscription ? (
-                            <span className="status-badge status-warning">{subscription.status}</span>
-                        ) : (
-                            <span className="status-badge status-warning">Sem assinatura</span>
-                        )}
-                    </div>
-                    <div className="cardBody">
-                        <div className="settings-subscription-summary">
-                            <div className="settings-subscription-head"><div><span>Plano atual</span><strong>{subscription ? 'Assinatura' : '—'}</strong><small>{subscription ? `Status: ${subscription.status}` : 'Nenhuma assinatura encontrada para este espaço.'}</small></div><span className="billing-plan-mark">ANUAL</span></div>
-                            <p>Acesso válido até: <strong>{subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('pt-BR') : '—'}</strong></p>
-                        </div>
-                        <p className="billing-note">O plano é anual e a renovação acontece por um novo checkout. Nenhuma cobrança recorrente é iniciada por esta tela.</p>
-                    </div>
-                </div>
-
-                <div className="card">
-                    <div className="cardHeader">
-                        <h2 className="cardTitle">Histórico de Faturas</h2>
-                    </div>
-                    <div className="table-scroll">
-                        <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>Valor</th>
-                                <th>Status</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {billingOrders.length === 0 ? (
-                                <tr>
-                                    <td colSpan={4}>
-                                        <EmptyState compact image="/empty-states/empty-finance.png" title="Nenhum pagamento registrado" description="Os pedidos e comprovantes aparecerão aqui depois do primeiro checkout." />
-                                    </td>
-                                </tr>
-                            ) : billingOrders.map((order) => {
-                                const receiptUrl = configuredExternalLink(order.receiptUrl)
-                                const status = order.status.toUpperCase()
-                                const statusLabel = status === 'PAID' ? 'Pago' : status === 'PENDING' ? 'Pendente' : status === 'FAILED' ? 'Falhou' : order.status
-                                const statusClass = status === 'PAID' ? 'status-success' : status === 'PENDING' ? 'status-pending' : 'status-warning'
-                                return (
-                                    <tr key={order.orderNsu}>
-                                        <td>{new Date(order.paidAt || order.createdAt).toLocaleDateString('pt-BR')}</td>
-                                        <td>{formatBRL(order.amountCents / 100)}</td>
-                                        <td><span className={`status-badge ${statusClass}`}>{statusLabel}</span></td>
-                                        <td>{receiptUrl ? <a className="table-link" href={receiptUrl} target="_blank" rel="noopener noreferrer">Comprovante</a> : '—'}</td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <CustomDomainsSettings />
+            </div></section>
+            <section className="settings-panel" role="tabpanel" id={`${tabsId}-panel-security`} aria-labelledby={`${tabsId}-tab-security`} hidden={activeTab!=='security'}>{visitedTabs.includes('security')?<SecuritySettingsCard />:null}</section>
+            <section className="settings-panel" role="tabpanel" id={`${tabsId}-panel-address`} aria-labelledby={`${tabsId}-tab-address`} hidden={activeTab!=='address'}>{visitedTabs.includes('address')?<CustomDomainsSettings />:null}</section>
+            <section className="settings-panel settings-panel-payments" role="tabpanel" id={`${tabsId}-panel-payments`} aria-labelledby={`${tabsId}-tab-payments`} hidden={activeTab!=='payments'}>{visitedTabs.includes('payments')?<BillingCenter />:null}</section>
         </div>
     )
 }

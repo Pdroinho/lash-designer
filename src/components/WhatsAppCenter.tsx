@@ -242,6 +242,8 @@ export function WhatsAppCenter() {
   const [view, setView] = useState<View>('conversations')
   const [instance, setInstance] = useState<WhatsAppInstance | null>(null)
   const [connectionState, setConnectionState] = useState<string | null>(null)
+  const [statusPending, setStatusPending] = useState(true)
+  const statusRequestRef = useRef(0)
   const status = statusToUi(connectionState)
   const connected = status === 'connected'
   const [settings, setSettings] = useState<WhatsAppSettings>(defaultSettings)
@@ -305,14 +307,21 @@ export function WhatsAppCenter() {
   }
 
   async function refreshStatus() {
-    const res = await api<{ state: string }>('/api/admin/whatsapp/status')
-    if (res.ok) {
-      setConnectionState(res.data.state)
-      if (statusToUi(res.data.state) === 'connected') setQrCode(null)
-      else setView('connection')
-    } else {
-      setConnectionState(null)
-      setError(res.error.message)
+    const request = ++statusRequestRef.current
+    if (connectionState === null) setStatusPending(true)
+    try {
+      const res = await api<{ state: string }>('/api/admin/whatsapp/status')
+      if (request !== statusRequestRef.current) return
+      if (res.ok) {
+        setConnectionState(res.data.state)
+        if (statusToUi(res.data.state) === 'connected') setQrCode(null)
+        else setView('connection')
+      } else {
+        setConnectionState(null)
+        setError(res.error.message)
+      }
+    } finally {
+      if (request === statusRequestRef.current) setStatusPending(false)
     }
   }
 
@@ -372,7 +381,7 @@ export function WhatsAppCenter() {
     }).catch(() => {
       if (alive) setError('Não foi possível carregar a Central de WhatsApp agora.')
     })
-    return () => { alive = false }
+    return () => { alive = false; statusRequestRef.current++ }
   }, [])
 
   useEffect(() => {
@@ -596,11 +605,13 @@ export function WhatsAppCenter() {
           <h2>WhatsApp</h2>
           <p>Conversas, confirmações e relacionamento com clientes em um único fluxo.</p>
         </div>
-        <div className={`wa39-health is-${status}`}>
+        <div className={`wa39-health is-${statusPending || connectionState === null ? 'unknown' : status}`}>
           <i />
-          <span>{connectionState === null ? 'Não verificado' : status === 'connected' ? 'Conectado' : status === 'qr_scan' ? 'Aguardando leitura' : 'Desconectado'}</span>
+          <span>{statusPending ? 'Verificando…' : connectionState === null ? 'Não verificado' : status === 'connected' ? 'Conectado' : status === 'qr_scan' ? 'Aguardando leitura' : 'Desconectado'}</span>
         </div>
       </header>
+
+      {statusPending ? <section className="wa39-connection-status" role="status" aria-live="polite" aria-label="Consultando conexão do WhatsApp"><RefreshCw size={22} aria-hidden="true" /><div><h3>Verificando seu WhatsApp…</h3><p>Aguarde enquanto consultamos a conexão do estúdio.</p></div></section> : null}
 
       {connected ? <nav className="wa39-tabs" aria-label="Seções do WhatsApp">
         {nav.map((item) => {
@@ -828,7 +839,7 @@ export function WhatsAppCenter() {
         </section>
       ) : null}
 
-      {!connected || view === 'connection' ? (
+      {!statusPending && (!connected || view === 'connection') ? (
         <section className="wa39-connection-grid">
           <article className="wa39-connection-status">
             <div className={`wa39-connection-mark is-${status}`}><Smartphone size={22} /></div>

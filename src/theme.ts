@@ -196,11 +196,11 @@ export function setAppMode(mode: AppMode) {
   }
 }
 
-export function applyPrimaryColor(hexColor: string) {
+export function applyPrimaryColor(hexColor?: string | null) {
   const root = document.documentElement
   
-  const normalizeHex = (hex: string) => {
-    const h = hex.trim().replace('#', '')
+  const normalizeHex = (hex?: string | null) => {
+    const h = (hex ?? '').trim().replace('#', '')
     if (h.length === 3) return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`
     if (h.length === 6) return `#${h}`
     return '#b43a68'
