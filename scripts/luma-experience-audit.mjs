@@ -28,7 +28,7 @@ const checks = [
   ['ações pendentes expiram e possuem auditoria', bridge.includes('15 * 60_000') && bridge.includes('assistant_action_audit')],
   ['telemetria registra custo e ferramentas', server.includes('cost_usd') && server.includes('tool_calls') && server.includes('reasoning_tokens')],
   ['há caps diário, mensal e por requisição', env.includes('LUMA_DAILY_COST_CAP_USD') && env.includes('LUMA_MONTHLY_COST_CAP_USD') && env.includes('LUMA_MAX_REQUEST_COST_USD')],
-  ['orçamento concorrente é reservado antes da chamada', server.includes('budget.usage.daily.costUsd + env.LUMA_MAX_REQUEST_COST_USD') && server.includes("'RESERVED'") && compactServer.includes('env.LUMA_MAX_REQUEST_COST_USD,attachment?1:0')],
+  ['orçamento concorrente é reservado antes da chamada', server.includes('budget.usage.daily.costUsd + env.LUMA_MAX_REQUEST_COST_USD') && server.includes("'RESERVED'") && compactServer.includes('env.LUMA_MAX_REQUEST_COST_USD,visionInputs') && compactServer.includes('visionInputs:attachment?1:0') && compactServer.indexOf('constreservation=reserveUsage(')<compactServer.indexOf('constanswer=awaitgenerateAssistantAnswer(')],
   ['imagem é suportada com limite', conversation.includes('imageFileToAttachment') && server.includes('ASSISTANT_MAX_IMAGE_BYTES') && provider.includes("type: 'image_url'")],
   ['composer oferece anexo de imagem', conversation.includes('luma35-attach') && conversation.includes('Paperclip')],
   ['ações aparecem como cards de confirmação', conversation.includes('luma35-actions') && conversation.includes('confirmAction')],

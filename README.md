@@ -2,9 +2,9 @@
 
 SaaS multi-tenant de agenda, clientes, serviços, finanças, billing e assistência de negócio para profissionais de extensão de cílios.
 
-**Release atual: 5.13.5 — Configurações organizadas em abas.**
+**Release atual: 5.13.6 — Luma analisa a troca de logo com os limites do chat.**
 
-Veja [as correções e a validação](docs/RELEASE_5_13_5.md). O ambiente Appmax é configurável; esta execução local não homologa cobrança real, WhatsApp externo ou a VPS de produção.
+Veja [as correções e a validação](docs/RELEASE_5_13_6.md). O ambiente Appmax é configurável; esta execução local não homologa cobrança real, WhatsApp externo ou a VPS de produção.
 
 ## Stack
 

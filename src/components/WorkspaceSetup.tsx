@@ -99,6 +99,7 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
     try {
       const result = await api<{ palettes: PaletteOption[]; source: 'VISION' | 'CURATED'; logoPresentation?: {layout:'SYMBOL_NAME'|'FULL'; size:'S'|'M'|'L'; rationale:string} }>('/api/admin/onboarding/brand-suggestions', {
         method: 'POST',
+        timeoutMs: 30_000,
         body: JSON.stringify({ businessName, preferences, logoDataUrl: selectedLogo.startsWith('data:image/') ? selectedLogo : null }),
       })
       if (!result.ok) throw new Error(result.error.message)

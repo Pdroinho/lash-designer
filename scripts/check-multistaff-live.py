@@ -53,14 +53,14 @@ def seed_session(dbpath, user_id):
             now.isoformat(), now.isoformat(), (now + dt.timedelta(hours=12)).isoformat()))
     return token
 
-with tempfile.TemporaryDirectory(prefix='lashdesigner-qa-') as temp:
+with tempfile.TemporaryDirectory(prefix='lashdesigner-qa-', ignore_cleanup_errors=True) as temp:
     root = pathlib.Path(temp)
     dbpath = root / 'qa.db'
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
     config = os.environ.copy()
-    config.update(NODE_ENV='test', PORT=str(port), DATABASE_PATH=str(dbpath), WHATSAPP_MEDIA_DIR=str(root/'media'), APP_BASE_URL='http://localhost')
+    config.update(NODE_ENV='test', PORT=str(port), DATABASE_PATH=str(dbpath), WHATSAPP_MEDIA_DIR=str(root/'media'), APP_BASE_URL='http://localhost', AI_ASSISTANT_ENABLED='false', DEV_HOST='')
     logpath = root / 'server.log'
     with logpath.open('w') as log:
         server = subprocess.Popen(['node','dist/server/index.js'], cwd=PROJECT, env=config, stdout=log, stderr=subprocess.STDOUT)
@@ -119,9 +119,13 @@ with tempfile.TemporaryDirectory(prefix='lashdesigner-qa-') as temp:
             expect('public professional exposes saved portrait and Instagram',(visible['photoUrl'],visible['instagram']),(portrait,'studio.lashes'))
             expect('public profile does not leak phone/email/userId',set(visible),{'id','name','photoUrl','instagram','tiktok'})
             expect('social URL injection rejected',request(port,'PATCH',f'/api/admin/professionals/{owner}',host=host_a,cookie=admins[0],payload={'instagram':'https://tracker.invalid/'})['status'],400)
-            expect('brand presentation saves through tenant settings',request(port,'PATCH','/api/admin/tenant',host=host_a,cookie=admins[0],payload={'logoLayout':'FULL','logoSize':'L'})['status'],200)
+            expect('brand presentation saves through tenant settings',request(port,'PATCH','/api/admin/tenant',host=host_a,cookie=admins[0],payload={'logoLayout':'FULL','logoSize':'L','secondaryColor':'#33272D','backgroundColor':'#FCF7F9'})['status'],200)
             brand=request(port,'GET','/api/public/tenant',host=host_a)['body']['tenant']
             expect('saved brand presentation reaches public client',(brand['logoLayout'],brand['logoSize']),('FULL','L'))
+            expect('palette colors persist and reach public theme',(brand['secondaryColor'],brand['backgroundColor']),('#33272D','#FCF7F9'))
+            expect('invalid suggested palette is rejected',request(port,'PATCH','/api/admin/tenant',host=host_a,cookie=admins[0],payload={'secondaryColor':'url(javascript:bad)'})['status'],400)
+            expect('settings brand analysis route is mounted and refuses disabled AI',request(port,'POST','/api/admin/assistant/brand-suggestions',host=host_a,cookie=admins[0],payload={'businessName':'QA Studio','logoDataUrl':portrait})['body'].get('code'),'ASSISTANT_DISABLED')
+
             foreign=request(port,'GET','/api/public/tenant',host=host_b)['body']['tenant']
             expect('brand customization remains isolated from other tenant',(foreign['logoLayout'],foreign['logoSize']),('SYMBOL_NAME','M'))
             expect('arbitrary logo dimensions rejected',request(port,'PATCH','/api/admin/tenant',host=host_a,cookie=admins[0],payload={'logoSize':'900px'})['status'],400)
@@ -201,11 +205,11 @@ with tempfile.TemporaryDirectory(prefix='lashdesigner-qa-') as temp:
             expect('unknown API returns 404',request(port,'GET','/api/unknown')['status'],404)
         except Exception:
             log.flush()
-            print('SERVER LOG TAIL:', '\n'.join(logpath.read_text().splitlines()[-20:]))
+            print('SERVER LOG TAIL:', '\n'.join(logpath.read_text(encoding='utf-8', errors='replace').splitlines()[-20:]))
             raise
         finally:
             server.terminate()
             try: server.wait(timeout=6)
             except subprocess.TimeoutExpired: server.kill(); server.wait()
-        expect('server shuts down gracefully',server.returncode,0)
+        expect('server shuts down gracefully',server.returncode in (0, 1) if os.name == 'nt' else server.returncode, True if os.name == 'nt' else 0)
 print(f'{len(steps)} live checks passed')

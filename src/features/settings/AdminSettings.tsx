@@ -340,6 +340,10 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
     const [logoUrl, setLogoUrl] = useState(tenant?.logoUrl ?? '')
     const [logoLayout, setLogoLayout] = useState<'SYMBOL_NAME'|'FULL'>(tenant?.logoLayout ?? 'SYMBOL_NAME')
     const [logoSize, setLogoSize] = useState<'S'|'M'|'L'>(tenant?.logoSize ?? 'M')
+    const [secondaryColor, setSecondaryColor] = useState(tenant?.secondaryColor ?? null)
+    const [backgroundColor, setBackgroundColor] = useState(tenant?.backgroundColor ?? null)
+    const [logoAdvice, setLogoAdvice] = useState('')
+    const logoRequest = useRef(0)
     const [saving, setSaving] = useState(false)
 
     // Logo state
@@ -366,27 +370,36 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
             setLogoUrl(tenant.logoUrl || '')
             setLogoLayout(tenant.logoLayout ?? 'SYMBOL_NAME')
             setLogoSize(tenant.logoSize ?? 'M')
+            setSecondaryColor(tenant.secondaryColor ?? null)
+            setBackgroundColor(tenant.backgroundColor ?? null)
         }
     }, [tenant])
 
     async function handleLogoFile(file: File) {
-        setLogoBusy(true)
-        setLogoError(null)
+        if(logoBusy || saving) return
+        const request=++logoRequest.current
+        setLogoBusy(true);setLogoError(null);setLogoAdvice('')
+        let uploaded=false
         try {
-            if (!file.type.startsWith('image/')) {
-                setLogoError('Arquivo inválido (envie uma imagem)')
-                return
-            }
-            const dataUrl = await fileToOptimizedDataUrl(file)
-            setLogoUrl(dataUrl)
+            const dataUrl=await fileToOptimizedDataUrl(file)
+            if(request!==logoRequest.current)return
+            setLogoUrl(dataUrl);setLogoLayout('SYMBOL_NAME');setLogoSize('M');uploaded=true
+            const result=await api<{palettes:Array<{primary:string;secondary:string;background:string}>;logoPresentation:{layout:'SYMBOL_NAME'|'FULL';size:'S'|'M'|'L';rationale:string}}>('/api/admin/assistant/brand-suggestions',{method:'POST',timeoutMs:30_000,body:JSON.stringify({businessName:name.trim(),logoDataUrl:dataUrl,preferences:'Preserve a identidade da logo. Prefira uma interface elegante, legível e consistente.'})})
+            if(request!==logoRequest.current)return
+            if(!result.ok){setLogoError(`Sua logo está pronta para salvar. ${result.error.message}`);return}
+            setLogoLayout(result.data.logoPresentation.layout);setLogoSize(result.data.logoPresentation.size)
+            const palette=result.data.palettes[0]
+            setPrimaryColor(palette.primary);setSecondaryColor(palette.secondary);setBackgroundColor(palette.background)
+            setLogoAdvice(result.data.logoPresentation.rationale)
         } catch {
-            setLogoError('Falha ao processar a imagem')
+            if(request===logoRequest.current)setLogoError(uploaded?'Sua logo está pronta para salvar. Não foi possível analisar agora; você pode ajustar manualmente.':'Não foi possível preparar a imagem. Use PNG, JPG ou WebP.')
         } finally {
-            setLogoBusy(false)
+            if(request===logoRequest.current)setLogoBusy(false)
         }
     }
 
     async function handleSave() {
+        if (logoBusy || saving) return
         setSaving(true)
         setLogoError(null)
         try {
@@ -402,6 +415,8 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
 
             if (logoLayout !== (tenant?.logoLayout ?? 'SYMBOL_NAME')) payload.logoLayout = logoLayout
             if (logoSize !== (tenant?.logoSize ?? 'M')) payload.logoSize = logoSize
+            if (secondaryColor && secondaryColor !== tenant?.secondaryColor) payload.secondaryColor = secondaryColor
+            if (backgroundColor && backgroundColor !== tenant?.backgroundColor) payload.backgroundColor = backgroundColor
             if (Object.keys(payload).length === 0) return
 
             const res = await api<{ tenant: TenantPublic }>('/api/admin/tenant', {
@@ -442,10 +457,10 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
                         <div><h2 className="cardTitle">Identidade visual</h2><p className="cardDesc">Personalize a aparência do seu espaço.</p></div>
                     </div>
                     <div className="cardBody">
-                        <div className="form-stack">
+                        <fieldset className="form-stack settings-brand-fields" aria-label="Identidade visual" disabled={saving || logoBusy}>
                             <div className="input-group">
                                 <label className="label" htmlFor={`${tabsId}-name`}>Nome do Espaço</label>
-                                <input id={`${tabsId}-name`} className="input" value={name} onChange={e => setName(e.target.value)} />
+                                <input id={`${tabsId}-name`} className="input" value={name} disabled={saving || logoBusy} onChange={e => setName(e.target.value)} />
                             </div>
 
                             <div className="input-group">
@@ -461,13 +476,14 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
                                     </div>
                                     <div className="settings-logo-controls">
                                         <div className="settings-logo-actions">
-                                            <button type="button" className="btn" onClick={() => logoInputRef.current?.click()} disabled={logoBusy}>Trocar logo</button>
-                                            {logoUrl && <button type="button" className="icon-btn domain-delete" onClick={() => setLogoUrl('')} aria-label="Remover logo"><Trash2 size={16} /></button>}
+                                            <button type="button" className="btn" onClick={() => logoInputRef.current?.click()} disabled={logoBusy || saving}>{logoBusy?'Analisando sua marca…':'Trocar logo'}</button>
+                                            {logoUrl && <button type="button" className="icon-btn domain-delete" disabled={logoBusy || saving} onClick={() => {logoRequest.current++;setLogoUrl('');setLogoAdvice('');setLogoLayout('SYMBOL_NAME')}} aria-label="Remover logo"><Trash2 size={16} /></button>}
                                         </div>
-                                        <p className="form-help">Use uma imagem nítida, em PNG, JPG ou WebP.</p>
+                                        <p className="form-help">PNG, JPG ou WebP. A análise automática usa 1 mensagem da Luma. Se o limite acabar, você pode ajustar manualmente.</p>
+                                        {logoAdvice && <p className="form-help" role="status">Sugestão da Luma: {logoAdvice} Confira a prévia antes de salvar.</p>}
                                         {logoError && <p className="form-error" role="alert">{logoError}</p>}
                                     </div>
-                                    <input type="file" ref={logoInputRef} className="visually-hidden" accept="image/png,image/jpeg,image/webp" onChange={e => { const f = e.target.files?.[0]; if(f) void handleLogoFile(f); e.currentTarget.value = '' }} />
+                                    <input type="file" ref={logoInputRef} disabled={logoBusy || saving} className="visually-hidden" accept="image/png,image/jpeg,image/webp" onChange={e => { const f = e.target.files?.[0]; if(f) void handleLogoFile(f); e.currentTarget.value = '' }} />
                                 </div>
                             </div>
 
@@ -481,11 +497,11 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
                             </div>
 
                             <div className="form-actions">
-                                <button type="button" className="btn btnPrimary" onClick={handleSave} disabled={saving}>
+                                <button type="button" className="btn btnPrimary" onClick={handleSave} disabled={saving || logoBusy}>
                                     {saving ? 'Salvando...' : 'Salvar Alterações'}
                                 </button>
                             </div>
-                        </div>
+                        </fieldset>
                     </div>
                 </div>
             </div>

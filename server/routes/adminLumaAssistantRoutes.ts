@@ -1,3 +1,4 @@
+import { logoSuggestionSchema } from '../brandPresentation.js'
 import Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import { Router, type RequestHandler } from 'express'
@@ -9,11 +10,12 @@ import {
   ASSISTANT_MONTHLY_LIMIT,
   type LumaAgentResult,
   type LumaAttachment,
+  type generateBrandSetupSuggestions,
 } from '../assistant.js'
 import { requireRole } from '../auth.js'
 import { getZonedDateTimeParts, monthBoundsUtc } from '../dateTime.js'
 import { env } from '../env.js'
-import { badRequest, forbidden } from '../http.js'
+import { badRequest, forbidden, HttpError } from '../http.js'
 import {
   LUMA_CREDIT_PACKS,
   lumaExtraCreditBalance,
@@ -50,6 +52,7 @@ type AdminLumaAssistantRouterOptions = {
   creditCheckoutAvailable?: boolean
   assistantEnabled: boolean
   assistantProvider: AssistantProvider
+  generateBrandSetupSuggestions?: typeof generateBrandSetupSuggestions
   generateAssistantAnswer: GenerateAssistantAnswer
   confirmLumaAction: ConfirmLumaAction
 }
@@ -170,6 +173,105 @@ export function createAdminLumaAssistantRouter(
     }
   }
 
+  // Chat and visual identity share one atomic admission and credit policy.
+  function reserveUsage({tenantId,userId,usageId,inputChars,visionInputs,model}: {tenantId:string;userId:string;usageId:string;inputChars:number;visionInputs:number;model:string}) {
+    return db
+          .transaction(() => {
+            const budget = lumaBudgetState(tenantId)
+            const needsExtraCredit =
+              budget.usage.daily.requests >= ASSISTANT_DAILY_LIMIT ||
+              budget.usage.monthly.requests >= ASSISTANT_MONTHLY_LIMIT ||
+              (splitCreditUsage &&
+                (budget.usage.daily.costUsd + env.LUMA_MAX_REQUEST_COST_USD >
+                  env.LUMA_DAILY_COST_CAP_USD ||
+                  budget.usage.monthly.costUsd + env.LUMA_MAX_REQUEST_COST_USD >
+                    env.LUMA_MONTHLY_COST_CAP_USD))
+            if (
+              splitCreditUsage &&
+              needsExtraCredit &&
+              budget.extraCreditBalance <= 0
+            )
+              return {
+                ok: false as const,
+                code: 'ASSISTANT_INCLUDED_LIMIT',
+                message:
+                  'O uso incluído acabou por enquanto. Você pode continuar com créditos extras.',
+              }
+            if (
+              !splitCreditUsage &&
+              budget.usage.daily.costUsd + env.LUMA_MAX_REQUEST_COST_USD >
+                env.LUMA_DAILY_COST_CAP_USD
+            )
+              return {
+                ok: false as const,
+                code: 'ASSISTANT_DAILY_BUDGET',
+                message:
+                  'Limite de uso inteligente de hoje atingido. A Luma volta a ficar disponível amanhã.',
+              }
+            if (
+              !splitCreditUsage &&
+              budget.usage.monthly.costUsd + env.LUMA_MAX_REQUEST_COST_USD >
+                env.LUMA_MONTHLY_COST_CAP_USD
+            )
+              return {
+                ok: false as const,
+                code: 'ASSISTANT_MONTHLY_BUDGET',
+                message: 'Limite inteligente deste mês atingido.',
+              }
+            if (
+              budget.usage.daily.requests >= ASSISTANT_DAILY_LIMIT &&
+              budget.extraCreditBalance <= 0
+            )
+              return {
+                ok: false as const,
+                code: 'ASSISTANT_DAILY_LIMIT',
+                message:
+                  'O limite diário da Luma acabou. Você pode continuar com créditos extras quando quiser.',
+              }
+            if (
+              budget.usage.monthly.requests >= ASSISTANT_MONTHLY_LIMIT &&
+              budget.extraCreditBalance <= 0
+            )
+              return {
+                ok: false as const,
+                code: 'ASSISTANT_MONTHLY_LIMIT',
+                message:
+                  'O limite mensal da Luma acabou. Você pode continuar com créditos extras quando quiser.',
+              }
+
+            db.prepare(
+              `
+          INSERT INTO assistant_usage (
+            id, tenant_id, user_id, request_day, input_chars, input_tokens, output_tokens,
+            reasoning_tokens, cost_usd, tool_calls, vision_inputs, agent_steps, status, model, created_at
+          ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?, 0, ?, 1, 'RESERVED', ?, ?)
+        `,
+            ).run(
+              usageId,
+              tenantId,
+              userId,
+              budget.usage.day,
+              inputChars,
+              env.LUMA_MAX_REQUEST_COST_USD,
+              visionInputs,
+              model,
+              new Date().toISOString(),
+            )
+            if (splitCreditUsage)
+              db.prepare(
+                'UPDATE assistant_usage SET credit_source=? WHERE id=?',
+              ).run(needsExtraCredit ? 'EXTRA' : 'INCLUDED', usageId)
+            if (needsExtraCredit)
+              consumeLumaExtraCredit(tenantId, userId, usageId)
+            return {
+              ok: true as const,
+              day: budget.usage.day,
+              usedExtraCredit: needsExtraCredit,
+            }
+          })
+          .immediate()
+  }
+
   router.get('/assistant/usage', requireRole('ADMIN'), (req, res, next) => {
     try {
       const tenantId = req.sessionUser?.tenantId
@@ -282,101 +384,7 @@ export function createAdminLumaAssistantRouter(
           return items
         }, [])
 
-        const reservation = db
-          .transaction(() => {
-            const budget = lumaBudgetState(tenantId)
-            const needsExtraCredit =
-              budget.usage.daily.requests >= ASSISTANT_DAILY_LIMIT ||
-              budget.usage.monthly.requests >= ASSISTANT_MONTHLY_LIMIT ||
-              (splitCreditUsage &&
-                (budget.usage.daily.costUsd + env.LUMA_MAX_REQUEST_COST_USD >
-                  env.LUMA_DAILY_COST_CAP_USD ||
-                  budget.usage.monthly.costUsd + env.LUMA_MAX_REQUEST_COST_USD >
-                    env.LUMA_MONTHLY_COST_CAP_USD))
-            if (
-              splitCreditUsage &&
-              needsExtraCredit &&
-              budget.extraCreditBalance <= 0
-            )
-              return {
-                ok: false as const,
-                code: 'ASSISTANT_INCLUDED_LIMIT',
-                message:
-                  'O uso incluído acabou por enquanto. Você pode continuar com créditos extras.',
-              }
-            if (
-              !splitCreditUsage &&
-              budget.usage.daily.costUsd + env.LUMA_MAX_REQUEST_COST_USD >
-                env.LUMA_DAILY_COST_CAP_USD
-            )
-              return {
-                ok: false as const,
-                code: 'ASSISTANT_DAILY_BUDGET',
-                message:
-                  'Limite de uso inteligente de hoje atingido. A Luma volta a ficar disponível amanhã.',
-              }
-            if (
-              !splitCreditUsage &&
-              budget.usage.monthly.costUsd + env.LUMA_MAX_REQUEST_COST_USD >
-                env.LUMA_MONTHLY_COST_CAP_USD
-            )
-              return {
-                ok: false as const,
-                code: 'ASSISTANT_MONTHLY_BUDGET',
-                message: 'Limite inteligente deste mês atingido.',
-              }
-            if (
-              budget.usage.daily.requests >= ASSISTANT_DAILY_LIMIT &&
-              budget.extraCreditBalance <= 0
-            )
-              return {
-                ok: false as const,
-                code: 'ASSISTANT_DAILY_LIMIT',
-                message:
-                  'O limite diário da Luma acabou. Você pode continuar com créditos extras quando quiser.',
-              }
-            if (
-              budget.usage.monthly.requests >= ASSISTANT_MONTHLY_LIMIT &&
-              budget.extraCreditBalance <= 0
-            )
-              return {
-                ok: false as const,
-                code: 'ASSISTANT_MONTHLY_LIMIT',
-                message:
-                  'O limite mensal da Luma acabou. Você pode continuar com créditos extras quando quiser.',
-              }
-
-            db.prepare(
-              `
-          INSERT INTO assistant_usage (
-            id, tenant_id, user_id, request_day, input_chars, input_tokens, output_tokens,
-            reasoning_tokens, cost_usd, tool_calls, vision_inputs, agent_steps, status, model, created_at
-          ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?, 0, ?, 1, 'RESERVED', ?, ?)
-        `,
-            ).run(
-              usageId,
-              tenantId,
-              userId,
-              budget.usage.day,
-              message.length,
-              env.LUMA_MAX_REQUEST_COST_USD,
-              attachment ? 1 : 0,
-              assistantProvider.model,
-              new Date().toISOString(),
-            )
-            if (splitCreditUsage)
-              db.prepare(
-                'UPDATE assistant_usage SET credit_source=? WHERE id=?',
-              ).run(needsExtraCredit ? 'EXTRA' : 'INCLUDED', usageId)
-            if (needsExtraCredit)
-              consumeLumaExtraCredit(tenantId, userId, usageId)
-            return {
-              ok: true as const,
-              day: budget.usage.day,
-              usedExtraCredit: needsExtraCredit,
-            }
-          })
-          .immediate()
+        const reservation = reserveUsage({tenantId,userId,usageId,inputChars:message.length,visionInputs:attachment?1:0,model:assistantProvider.model})
         if (!reservation.ok)
           return next(forbidden(reservation.message, reservation.code))
         usageInserted = true
@@ -452,6 +460,35 @@ export function createAdminLumaAssistantRouter(
       }
     },
   )
+
+  router.post('/assistant/brand-suggestions', lumaAssistantLimiter, requireRole('ADMIN'), async (req,res,next)=>{
+    const usageId=randomUUID()
+    let usageInserted=false, extraCreditReserved=false
+    try {
+      if(!assistantEnabled || !assistantProvider.apiKey || !options.generateBrandSetupSuggestions) throw forbidden('A análise da Luma não está disponível. Você pode ajustar a marca manualmente.','ASSISTANT_DISABLED')
+      const tenantId=req.sessionUser?.tenantId, userId=req.sessionUser?.id
+      if(!tenantId || !userId) throw badRequest('Tenant inválido','INVALID_TENANT')
+      const body=z.object({businessName:z.string().trim().min(2).max(120),preferences:z.string().trim().max(280).default(''),logoDataUrl:z.string().max(450_000).regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/)}).strict().parse(req.body)
+      const reservation=reserveUsage({tenantId,userId,usageId,inputChars:body.businessName.length+body.preferences.length,visionInputs:1,model:assistantProvider.model})
+      if(!reservation.ok) throw forbidden(reservation.message,reservation.code)
+      usageInserted=true;extraCreditReserved=reservation.usedExtraCredit
+      const answer=await options.generateBrandSetupSuggestions(body).catch(()=>{throw new HttpError(502,'Não foi possível analisar a logo agora. Você pode ajustar a marca manualmente.','ASSISTANT_BRAND_FAILED')})
+      const logoResult=logoSuggestionSchema.safeParse(answer.logoPresentation)
+      if(!logoResult.success) throw new HttpError(502,'A Luma não retornou uma apresentação válida. Você pode ajustar manualmente.','ASSISTANT_BRAND_FAILED')
+      const logoPresentation=logoResult.data
+      const palettes=z.array(z.object({name:z.string().max(40),primary:z.string().regex(/^#[0-9a-f]{6}$/i),secondary:z.string().regex(/^#[0-9a-f]{6}$/i),background:z.string().regex(/^#[0-9a-f]{6}$/i),rationale:z.string().max(140)})).length(3).safeParse(answer.palettes)
+      if(!palettes.success) throw new HttpError(502,'A Luma não retornou uma paleta válida. Você pode ajustar manualmente.','ASSISTANT_BRAND_FAILED')
+      db.prepare("UPDATE assistant_usage SET input_tokens=?,output_tokens=?,cost_usd=?,model=?,status='COMPLETED' WHERE id=? AND status='RESERVED'").run(answer.inputTokens,answer.outputTokens,answer.costUsd,answer.model,usageId)
+      const usage=lumaUsageWindow(tenantId)
+      res.json({palettes:palettes.data,logoPresentation,source:'VISION',usage:{used:usage.daily.requests,limit:ASSISTANT_DAILY_LIMIT,monthlyUsed:usage.monthly.requests,monthlyLimit:ASSISTANT_MONTHLY_LIMIT,extraCreditBalance:lumaExtraCreditBalance(db,tenantId)}})
+    } catch(error) {
+      if(usageInserted) db.transaction(()=>{
+        const reverted=db.prepare("UPDATE assistant_usage SET status='ERROR' WHERE id=? AND status='RESERVED'").run(usageId)
+        if(reverted.changes===1 && extraCreditReserved) refundLumaExtraCredit(req.sessionUser!.tenantId!,req.sessionUser!.id,usageId)
+      }).immediate()
+      next(error)
+    }
+  })
 
   router.post(
     '/assistant/actions/:id/confirm',

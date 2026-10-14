@@ -95,6 +95,7 @@ export function registerBillingAssistantRoutes(app: express.Express, options: Bi
     creditCheckoutAvailable:Boolean(assistantEnabled && assistantProvider.apiKey && options.lumaAppmaxCredits),
     assistantProvider,
     generateAssistantAnswer,
+    generateBrandSetupSuggestions,
     confirmLumaAction,
   }))
 

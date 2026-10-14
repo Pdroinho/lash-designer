@@ -40,6 +40,8 @@ export function createAdminTenantSettingsRouter(options: AdminTenantSettingsRout
       if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
       const body = z.object({
         name: z.string().min(2).optional(),
+        secondaryColor: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
+        backgroundColor: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
         primaryColor: z.string().min(4).optional(),
         logoLayout: logoLayoutSchema.optional(),
         logoSize: logoSizeSchema.optional(),
@@ -60,10 +62,12 @@ export function createAdminTenantSettingsRouter(options: AdminTenantSettingsRout
         const nextLogo = body.logoUrl === null ? null : (body.logoUrl ?? '').trim()
         updates.push({ sql: 'logo_url = ?', params: [nextLogo || null] })
       }
-      if (body.logoLayout !== undefined || body.logoSize !== undefined) {
+      if (body.logoLayout !== undefined || body.logoSize !== undefined || body.secondaryColor !== undefined || body.backgroundColor !== undefined) {
         if (!brandColumns(db)) throw badRequest('Atualize o banco para personalizar a marca.', 'MIGRATION_REQUIRED')
         if (body.logoLayout !== undefined) updates.push({sql:'logo_layout = ?', params:[body.logoLayout]})
         if (body.logoSize !== undefined) updates.push({sql:'logo_size = ?', params:[body.logoSize]})
+        if (body.secondaryColor !== undefined) updates.push({sql:'brand_secondary = ?', params:[body.secondaryColor]})
+        if (body.backgroundColor !== undefined) updates.push({sql:'brand_background = ?', params:[body.backgroundColor]})
       }
       if (updates.length === 0) return next(badRequest('Nada para atualizar', 'NO_UPDATES'))
 
