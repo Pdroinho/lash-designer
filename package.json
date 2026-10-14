@@ -1,7 +1,7 @@
 {
   "name": "lashdesigner",
   "private": true,
-  "version": "5.13.7",
+  "version": "5.13.8",
   "description": "Agenda online para lash designers",
   "type": "module",
   "main": "dist/server/index.js",

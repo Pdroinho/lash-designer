@@ -2,9 +2,9 @@
 
 SaaS multi-tenant de agenda, clientes, serviços, finanças, billing e assistência de negócio para profissionais de extensão de cílios.
 
-**Release atual: 5.13.7 — Marca centralizada no agendamento e preparação de logo no chat da Luma.**
+**Release atual: 5.13.8 — Layout original do agendamento restaurado; marca centralizada no espaço existente.**
 
-Veja [as correções e a validação](docs/RELEASE_5_13_7.md). O ambiente Appmax é configurável; esta execução local não homologa cobrança real, WhatsApp externo ou a VPS de produção.
+Veja [as correções e a validação](docs/RELEASE_5_13_8.md). O ambiente Appmax é configurável; esta execução local não homologa cobrança real, WhatsApp externo ou a VPS de produção.
 
 ## Stack
 
