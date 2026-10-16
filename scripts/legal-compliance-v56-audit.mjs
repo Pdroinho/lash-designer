@@ -17,7 +17,7 @@ const campaignCore = read('server/marketingCampaign.ts')
 const migrate = read('server/migrate.ts')
 const env = read('server/env.ts')
 const envExample = read('.env.example')
-const whatsapp = read('src/components/WhatsAppCenter.tsx')
+const whatsapp = read('src/components/WhatsAppCenter.tsx') + read('src/components/WhatsappCampaignComposer.tsx')
 const preflight = read('scripts/preflight.mjs')
 
 const checks = []
@@ -57,12 +57,12 @@ assert(envExample.includes('SUBSTITUA_PELA_RAZAO_SOCIAL_OU_NOME_EMPRESARIAL') &&
 
 assert(server.includes('c.marketing_whatsapp_opt_in = 1') && server.includes('WHATSAPP_CAMPAIGN_MAX_RECIPIENTS'), 'campaign audience is explicitly consented and bounded')
 assert(server.includes('campaignMessageWithOptOut') && campaignCore.includes('responda SAIR') && campaignCore.includes('responda\\s+'), 'campaign pipeline ensures a tested explicit opt-out instruction')
-assert(server.includes('Consentimento ausente ou contato alterado') && server.includes("purpose: 'MARKETING'"), 'worker rechecks active consent at send time and uses marketing send guard')
-assert(migrate.includes('claimed_at TEXT') && server.includes('staleClaimCutoff') && server.includes("campaign_id IN (SELECT id FROM whatsapp_marketing_campaigns WHERE status IN ('QUEUED','RUNNING'))"), 'campaign claims are recoverable only while the campaign remains active')
-assert(server.includes('attempts < 3') && server.includes('next_attempt_at'), 'campaign worker has bounded retry/backoff state')
+assert(server.includes('consent.phone !== recipient.phone') && server.includes("purpose: 'MARKETING'"), 'worker rechecks active consent at send time and uses marketing send guard')
+assert(migrate.includes('claimed_at TEXT') && server.includes('stale') && server.includes('stopCampaign(row.campaignId'), 'interrupted campaign claims fail closed instead of being replayed')
+assert(server.includes('if (!delivered) { stopCampaign') && server.includes('whatsapp_campaign_delivery_guard'), 'unconfirmed delivery stops campaigns and a persistent guard serializes sends')
 assert(server.includes("WHERE campaign_id = ? AND tenant_id = ? AND status = 'PENDING'") && server.includes("SET status = 'CANCELLED'"), 'campaign cancellation stops queued recipients without pretending to recall an in-flight message')
 assert(server.includes('WHATSAPP_BROADCAST_REPLACED'), 'legacy broadcast endpoint cannot bypass campaign safeguards')
-assert(whatsapp.includes('Campanhas recentes') && whatsapp.includes('Criar campanha para') && whatsapp.includes('consentimento promocional ativo'), 'campaign UI exposes consent-safe queue and history')
+assert(whatsapp.includes('Campanhas recentes') && whatsapp.includes('Revisar e enviar campanha') && whatsapp.includes('Somente clientes que autorizaram recebem'), 'campaign UI exposes consent-aware preview, confirmation and history')
 assert(bookingPage.includes('const [marketingOptIn, setMarketingOptIn] = useState(false)') && bookingPage.includes('respondendo SAIR'), 'client booking consent remains unchecked and explains withdrawal')
 assert(pkg.scripts?.check?.includes('npm run test:legal56') && pkg.scripts?.['test:legal56'] === 'node scripts/legal-compliance-v56-audit.mjs', 'legal audit is part of the main check pipeline')
 

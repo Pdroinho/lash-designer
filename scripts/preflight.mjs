@@ -85,9 +85,10 @@ for (const key of ['LEGAL_CONTACT_EMAIL', 'PRIVACY_CONTACT_EMAIL']) {
 const campaignsFlag = (process.env.WHATSAPP_PROMOTIONAL_CAMPAIGNS_ENABLED ?? '').trim().toLowerCase()
 if (!['true', 'false'].includes(campaignsFlag)) errors.push('WHATSAPP_PROMOTIONAL_CAMPAIGNS_ENABLED deve ser true ou false')
 const campaignMaxRecipients = Number(process.env.WHATSAPP_CAMPAIGN_MAX_RECIPIENTS ?? 50)
-const campaignIntervalSeconds = Number(process.env.WHATSAPP_CAMPAIGN_SEND_INTERVAL_SECONDS ?? 15)
+const campaignIntervalSeconds = Number(process.env.WHATSAPP_CAMPAIGN_SEND_INTERVAL_SECONDS ?? 60)
 if (!Number.isInteger(campaignMaxRecipients) || campaignMaxRecipients < 1 || campaignMaxRecipients > 500) errors.push('WHATSAPP_CAMPAIGN_MAX_RECIPIENTS deve ser inteiro entre 1 e 500')
 if (!Number.isInteger(campaignIntervalSeconds) || campaignIntervalSeconds < 8 || campaignIntervalSeconds > 300) errors.push('WHATSAPP_CAMPAIGN_SEND_INTERVAL_SECONDS deve ser inteiro entre 8 e 300')
+if (campaignIntervalSeconds < 60) warnings.push('O intervalo efetivo de campanhas será de pelo menos 60 segundos. Esse limite não elimina o risco de bloqueio do WhatsApp.')
 if (campaignsFlag === 'true') warnings.push('Campanhas promocionais estão habilitadas: valide opt-in, opt-out, reputação do número e regras do provedor/WhatsApp antes do primeiro disparo real')
 
 const evolutionBootstrapUrl = process.env.EVOLUTION_API_URL?.trim() ?? ''

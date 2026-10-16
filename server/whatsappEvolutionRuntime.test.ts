@@ -236,3 +236,12 @@ test('parser usa remoteJidAlt e confirmação citada permanece no tenant esperad
   assert.equal(events[0]?.eventType, 'CLIENT_CONFIRMED')
   db.close()
 })
+
+ test('media campaign transport sends image and caption once; missing receipt is not success', async()=>{
+  const db=createTestDb();db.prepare('UPDATE clients SET marketing_whatsapp_opt_in=1 WHERE tenant_id=?').run(tenantOne)
+  let calls=0,url='',payload:Record<string,unknown>={}
+  const runtime=createRuntime(db,{fetchFn:async(input,init)=>{calls++;url=String(input);payload=JSON.parse(String(init?.body));return new Response(JSON.stringify(calls===1?{key:{id:'media-accepted'}}:{}))}})
+  assert.equal(await runtime.sendWhatsappTextForTenant(tenantOne,'5511999999999','Novidade · responda SAIR',{purpose:'MARKETING',mediaDataUrl:'data:image/jpeg;base64,aGVsbG8='}),true)
+  assert.ok(url.includes('/message/sendMedia/'));assert.equal(payload.mediatype,'image');assert.equal(payload.caption,'Novidade · responda SAIR');assert.equal(payload.media,'aGVsbG8=')
+  assert.equal(await runtime.sendWhatsappTextForTenant(tenantOne,'5511999999999','Novidade · responda SAIR',{purpose:'MARKETING'}),false);assert.equal(calls,2);db.close()
+ })

@@ -101,7 +101,7 @@ const envSchema = z.object({
   PRIVACY_CONTACT_EMAIL: z.string().email().optional(),
   WHATSAPP_PROMOTIONAL_CAMPAIGNS_ENABLED: envBoolean(false),
   WHATSAPP_CAMPAIGN_MAX_RECIPIENTS: z.coerce.number().int().min(1).max(500).default(50),
-  WHATSAPP_CAMPAIGN_SEND_INTERVAL_SECONDS: z.coerce.number().int().min(8).max(300).default(15),
+  WHATSAPP_CAMPAIGN_SEND_INTERVAL_SECONDS: z.coerce.number().int().min(8).max(300).default(60),
   CUSTOM_DOMAIN_CNAME_TARGET: z.string().optional(),
   CUSTOM_DOMAIN_IPV4: z.string().optional(),
   CUSTOM_DOMAIN_IPV6: z.string().optional(),

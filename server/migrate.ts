@@ -1268,5 +1268,15 @@ export function migrate() {
   `))
 
   apply(49, () => createPasswordRecoverySchema(db))
+  apply(50, () => db.exec(`
+    ALTER TABLE whatsapp_marketing_campaigns ADD COLUMN image_data_url TEXT;
+    ALTER TABLE whatsapp_marketing_recipients ADD COLUMN dispatch_started_at TEXT;
+    UPDATE whatsapp_marketing_recipients SET dispatch_started_at=COALESCE(sent_at,claimed_at,created_at) WHERE status IN ('SENT','SENDING','FAILED') AND attempts>0;
+    CREATE INDEX idx_marketing_frequency ON whatsapp_marketing_recipients(tenant_id, phone_normalized, dispatch_started_at);
+    CREATE TABLE whatsapp_campaign_delivery_guard (
+      tenant_id TEXT PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+      next_allowed_at TEXT NOT NULL
+    );
+  `))
 
 }

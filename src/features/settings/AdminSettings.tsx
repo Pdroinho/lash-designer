@@ -1,4 +1,4 @@
-import { LogoPreparationControls, prepareBrandImage } from '../../components/LogoPreparationControls'
+import { prepareBrandImage } from '../../lib/brandImage'
 import { BillingCenter } from '../../components/BillingCenter'
 import { BrandPresentationControls } from '../../components/BrandPresentationControls'
 import { useEffect, useId, useRef, useState } from 'react'
@@ -338,7 +338,7 @@ export function SecuritySettingsCard({ title = 'Segurança da conta' }: { title?
 export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUpdate?: (tenant: TenantPublic) => void }) {
     const [name, setName] = useState(tenant?.name ?? '')
     const [primaryColor, setPrimaryColor] = useState(tenant?.primaryColor ?? '#b43a68')
-    const [logoOriginal, setLogoOriginal] = useState(tenant?.logoUrl ?? '')
+
     const [logoUrl, setLogoUrl] = useState(tenant?.logoUrl ?? '')
     const [logoLayout, setLogoLayout] = useState<'SYMBOL_NAME'|'FULL'>(tenant?.logoLayout ?? 'SYMBOL_NAME')
     const [logoSize, setLogoSize] = useState<'S'|'M'|'L'>(tenant?.logoSize ?? 'M')
@@ -369,7 +369,7 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
         if(tenant) {
             setName(tenant.name)
             setPrimaryColor(tenant.primaryColor)
-            setLogoUrl(tenant.logoUrl || '');setLogoOriginal(tenant.logoUrl || '')
+            setLogoUrl(tenant.logoUrl || '')
             setLogoLayout(tenant.logoLayout ?? 'SYMBOL_NAME')
             setLogoSize(tenant.logoSize ?? 'M')
             setSecondaryColor(tenant.secondaryColor ?? null)
@@ -384,7 +384,6 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
         let uploaded=false
         try {
             let dataUrl=await fileToOptimizedDataUrl(file)
-            setLogoOriginal(dataUrl)
             const preparation=await prepareBrandImage(dataUrl)
             if(request!==logoRequest.current)return
             if(preparation.ok) dataUrl=preparation.data.imageDataUrl
@@ -494,7 +493,7 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
                                 </div>
                             </div>
 
-                            <BrandPresentationControls brand={{name,logoUrl,logoLayout,logoSize}} onLayout={setLogoLayout} onSize={setLogoSize} disabled={saving || logoBusy} imageEditor={<LogoPreparationControls originalUrl={logoOriginal} currentUrl={logoUrl} onChange={setLogoUrl} onBusy={setLogoBusy} disabled={saving || logoBusy} />} />
+                            <BrandPresentationControls brand={{name,logoUrl,logoLayout,logoSize}} onLayout={setLogoLayout} onSize={setLogoSize} disabled={saving || logoBusy} />
                             <div className="input-group">
                                 <label className="label">Cor Principal</label>
                                 <ColorPicker

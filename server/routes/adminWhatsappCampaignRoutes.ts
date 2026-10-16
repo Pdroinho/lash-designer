@@ -1,16 +1,18 @@
+import { prepareCampaignImage } from '../campaignImage.js'
 import { randomUUID } from 'node:crypto'
 import Database from 'better-sqlite3'
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireRole } from '../auth.js'
 import { badRequest, forbidden, notFound } from '../http.js'
-import { campaignMessageWithOptOut } from '../marketingCampaign.js'
+import { campaignMessageWithOptOut, renderMarketingCampaignMessage } from '../marketingCampaign.js'
 import type { WhatsappSettings } from './adminWhatsappSettingsRoutes.js'
 
 export type MarketingCampaignRow = {
   id: string
   tenantId: string
   name: string
+  imageDataUrl?: string | null
   messageText: string
   status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED' | 'FAILED'
   totalRecipients: number
@@ -39,6 +41,7 @@ function marketingCampaignPayload(row: MarketingCampaignRow) {
     id: row.id,
     name: row.name,
     messageText: row.messageText,
+    hasImage: Boolean(row.imageDataUrl),
     status: row.status,
     totalRecipients: Number(row.totalRecipients || 0),
     sentCount: Number(row.sentCount || 0),
@@ -62,13 +65,15 @@ export function createAdminWhatsappCampaignRouter({
   now = () => new Date(),
 }: AdminWhatsappCampaignRouterOptions) {
   const router = Router()
+  maxRecipients = Math.min(50, maxRecipients)
+  sendIntervalSeconds = Math.max(60, sendIntervalSeconds)
 
   router.get('/whatsapp/campaigns', requireRole('ADMIN'), (req, res, next) => {
     try {
       const tenantId = req.sessionUser?.tenantId
       if (!tenantId) return next(badRequest('Tenant inválido', 'INVALID_TENANT'))
       const campaigns = db.prepare(`
-        SELECT id, tenant_id as tenantId, name, message_text as messageText, status,
+        SELECT id, tenant_id as tenantId, name, message_text as messageText, image_data_url as imageDataUrl, status,
                total_recipients as totalRecipients, sent_count as sentCount,
                failed_count as failedCount, skipped_count as skippedCount,
                created_at as createdAt, started_at as startedAt, completed_at as completedAt,
@@ -78,10 +83,15 @@ export function createAdminWhatsappCampaignRouter({
         ORDER BY created_at DESC
         LIMIT 20
       `).all(tenantId) as MarketingCampaignRow[]
+      const dailyUsed = Number((db.prepare('SELECT COUNT(*) as n FROM whatsapp_marketing_recipients WHERE tenant_id=? AND dispatch_started_at>=?').get(tenantId,new Date(now().getTime()-86400000).toISOString()) as {n:number}).n)
+      const eligible = Number((db.prepare(`SELECT COUNT(DISTINCT c.phone_normalized) as n FROM clients c WHERE c.tenant_id=? AND c.marketing_whatsapp_opt_in=1 AND c.phone_normalized IS NOT NULL AND trim(c.phone_normalized)<>'' AND NOT EXISTS(SELECT 1 FROM whatsapp_marketing_recipients r WHERE r.tenant_id=c.tenant_id AND r.phone_normalized=c.phone_normalized AND r.dispatch_started_at>=?)`).get(tenantId,new Date(now().getTime()-7*86400000).toISOString()) as {n:number}).n)
       res.json({
         enabled: campaignsEnabled,
+        plannedRecipients: Math.min(eligible,maxRecipients,Math.max(0,50-dailyUsed)),
         maxRecipients,
         sendIntervalSeconds,
+        dailyLimit: 50,
+        contactIntervalDays: 7,
         campaigns: campaigns.map(marketingCampaignPayload),
       })
     } catch (err) {
@@ -89,11 +99,11 @@ export function createAdminWhatsappCampaignRouter({
     }
   })
 
-  router.post('/whatsapp/campaigns', requireRole('ADMIN'), (req, res, next) => {
+  router.post('/whatsapp/campaigns', requireRole('ADMIN'), async (req, res, next) => {
     try {
       if (!campaignsEnabled) {
         return next(forbidden(
-          'Campanhas promocionais estão desativadas nesta instalação. Ative explicitamente a função somente após validar sua configuração do WhatsApp.',
+          'O envio de campanhas ainda não está disponível para este espaço. Fale com o suporte para configurar.',
           'WHATSAPP_CAMPAIGNS_DISABLED',
         ))
       }
@@ -103,8 +113,10 @@ export function createAdminWhatsappCampaignRouter({
       const body = z.object({
         name: z.string().trim().min(2).max(80),
         message: z.string().trim().min(10).max(1400),
+        imageDataUrl: z.string().max(1_400_000).nullable().optional(),
       }).strict().parse(req.body)
 
+      const imageDataUrl = await prepareCampaignImage(body.imageDataUrl)
       const settings = requireWhatsappSettings(tenantId) ?? defaultWhatsappSettings
       if (!settings.promoEnabled) {
         return next(badRequest('Ative o modelo promocional antes de criar uma campanha.', 'WHATSAPP_PROMO_MODEL_DISABLED'))
@@ -117,6 +129,8 @@ export function createAdminWhatsappCampaignRouter({
         return next(badRequest('Já existe uma campanha em andamento. Aguarde ou cancele a campanha atual.', 'WHATSAPP_CAMPAIGN_ALREADY_ACTIVE'))
       }
 
+      const budget = Math.max(0, 50 - Number((db.prepare('SELECT COUNT(*) as n FROM whatsapp_marketing_recipients WHERE tenant_id=? AND dispatch_started_at>=?').get(tenantId, new Date(now().getTime()-86400000).toISOString()) as {n:number}).n))
+      if (!budget) return next(badRequest('O limite de campanhas de hoje foi alcançado. Aguarde para enviar outra novidade.', 'WHATSAPP_CAMPAIGN_DAILY_LIMIT'))
       const audience = db.prepare(`
         SELECT c.user_id as userId, c.name, c.phone_normalized as phone
         FROM clients c
@@ -124,28 +138,28 @@ export function createAdminWhatsappCampaignRouter({
           AND c.marketing_whatsapp_opt_in = 1
           AND c.phone_normalized IS NOT NULL
           AND trim(c.phone_normalized) <> ''
+          AND NOT EXISTS (SELECT 1 FROM whatsapp_marketing_recipients r WHERE r.tenant_id=c.tenant_id AND r.phone_normalized=c.phone_normalized AND r.dispatch_started_at>=?)
+        GROUP BY c.phone_normalized
         ORDER BY c.created_at ASC
         LIMIT ?
-      `).all(tenantId, maxRecipients + 1) as Array<{ userId: string; name: string; phone: string }>
+      `).all(tenantId, new Date(now().getTime()-7*86400000).toISOString(), Math.min(maxRecipients,budget)) as Array<{ userId: string; name: string; phone: string }>
       if (!audience.length) {
-        return next(badRequest('Nenhuma cliente possui consentimento promocional ativo.', 'WHATSAPP_CAMPAIGN_EMPTY_AUDIENCE'))
-      }
-      if (audience.length > maxRecipients) {
-        return next(badRequest(
-          `A audiência atual ultrapassa o limite operacional de ${maxRecipients} destinatários por campanha.`,
-          'WHATSAPP_CAMPAIGN_AUDIENCE_LIMIT',
-        ))
+        return next(badRequest('Nenhuma cliente está disponível para esta campanha. Só entram clientes que autorizaram e não receberam uma campanha nos últimos 7 dias.', 'WHATSAPP_CAMPAIGN_EMPTY_AUDIENCE'))
       }
 
+      if (audience.length > budget) return next(badRequest('Esta campanha ultrapassa o limite restante de hoje. Aguarde antes de criar outra.', 'WHATSAPP_CAMPAIGN_DAILY_LIMIT'))
       const campaignId = randomUUID()
       const timestamp = now().toISOString()
       const messageText = campaignMessageWithOptOut(body.message)
+      const studio = db.prepare('SELECT name FROM tenants WHERE id=?').get(tenantId) as {name:string}|undefined
+      if (audience.some(client => renderMarketingCampaignMessage(messageText,{clientName:client.name,tenantName:studio?.name ?? ''}).length > (imageDataUrl ? 1024 : 4096))) return next(badRequest(imageDataUrl ? 'Encurte a mensagem que acompanha a imagem. Ela pode ter até 1.024 caracteres após incluir os nomes e a opção de sair.' : 'Encurte a mensagem ou use menos repetições dos nomes.', 'WHATSAPP_CAMPAIGN_MESSAGE_TOO_LONG'))
       db.transaction(() => {
+        if (db.prepare("SELECT id FROM whatsapp_marketing_campaigns WHERE tenant_id=? AND status IN ('QUEUED','RUNNING')").get(tenantId)) throw badRequest('Já existe uma campanha em andamento.', 'WHATSAPP_CAMPAIGN_ALREADY_ACTIVE')
         db.prepare(`
           INSERT INTO whatsapp_marketing_campaigns
-            (id, tenant_id, created_by_user_id, name, message_text, status, total_recipients, sent_count, failed_count, skipped_count, created_at)
-          VALUES (?, ?, ?, ?, ?, 'QUEUED', ?, 0, 0, 0, ?)
-        `).run(campaignId, tenantId, userId, body.name, messageText, audience.length, timestamp)
+            (id, tenant_id, created_by_user_id, name, message_text, image_data_url, status, total_recipients, sent_count, failed_count, skipped_count, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, 'QUEUED', ?, 0, 0, 0, ?)
+        `).run(campaignId, tenantId, userId, body.name, messageText, imageDataUrl, audience.length, timestamp)
         const insertRecipient = db.prepare(`
           INSERT INTO whatsapp_marketing_recipients
             (id, campaign_id, tenant_id, client_user_id, phone_normalized, client_name, status, attempts, created_at)
@@ -157,7 +171,7 @@ export function createAdminWhatsappCampaignRouter({
             recipient.phone, recipient.name, timestamp,
           )
         }
-      })()
+      }).immediate()
 
       res.json({
         ok: true,

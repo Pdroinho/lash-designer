@@ -149,9 +149,18 @@ test('runtime WhatsApp revalida consentimento e conclui campanha entregue', asyn
     INSERT INTO tenants VALUES ('${tenantConnected}', 'Studio Aurora');
     INSERT INTO clients VALUES ('${tenantConnected}', 'user-ok', 1, '5511999999999');
     INSERT INTO whatsapp_marketing_campaigns VALUES
-      ('campaign-ok', '${tenantConnected}', 'Julho', 'Oi {{nome}}, novidade no {{espaco}}.', 'QUEUED', 1, 0, 0, 0, '2030-01-01T00:00:00.000Z', NULL, NULL, NULL, NULL);
+      ('campaign-ok', '${tenantConnected}', 'Julho', 'Oi {{nome}}, novidade no {{espaco}}.', 'QUEUED', 1, 0, 0, 0, '2030-07-01T11:00:00.000Z', NULL, NULL, NULL, NULL);
     INSERT INTO whatsapp_marketing_recipients VALUES
       ('recipient-ok', 'campaign-ok', '${tenantConnected}', 'user-ok', '5511999999999', 'Ana', 0, 'PENDING', NULL, '2030-01-01T00:00:00.000Z', NULL, NULL, NULL, NULL);
+  `)
+  db.exec(`ALTER TABLE tenants ADD COLUMN status TEXT DEFAULT 'ACTIVE';
+    ALTER TABLE whatsapp_marketing_campaigns ADD COLUMN image_data_url TEXT;
+    ALTER TABLE whatsapp_marketing_recipients ADD COLUMN dispatch_started_at TEXT;
+    CREATE TABLE subscriptions(tenant_id TEXT,status TEXT,current_period_end TEXT);
+    INSERT INTO subscriptions VALUES ('${tenantConnected}','ACTIVE',NULL);
+    CREATE TABLE whatsapp_settings(tenant_id TEXT,promo_enabled INTEGER);
+    INSERT INTO whatsapp_settings VALUES ('${tenantConnected}',1);
+    CREATE TABLE whatsapp_campaign_delivery_guard(tenant_id TEXT PRIMARY KEY,next_allowed_at TEXT);
   `)
   const sent: Array<{ tenantId: string; phone: string; text: string; purpose?: string }> = []
   const runtime = createWhatsappWorkerRuntime({
@@ -166,6 +175,7 @@ test('runtime WhatsApp revalida consentimento e conclui campanha entregue', asyn
       options?.onProviderMessageId?.('provider-sent')
       return true
     },
+    fetchFn: async () => new Response(JSON.stringify({instance:{state:'open'}})),
     now: () => new Date(fixedNow),
   })
 
@@ -223,7 +233,7 @@ test('runtime WhatsApp centraliza e encerra os seis timers de forma idempotente'
   assert.deepEqual(timers.map(timer => [timer.kind, timer.delayMs]), [
     ['interval', 120_000], ['timeout', 18_000],
     ['interval', 30_000], ['timeout', 20_000],
-    ['interval', 17_000], ['timeout', 22_000],
+    ['interval', 60_000], ['timeout', 22_000],
   ])
   assert.equal(unrefCount, 6)
   runtime.stop()

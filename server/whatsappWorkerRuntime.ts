@@ -26,6 +26,7 @@ type SendWhatsappText = (
   phone: string,
   text: string,
   options?: {
+    mediaDataUrl?: string | null
     source?: 'AUTOMATION' | 'MANUAL' | 'SYSTEM'
     purpose?: 'MARKETING' | 'APPOINTMENT_AUTOMATION' | 'MANUAL' | 'SYSTEM'
     displayName?: string | null
@@ -232,94 +233,80 @@ export function createWhatsappWorkerRuntime({
     }
   }
 
+  // Fail closed: an unconfirmed send must never be automatically repeated.
+  const stopCampaign = (campaignId: string, recipientId: string, message: string) => {
+    db.transaction(() => {
+      const changed = db.prepare("UPDATE whatsapp_marketing_recipients SET status='FAILED',last_error=?,claimed_at=NULL,next_attempt_at=NULL WHERE id=? AND status='SENDING'").run(message, recipientId).changes
+      const skipped = db.prepare("UPDATE whatsapp_marketing_recipients SET status='SKIPPED',last_error='Campanha interrompida',next_attempt_at=NULL WHERE campaign_id=? AND status='PENDING'").run(campaignId).changes
+      db.prepare("UPDATE whatsapp_marketing_campaigns SET status=CASE WHEN status='CANCELLED' THEN status ELSE 'FAILED' END,failed_count=failed_count+?,skipped_count=skipped_count+?,last_error=?,completed_at=COALESCE(completed_at,?) WHERE id=?").run(changed, skipped, message, now().toISOString(), campaignId)
+    }).immediate()
+  }
+
   const processMarketingCampaignQueue = async () => {
     if (!campaignsEnabled || marketingRunning) return
     marketingRunning = true
     try {
-      const referenceTime = now()
-      const currentTime = referenceTime.toISOString()
-      const staleClaimCutoff = new Date(referenceTime.getTime() - 5 * 60_000).toISOString()
-      db.prepare(`UPDATE whatsapp_marketing_recipients SET status = 'PENDING', claimed_at = NULL WHERE status = 'SENDING' AND (claimed_at IS NULL OR claimed_at < ?) AND campaign_id IN (SELECT id FROM whatsapp_marketing_campaigns WHERE status IN ('QUEUED','RUNNING'))`).run(staleClaimCutoff)
+      const referenceTime = now(), currentTime = referenceTime.toISOString()
+      const stale = db.prepare("SELECT id,campaign_id as campaignId FROM whatsapp_marketing_recipients WHERE status='SENDING' AND (claimed_at IS NULL OR claimed_at<?)").all(new Date(referenceTime.getTime()-5*60000).toISOString()) as Array<{id:string;campaignId:string}>
+      for (const row of stale) stopCampaign(row.campaignId,row.id,'Envio anterior não confirmado. A campanha foi interrompida para evitar mensagens repetidas. Confira o WhatsApp antes de tentar novamente.')
+      const expired = db.prepare("SELECT id FROM whatsapp_marketing_campaigns c WHERE status IN ('QUEUED','RUNNING') AND created_at<? AND NOT EXISTS(SELECT 1 FROM whatsapp_marketing_recipients r WHERE r.campaign_id=c.id AND r.status='SENDING')").all(new Date(referenceTime.getTime()-86400000).toISOString()) as Array<{id:string}>
+      for (const row of expired) db.transaction(()=>{const skipped=db.prepare("UPDATE whatsapp_marketing_recipients SET status='SKIPPED',last_error='Campanha expirada' WHERE campaign_id=? AND status='PENDING'").run(row.id).changes;db.prepare("UPDATE whatsapp_marketing_campaigns SET status='FAILED',skipped_count=skipped_count+?,completed_at=?,last_error='Esta campanha expirou. Confira a mensagem antes de preparar uma nova.' WHERE id=? AND status IN ('QUEUED','RUNNING')").run(skipped,currentTime,row.id)})()
       const campaign = db.prepare(`
-        SELECT id, tenant_id as tenantId, name, message_text as messageText, status,
-               total_recipients as totalRecipients, sent_count as sentCount,
-               failed_count as failedCount, skipped_count as skippedCount,
-               created_at as createdAt, started_at as startedAt, completed_at as completedAt,
-               cancelled_at as cancelledAt, last_error as lastError
-        FROM whatsapp_marketing_campaigns
-        WHERE status IN ('QUEUED','RUNNING')
-        ORDER BY created_at ASC
-        LIMIT 1
-      `).get() as MarketingCampaignRow | undefined
+        SELECT c.id,c.tenant_id as tenantId,c.name,c.message_text as messageText,c.image_data_url as imageDataUrl,c.status
+        FROM whatsapp_marketing_campaigns c
+        WHERE c.status IN ('QUEUED','RUNNING')
+          AND EXISTS (SELECT 1 FROM tenants t JOIN subscriptions s ON s.tenant_id=t.id WHERE t.id=c.tenant_id AND t.status='ACTIVE' AND s.status='ACTIVE' AND (s.current_period_end IS NULL OR s.current_period_end>?))
+          AND EXISTS (SELECT 1 FROM whatsapp_settings w WHERE w.tenant_id=c.tenant_id AND w.promo_enabled=1)
+        ORDER BY COALESCE((SELECT next_allowed_at FROM whatsapp_campaign_delivery_guard g WHERE g.tenant_id=c.tenant_id),c.created_at) ASC LIMIT 1
+      `).get(currentTime) as MarketingCampaignRow | undefined
       if (!campaign) return
-      if (campaign.status === 'QUEUED') {
-        db.prepare(`UPDATE whatsapp_marketing_campaigns SET status = 'RUNNING', started_at = COALESCE(started_at, ?) WHERE id = ? AND status = 'QUEUED'`).run(currentTime, campaign.id)
-      }
-      const recipient = db.prepare(`
-        SELECT r.id, r.client_user_id as clientUserId, r.phone_normalized as phone, r.client_name as clientName, r.attempts,
-               t.name as tenantName
-        FROM whatsapp_marketing_recipients r
-        JOIN tenants t ON t.id = r.tenant_id
-        WHERE r.campaign_id = ? AND r.tenant_id = ? AND r.status = 'PENDING'
-          AND (r.next_attempt_at IS NULL OR r.next_attempt_at <= ?)
-        ORDER BY r.created_at ASC
-        LIMIT 1
-      `).get(campaign.id, campaign.tenantId, currentTime) as { id: string; clientUserId: string; phone: string; clientName: string; attempts: number; tenantName: string } | undefined
-
+      const recipient = db.prepare(`SELECT r.id,r.client_user_id as clientUserId,r.phone_normalized as phone,r.client_name as clientName,t.name as tenantName FROM whatsapp_marketing_recipients r JOIN tenants t ON t.id=r.tenant_id WHERE r.campaign_id=? AND r.tenant_id=? AND r.status='PENDING' ORDER BY r.created_at LIMIT 1`).get(campaign.id,campaign.tenantId) as {id:string;clientUserId:string;phone:string;clientName:string;tenantName:string} | undefined
       if (!recipient) {
-        const pending = db.prepare(`SELECT COUNT(*) as n FROM whatsapp_marketing_recipients WHERE campaign_id = ? AND status IN ('PENDING','SENDING')`).get(campaign.id) as { n: number }
-        if (!Number(pending.n || 0)) {
-          db.prepare(`UPDATE whatsapp_marketing_campaigns SET status = 'COMPLETED', completed_at = ? WHERE id = ? AND status IN ('QUEUED','RUNNING')`).run(currentTime, campaign.id)
-        }
+        if (!(db.prepare("SELECT id FROM whatsapp_marketing_recipients WHERE campaign_id=? AND status='SENDING'").get(campaign.id))) db.prepare("UPDATE whatsapp_marketing_campaigns SET status='COMPLETED',completed_at=? WHERE id=? AND status IN ('QUEUED','RUNNING')").run(currentTime,campaign.id)
         return
       }
-
-      const claimed = db.prepare(`UPDATE whatsapp_marketing_recipients SET status = 'SENDING', attempts = attempts + 1, claimed_at = ? WHERE id = ? AND status = 'PENDING'`).run(currentTime, recipient.id)
-      if (!claimed.changes) return
-
-      const currentConsent = db.prepare(`
-        SELECT marketing_whatsapp_opt_in as optedIn, phone_normalized as phone
-        FROM clients
-        WHERE tenant_id = ? AND user_id = ? LIMIT 1
-      `).get(campaign.tenantId, recipient.clientUserId) as { optedIn: number; phone: string | null } | undefined
-      if (!currentConsent?.optedIn || !currentConsent.phone || currentConsent.phone !== recipient.phone) {
-        db.transaction(() => {
-          db.prepare(`UPDATE whatsapp_marketing_recipients SET status = 'SKIPPED', last_error = 'Consentimento ausente ou contato alterado', next_attempt_at = NULL, claimed_at = NULL WHERE id = ?`).run(recipient.id)
-          db.prepare(`UPDATE whatsapp_marketing_campaigns SET skipped_count = skipped_count + 1 WHERE id = ?`).run(campaign.id)
-        })()
+      const acquired = db.transaction(() => {
+        db.prepare("INSERT OR IGNORE INTO whatsapp_campaign_delivery_guard(tenant_id,next_allowed_at) VALUES(?,?)").run(campaign.tenantId,currentTime)
+        const guard = db.prepare("UPDATE whatsapp_campaign_delivery_guard SET next_allowed_at=? WHERE tenant_id=? AND next_allowed_at<=? AND NOT EXISTS(SELECT 1 FROM whatsapp_marketing_recipients WHERE tenant_id=? AND status='SENDING')").run(new Date(referenceTime.getTime()+Math.max(60,campaignSendIntervalSeconds)*1000).toISOString(),campaign.tenantId,currentTime,campaign.tenantId)
+        if (!guard.changes) return false
+        const claim = db.prepare("UPDATE whatsapp_marketing_recipients SET status='SENDING',claimed_at=? WHERE id=? AND status='PENDING' AND EXISTS(SELECT 1 FROM whatsapp_marketing_campaigns WHERE id=? AND status IN ('QUEUED','RUNNING'))").run(currentTime,recipient.id,campaign.id)
+        if (!claim.changes) return false
+        db.prepare("UPDATE whatsapp_marketing_campaigns SET status='RUNNING',started_at=COALESCE(started_at,?) WHERE id=? AND status='QUEUED'").run(currentTime,campaign.id)
+        return true
+      }).immediate()
+      if (!acquired) return
+      const consent = db.prepare('SELECT marketing_whatsapp_opt_in as optedIn,phone_normalized as phone FROM clients WHERE tenant_id=? AND user_id=?').get(campaign.tenantId,recipient.clientUserId) as {optedIn:number;phone:string}|undefined
+      const recent = db.prepare('SELECT id FROM whatsapp_marketing_recipients WHERE tenant_id=? AND phone_normalized=? AND id<>? AND dispatch_started_at>=?').get(campaign.tenantId,recipient.phone,recipient.id,new Date(referenceTime.getTime()-7*86400000).toISOString())
+      if (!consent?.optedIn || consent.phone !== recipient.phone || recent) {
+        db.transaction(()=>{ db.prepare("UPDATE whatsapp_marketing_recipients SET status='SKIPPED',claimed_at=NULL,last_error='Autorização ausente, contato alterado ou campanha recente' WHERE id=?").run(recipient.id);db.prepare('UPDATE whatsapp_marketing_campaigns SET skipped_count=skipped_count+1 WHERE id=?').run(campaign.id) })()
         return
       }
-
-      let providerMessageId: string | null = null
-      const text = renderMarketingCampaignMessage(campaign.messageText, { clientName: recipient.clientName, tenantName: recipient.tenantName })
-      const delivered = await sendWhatsappTextForTenant(campaign.tenantId, recipient.phone, text, {
-        source: 'AUTOMATION',
-        purpose: 'MARKETING',
-        displayName: recipient.clientName,
-        onProviderMessageId: id => { providerMessageId = id },
-      })
-      const finishedAt = now().toISOString()
-      if (delivered) {
-        db.transaction(() => {
-          db.prepare(`UPDATE whatsapp_marketing_recipients SET status = 'SENT', provider_message_id = ?, sent_at = ?, last_error = NULL, next_attempt_at = NULL, claimed_at = NULL WHERE id = ?`).run(providerMessageId, finishedAt, recipient.id)
-          db.prepare(`UPDATE whatsapp_marketing_campaigns SET sent_count = sent_count + 1, last_error = NULL WHERE id = ?`).run(campaign.id)
-        })()
+      const daily = db.prepare('SELECT COUNT(*) as n FROM whatsapp_marketing_recipients WHERE tenant_id=? AND dispatch_started_at>=?').get(campaign.tenantId,new Date(referenceTime.getTime()-86400000).toISOString()) as {n:number}
+      if (daily.n >= 50) { db.prepare("UPDATE whatsapp_marketing_recipients SET status='PENDING',claimed_at=NULL WHERE id=? AND status='SENDING'").run(recipient.id);return }
+      const text = renderMarketingCampaignMessage(campaign.messageText,{clientName:recipient.clientName,tenantName:recipient.tenantName})
+      if (text.length > (campaign.imageDataUrl ? 1024 : 4096)) { stopCampaign(campaign.id,recipient.id,'A mensagem ficou longa após incluir os nomes. Encurte o texto antes de preparar outra campanha.');return }
+      const health = await fetchEvolutionConnectionState(campaign.tenantId)
+      if (health.state !== 'CONNECTED') {
+        const cancelled = db.prepare("SELECT id FROM whatsapp_marketing_campaigns WHERE id=? AND status='CANCELLED'").get(campaign.id)
+        if (cancelled) { db.transaction(()=>{const changed=db.prepare("UPDATE whatsapp_marketing_recipients SET status='SKIPPED',claimed_at=NULL WHERE id=? AND status='SENDING'").run(recipient.id).changes;db.prepare('UPDATE whatsapp_marketing_campaigns SET skipped_count=skipped_count+? WHERE id=?').run(changed,campaign.id)})();return }
+        db.prepare("UPDATE whatsapp_marketing_recipients SET status='PENDING',claimed_at=NULL WHERE id=? AND status='SENDING'").run(recipient.id)
+        db.prepare("UPDATE whatsapp_marketing_campaigns SET last_error='Aguardando a conexão do WhatsApp para continuar.' WHERE id=? AND status IN ('QUEUED','RUNNING')").run(campaign.id)
         return
       }
-
-      const attempts = Number(recipient.attempts || 0) + 1
-      const retry = attempts < 3
-      const retryAt = retry ? new Date(referenceTime.getTime() + attempts * 60_000).toISOString() : null
-      db.transaction(() => {
-        db.prepare(`UPDATE whatsapp_marketing_recipients SET status = ?, last_error = ?, next_attempt_at = ?, claimed_at = NULL WHERE id = ?`)
-          .run(retry ? 'PENDING' : 'FAILED', 'Falha de entrega pelo provedor', retryAt, recipient.id)
-        if (!retry) db.prepare(`UPDATE whatsapp_marketing_campaigns SET failed_count = failed_count + 1, last_error = ? WHERE id = ?`).run('Uma ou mais mensagens falharam após 3 tentativas.', campaign.id)
-      })()
-    } catch (error) {
-      logger.error('[WhatsAppCampaignWorker]', error)
-    } finally {
-      marketingRunning = false
-    }
+      // Re-check cancellation and opt-out after the provider health request.
+      if (!db.prepare("SELECT r.id FROM whatsapp_marketing_recipients r JOIN whatsapp_marketing_campaigns c ON c.id=r.campaign_id JOIN clients cl ON cl.tenant_id=r.tenant_id AND cl.user_id=r.client_user_id WHERE r.id=? AND r.status='SENDING' AND c.status IN ('QUEUED','RUNNING') AND cl.marketing_whatsapp_opt_in=1 AND cl.phone_normalized=r.phone_normalized").get(recipient.id)) {
+        db.transaction(()=>{const changed=db.prepare("UPDATE whatsapp_marketing_recipients SET status='SKIPPED',claimed_at=NULL WHERE id=? AND status='SENDING'").run(recipient.id).changes;db.prepare('UPDATE whatsapp_marketing_campaigns SET skipped_count=skipped_count+? WHERE id=?').run(changed,campaign.id)})();return
+      }
+      db.prepare('UPDATE whatsapp_marketing_recipients SET attempts=attempts+1,dispatch_started_at=? WHERE id=?').run(currentTime,recipient.id)
+      let providerMessageId: string | null = null, delivered = false
+      try { delivered = await sendWhatsappTextForTenant(campaign.tenantId,recipient.phone,text,{source:'AUTOMATION',purpose: 'MARKETING',mediaDataUrl:campaign.imageDataUrl,displayName:recipient.clientName,onProviderMessageId:id=>{providerMessageId=id}}) } catch { /* Uncertain acceptance: stop, never replay. */ }
+      if (!delivered) { stopCampaign(campaign.id,recipient.id,'O WhatsApp não confirmou o envio. A campanha foi interrompida e esta mensagem não será repetida automaticamente. Confira a conexão e o celular.');return }
+      db.transaction(()=>{
+        const changed = db.prepare("UPDATE whatsapp_marketing_recipients SET status='SENT',provider_message_id=?,sent_at=?,claimed_at=NULL,last_error=NULL WHERE id=? AND status='SENDING'").run(providerMessageId,now().toISOString(),recipient.id).changes
+        db.prepare('UPDATE whatsapp_marketing_campaigns SET sent_count=sent_count+?,last_error=NULL WHERE id=?').run(changed,campaign.id)
+      }).immediate()
+    } catch (error) { logger.error('[WhatsAppCampaignWorker]',error) }
+    finally { marketingRunning=false }
   }
 
   const runSafely = (label: string, worker: () => Promise<void>) => {
@@ -342,7 +329,7 @@ export function createWhatsappWorkerRuntime({
       runSafely('[WhatsApp] falha no bootstrap de mídia', processMediaQueue)
     }, 20_000)
     mediaStartup.unref()
-    marketingInterval = scheduler.setInterval(() => runSafely('[WhatsApp] falha no worker de campanhas', processMarketingCampaignQueue), campaignSendIntervalSeconds * 1000)
+    marketingInterval = scheduler.setInterval(() => runSafely('[WhatsApp] falha no worker de campanhas', processMarketingCampaignQueue), Math.max(60,campaignSendIntervalSeconds) * 1000)
     marketingInterval.unref()
     marketingStartup = scheduler.setTimeout(() => {
       marketingStartup = null

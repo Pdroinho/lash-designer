@@ -332,25 +332,29 @@ export function createWhatsappEvolutionRuntime({
     tenantId: string,
     phone: string,
     text: string,
-    options: { source?: WhatsappMessageSource; persist?: boolean; displayName?: string | null; purpose?: WhatsappPurpose; onProviderMessageId?: (id: string | null) => void } = {},
+    options: { mediaDataUrl?: string | null; source?: WhatsappMessageSource; persist?: boolean; displayName?: string | null; purpose?: WhatsappPurpose; onProviderMessageId?: (id: string | null) => void } = {},
   ) => {
     const config = requireWhatsappConfig(tenantId)
     if (!config?.baseUrl || !config.apiKey || !config.instanceName) return false
     const normalizedPhone = whatsappPhone(phone)
     if (!normalizedPhone) return false
+    const resolvedBaseUrl = await resolveExternalHttpsBaseUrl(config.baseUrl)
     if (options.purpose === 'MARKETING') {
       const consent = db.prepare(`SELECT marketing_whatsapp_opt_in as optedIn FROM clients WHERE tenant_id = ? AND phone_normalized = ? LIMIT 1`).get(tenantId, normalizedPhone) as { optedIn: number } | undefined
       if (!consent?.optedIn) return false
     }
-    const response = await fetchFn(`${await resolveExternalHttpsBaseUrl(config.baseUrl)}/message/sendText/${encodeURIComponent(config.instanceName)}`, {
+    const image = options.mediaDataUrl ? /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(options.mediaDataUrl) : null
+    if (options.mediaDataUrl && !image) return false
+    const response = await fetchFn(`${resolvedBaseUrl}/message/${image ? 'sendMedia' : 'sendText'}/${encodeURIComponent(config.instanceName)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', apikey: config.apiKey }, redirect: 'error', signal: AbortSignal.timeout(10_000),
-      body: JSON.stringify({ number: normalizedPhone, text, textMessage: text }),
+      body: JSON.stringify(image ? { number: normalizedPhone, mediatype: 'image', mimetype: `image/${image[1]}`, caption: text, media: image[2], fileName: 'campanha.jpg' } : { number: normalizedPhone, text, textMessage: text }),
     }).catch(() => null)
     if (!response?.ok) return false
     const providerMessageId = extractWhatsappProviderMessageId(await response.json().catch(() => null))
+    if (options.purpose === 'MARKETING' && !providerMessageId) return false
     options.onProviderMessageId?.(providerMessageId)
     if (options.persist !== false) recordWhatsappMessage({
-      tenantId, phone: normalizedPhone, direction: 'OUTBOUND', type: 'TEXT', text,
+      tenantId, phone: normalizedPhone, direction: 'OUTBOUND', type: image ? 'IMAGE' : 'TEXT', text,
       source: options.source ?? 'AUTOMATION', providerMessageId, sentAt: now().toISOString(), displayName: options.displayName ?? null,
     })
     return true

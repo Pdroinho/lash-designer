@@ -39,7 +39,7 @@ const checks = [
   ['diagnóstico mostra última entrada e saída', server.includes('lastInboundAt') && server.includes('lastOutboundAt') && ui.includes('Última recebida')],
   ['campanhas mostram audiência autorizada', ui.includes('Audiência autorizada') && server.includes('optedInClients')],
   ['broadcast legado continua bloqueado em favor da fila', server.includes('WHATSAPP_BROADCAST_REPLACED')],
-  ['campanhas possuem fila consentida e UI de histórico', server.includes("router.get('/whatsapp/campaigns'") && server.includes("router.post('/whatsapp/campaigns'") && ui.includes('Campanhas recentes') && ui.includes('Criar campanha para')],
+  ['campanhas possuem fila consentida e UI de histórico', server.includes("router.get('/whatsapp/campaigns'") && server.includes("router.post('/whatsapp/campaigns'") && ui.includes('Campanhas recentes') && ui.includes('WhatsappCampaignComposer')],
   ['camada visual WhatsApp 3.9 está importada', main.includes("import './whatsapp-v39.css'" )],
   ['CSS 3.9 contém inbox, automações, campanhas e conexão', ['.wa39-inbox','.wa39-flow-card','.wa39-campaign-overview','.wa39-connection-grid'].every((selector) => css.includes(selector))],
 ]

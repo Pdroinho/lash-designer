@@ -1,3 +1,6 @@
+import { WhatsappCampaignComposer } from './WhatsappCampaignComposer'
+import { confirmAction } from './FeedbackCenter'
+import { PersonalReminders } from '../features/luma/PersonalReminders'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { api } from '../api'
 import { whatsappConnectionState as statusToUi } from '../whatsappConnectionState'
@@ -16,7 +19,6 @@ import {
   RefreshCw,
   Search,
   Send,
-  ShieldCheck,
   Settings,
   Sparkles,
   Smartphone,
@@ -26,7 +28,7 @@ import {
 } from './Icons'
 import { ProductSelect } from './ProductSelect'
 
-type View = 'conversations' | 'automations' | 'campaigns' | 'connection'
+type View = 'conversations' | 'automations' | 'campaigns' | 'reminders' | 'connection'
 
 type WhatsAppInstance = {
   id: string
@@ -123,6 +125,7 @@ type CampaignsResponse = {
   enabled: boolean
   maxRecipients: number
   sendIntervalSeconds: number
+  plannedRecipients?: number
   campaigns: MarketingCampaign[]
 }
 
@@ -267,12 +270,12 @@ export function WhatsAppCenter() {
   const [newPhone, setNewPhone] = useState('')
   const [newMessage, setNewMessage] = useState('')
   const [testPhone, setTestPhone] = useState('')
-  const [campaignName, setCampaignName] = useState('')
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([])
   const [campaignsEnabled, setCampaignsEnabled] = useState(false)
   const [campaignMaxRecipients, setCampaignMaxRecipients] = useState(50)
-  const [campaignSendIntervalSeconds, setCampaignSendIntervalSeconds] = useState(15)
+  const [campaignRecipients, setCampaignRecipients] = useState(0)
   const [campaignBusy, setCampaignBusy] = useState(false)
+  const tabsRef = useRef<HTMLElement>(null)
   const messagesViewportRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<ChatMessage[]>([])
   const lastInboxActivityRef = useRef(Date.now())
@@ -299,11 +302,11 @@ export function WhatsAppCenter() {
 
   async function loadCampaigns() {
     const res = await api<CampaignsResponse>('/api/admin/whatsapp/campaigns')
-    if (!res.ok) return
+    if (!res.ok) { setError(res.error.message); return }
     setCampaigns(res.data.campaigns)
     setCampaignsEnabled(res.data.enabled)
     setCampaignMaxRecipients(res.data.maxRecipients)
-    setCampaignSendIntervalSeconds(res.data.sendIntervalSeconds)
+    setCampaignRecipients(res.data.plannedRecipients ?? 0)
   }
 
   async function refreshStatus() {
@@ -526,31 +529,9 @@ export function WhatsAppCenter() {
     if (!res.ok) setError(res.error.message)
   }
 
-  async function createCampaign() {
-    if (campaignBusy) return
-    const name = campaignName.trim() || `Campanha ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date())}`
-    if (!settings.promoEnabled) { setError('Ative e salve o modelo promocional antes de criar a campanha.'); return }
-    if (settings.promoMessage.trim().length < 10) { setError('Escreva uma mensagem promocional antes de criar a campanha.'); return }
-    setCampaignBusy(true)
-    setError(null)
-    const saved = await api<{ ok: true }>('/api/admin/whatsapp/settings', { method: 'PUT', body: JSON.stringify(settings) })
-    if (!saved.ok) {
-      setCampaignBusy(false)
-      setError(saved.error.message)
-      return
-    }
-    const res = await api<{ ok: true; campaign: MarketingCampaign }>('/api/admin/whatsapp/campaigns', {
-      method: 'POST',
-      body: JSON.stringify({ name, message: settings.promoMessage }),
-    })
-    setCampaignBusy(false)
-    if (!res.ok) { setError(res.error.message); return }
-    setCampaignName('')
-    await Promise.all([loadCampaigns(), loadDiagnostics()])
-  }
-
   async function cancelCampaign(campaignId: string) {
     if (campaignBusy) return
+    if (!(await confirmAction({ title: 'Cancelar campanha?', message: 'Os envios que ainda não começaram serão cancelados. Uma mensagem já em envio pode chegar à cliente.', confirmLabel: 'Cancelar campanha', danger: true }))) return
     setCampaignBusy(true)
     setError(null)
     const res = await api<{ ok: true }>(`/api/admin/whatsapp/campaigns/${encodeURIComponent(campaignId)}/cancel`, { method: 'POST' })
@@ -590,9 +571,25 @@ export function WhatsAppCenter() {
     }))
   }
 
+  useEffect(() => {
+    const tabs = tabsRef.current
+    if (!tabs) return
+    const reveal = () => {
+      const active = tabs.querySelector<HTMLElement>('.is-active')
+      if (!active) return
+      const rail = tabs.getBoundingClientRect(), item = active.getBoundingClientRect()
+      if (item.left < rail.left) tabs.scrollLeft -= rail.left-item.left+6
+      else if (item.right > rail.right) tabs.scrollLeft += item.right-rail.right+6
+    }
+    reveal()
+    const observer = new ResizeObserver(reveal); observer.observe(tabs)
+    return () => observer.disconnect()
+  }, [view, connected])
+
   const nav: Array<{ id: View; label: string; icon: typeof MessageSquare; badge?: number }> = connected ? [
     { id: 'conversations', label: 'Conversas', icon: MessageSquare, badge: unreadTotal },
     { id: 'automations', label: 'Automações', icon: Bell },
+    { id: 'reminders', label: 'Meus lembretes', icon: Clock },
     { id: 'campaigns', label: 'Campanhas', icon: Megaphone },
     { id: 'connection', label: 'Conexão', icon: Settings },
   ] : []
@@ -613,11 +610,11 @@ export function WhatsAppCenter() {
 
       {statusPending ? <section className="wa39-connection-status" role="status" aria-live="polite" aria-label="Consultando conexão do WhatsApp"><RefreshCw size={22} aria-hidden="true" /><div><h3>Verificando seu WhatsApp…</h3><p>Aguarde enquanto consultamos a conexão do estúdio.</p></div></section> : null}
 
-      {connected ? <nav className="wa39-tabs" aria-label="Seções do WhatsApp">
+      {connected ? <nav ref={tabsRef} className="wa39-tabs" aria-label="Seções do WhatsApp">
         {nav.map((item) => {
           const Icon = item.icon
           return (
-            <button type="button" key={item.id} className={view === item.id ? 'is-active' : ''} onClick={() => setView(item.id)}>
+            <button type="button" key={item.id} aria-pressed={view === item.id} className={view === item.id ? 'is-active' : ''} onClick={() => setView(item.id)}>
               <Icon size={17} />
               <span>{item.label}</span>
               {item.badge ? <b>{Math.min(item.badge, 99)}</b> : null}
@@ -803,24 +800,17 @@ export function WhatsAppCenter() {
         </section>
       ) : null}
 
+      {connected && view === 'reminders' ? <PersonalReminders /> : null}
+
       {connected && view === 'campaigns' ? (
         <section className="wa39-campaigns">
-          <div className="wa39-section-intro"><span>Relacionamento</span><h3>Campanhas para quem escolheu receber.</h3><p>O Lash Designer usa somente a audiência com consentimento promocional ativo e revalida essa autorização no momento de cada envio.</p></div>
+          <div className="wa39-section-intro"><span>Novidades do estúdio</span><h3>Uma boa mensagem, para quem quer receber.</h3><p>Compartilhe novidades com texto e imagem. Você confere tudo antes de enviar.</p></div>
           <div className="wa39-campaign-overview">
-            <article><div className="wa39-stat-icon"><Users size={18} /></div><span>Audiência autorizada</span><strong>{diagnostics ? diagnostics.optedInClients : '—'}</strong><small>de {diagnostics ? diagnostics.totalClients : '—'} clientes · limite de {campaignMaxRecipients} por campanha</small></article>
-            <article><div className="wa39-stat-icon"><Megaphone size={18} /></div><span>Envio operacional</span><strong className="is-text">{campaignsEnabled ? `1 mensagem a cada ${campaignSendIntervalSeconds}s` : 'Desativado no servidor'}</strong><small>{campaignsEnabled ? 'Fila com revalidação de consentimento, tentativas e histórico.' : 'A liberação exige configuração explícita de produção.'}</small></article>
+            <article><div className="wa39-stat-icon"><Users size={18} /></div><span>Audiência autorizada</span><strong>{diagnostics?.optedInClients ?? '—'}</strong><small>Até {campaignMaxRecipients} clientes por campanha.</small></article>
+            <article><div className="wa39-stat-icon"><Megaphone size={18} /></div><span>Disponíveis agora</span><strong>{campaignRecipients}</strong><small>Quem recebeu uma campanha nos últimos 7 dias não recebe outra agora.</small></article>
           </div>
-
-          {!campaignsEnabled ? <div className="wa39-campaign-gate"><ShieldCheck size={18} /><div><strong>Disparos protegidos por feature flag</strong><p>O editor e o histórico continuam disponíveis, mas novas campanhas só entram na fila quando <code>WHATSAPP_PROMOTIONAL_CAMPAIGNS_ENABLED=true</code> estiver configurado no servidor.</p></div></div> : null}
-
-          <article className="wa39-campaign-editor">
-            <header><div><span>Campanha promocional</span><strong>Mensagem e audiência consentida</strong><small>A instrução de saída é acrescentada automaticamente se o texto ainda não tiver SAIR/PARE/PARAR/STOP.</small></div><MiniToggle checked={settings.promoEnabled} onChange={(checked) => setSettings((value) => ({ ...value, promoEnabled: checked }))} label="Ativar modelo promocional" /></header>
-            <label className="wa39-campaign-name"><span>Nome interno</span><input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} maxLength={80} placeholder="Ex.: Agenda de setembro" /></label>
-            <label className="wa39-template"><span>Mensagem</span><textarea value={settings.promoMessage} onChange={(e) => setSettings((value) => ({ ...value, promoMessage: e.target.value }))} maxLength={1400} /></label>
-            <div className="wa39-variable-row"><span>Variáveis</span>{['{{nome}}','{{espaco}}'].map((item) => <button type="button" key={item} onClick={() => setSettings((value) => ({ ...value, promoMessage: `${value.promoMessage} ${item}` }))}>{item}</button>)}</div>
-            <div className="wa39-campaign-compliance"><ShieldCheck size={16} /><p>Somente clientes com consentimento ativo entram na audiência. Se alguém retirar a autorização antes do envio, essa pessoa é ignorada. Responder <strong>SAIR</strong>, <strong>PARE</strong>, <strong>PARAR</strong> ou <strong>STOP</strong> remove a autorização promocional.</p></div>
-            <div className="wa39-campaign-actions"><label><span>Testar em um número</span><input value={testPhone} onChange={(e) => setTestPhone(e.target.value)} placeholder="(11) 99999-9999" /></label><button type="button" onClick={() => void sendTest('promo')} disabled={status !== 'connected'}>Enviar teste</button><button type="button" onClick={() => void saveSettings()} disabled={settingsBusy}>Salvar modelo</button><button type="button" className="is-primary" onClick={() => void createCampaign()} disabled={campaignBusy || !campaignsEnabled || !settings.promoEnabled || !(diagnostics?.optedInClients ?? 0)}>{campaignBusy ? 'Preparando…' : `Criar campanha para ${diagnostics?.optedInClients ?? 0} autorizadas`}</button></div>
-          </article>
+          <WhatsappCampaignComposer enabled={campaignsEnabled} recipients={campaignRecipients} settings={settings} onMessage={message=>setSettings(value=>({...value,promoMessage:message}))} onDone={()=>Promise.all([loadCampaigns(),loadDiagnostics()])} />
+          <p className="form-help campaign-channel-note">Envie novidades que suas clientes esperam receber. Evite repetir ofertas; se precisar ampliar a campanha, fale com o suporte.</p>
 
           <section className="wa39-campaign-history" aria-label="Histórico de campanhas">
             <header><div><span>Histórico</span><strong>Campanhas recentes</strong></div><button type="button" onClick={() => void loadCampaigns()} disabled={campaignBusy}><RefreshCw size={14} /> Atualizar</button></header>
@@ -829,8 +819,8 @@ export function WhatsAppCenter() {
               const progress = campaign.totalRecipients ? Math.min(100, Math.round((finished / campaign.totalRecipients) * 100)) : 0
               const active = campaign.status === 'QUEUED' || campaign.status === 'RUNNING'
               return <article className="wa39-campaign-row" key={campaign.id}>
-                <div className="wa39-campaign-row-main"><div><strong>{campaign.name}</strong><span>{new Date(campaign.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span></div><b className={`is-${campaign.status.toLowerCase()}`}>{campaign.status === 'QUEUED' ? 'Na fila' : campaign.status === 'RUNNING' ? 'Enviando' : campaign.status === 'COMPLETED' ? 'Concluída' : campaign.status === 'CANCELLED' ? 'Cancelada' : 'Falhou'}</b></div>
-                <div className="wa39-campaign-progress"><i><span style={{ width: `${progress}%` }} /></i><small>{campaign.sentCount} enviadas · {campaign.skippedCount} ignoradas · {campaign.failedCount} falharam · {campaign.totalRecipients} total</small></div>
+                <div className="wa39-campaign-row-main"><div><strong>{campaign.name}</strong><span>{new Date(campaign.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span></div><b className={`is-${campaign.status.toLowerCase()}`}>{campaign.status === 'QUEUED' ? 'Na fila' : campaign.status === 'RUNNING' ? 'Enviando' : campaign.status === 'COMPLETED' ? 'Concluída' : campaign.status === 'CANCELLED' ? 'Cancelada' : 'Interrompida'}</b></div>
+                <div className="wa39-campaign-progress"><i><span style={{ width: `${progress}%` }} /></i><small>{campaign.sentCount} enviadas · {campaign.skippedCount} ignoradas · {campaign.failedCount} não confirmadas · {campaign.totalRecipients} total</small></div>
                 {campaign.lastError ? <p>{campaign.lastError}</p> : null}
                 {active ? <button type="button" onClick={() => void cancelCampaign(campaign.id)} disabled={campaignBusy}>Cancelar campanha</button> : null}
               </article>

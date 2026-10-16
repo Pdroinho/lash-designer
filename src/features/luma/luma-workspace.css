@@ -295,3 +295,5 @@
 @media(hover:hover){.luma34-launcher:hover .luma-launcher-tooltip{opacity:1;visibility:visible;}}
 .luma34-launcher:focus-visible .luma-launcher-tooltip {opacity:1;visibility:visible;}
 @media(max-width:768px){.luma-context-action {min-width:44px;min-height:44px;}.luma34-launcher{width:44px;height:44px;min-width:44px;}}
+
+.luma-reminders-heading {margin-bottom:20px}.luma-reminders-heading h2 {font-size:1.25rem;margin:0 0 8px}.luma-reminder-create {margin-block:16px 24px}.luma-reminder-create>summary {display:inline-flex;cursor:pointer;list-style:none}.luma-reminder-create>summary::-webkit-details-marker {display:none}.luma-reminder-create .luma-work-form {margin-top:16px}.luma-reminders-filter {max-width:280px;margin-bottom:16px}.luma-reminder-list .luma-reminder strong {overflow-wrap:anywhere;font-size:.875rem}.luma-reminder-list .luma-reminder p {font-size:.8125rem}

@@ -83,15 +83,16 @@ type ImageAttachment = {
 }
 
 type Starter = {
+  compactTitle?: string
   title: string
   prompt: string
 }
 
 const starters: Starter[] = [
-  {title:'Organize minha agenda',prompt:'Mostre minha agenda desta semana por profissional e destaque atendimentos passados sem comparecimento registrado. Consulte todas as páginas necessárias.'},
-  {title:'Me ajude com o financeiro',prompt:'Consulte meu financeiro deste mês, resuma entradas, despesas e saldo, e me explique o que merece atenção.'},
-  {title:'Preciso de ajuda',prompt:'Preciso de ajuda com um problema na plataforma. Converse comigo para entender e, se precisar da equipe humana, prepare um chamado para minha revisão.'},
-  {title:'Me lembre pelo WhatsApp',prompt:'Quero receber um lembrete no meu WhatsApp. Pergunte o que devo lembrar, o dia e o horário antes de preparar.'},
+  {title:'Organize minha agenda',compactTitle:'Agenda',prompt:'Mostre minha agenda desta semana por profissional e destaque atendimentos passados sem comparecimento registrado. Consulte todas as páginas necessárias.'},
+  {title:'Me ajude com o financeiro',compactTitle:'Financeiro',prompt:'Consulte meu financeiro deste mês, resuma entradas, despesas e saldo, e me explique o que merece atenção.'},
+  {title:'Preciso de ajuda',compactTitle:'Suporte',prompt:'Preciso de ajuda com um problema na plataforma. Converse comigo para entender e, se precisar da equipe humana, prepare um chamado para minha revisão.'},
+  {title:'Me lembre pelo WhatsApp',compactTitle:'Lembretes',prompt:'Quero receber um lembrete no meu WhatsApp. Pergunte o que devo lembrar, o dia e o horário antes de preparar.'},
 ]
 const capabilities: Starter[] = [
   {title:'Preparar minha logo',prompt:'Quero remover o fundo liso da minha logo e recortar as margens vazias. Use a logo atual ou peça que eu envie a imagem. Prepare uma prévia para eu revisar antes de aplicar.'},
@@ -122,7 +123,9 @@ const followUps: Starter[] = [
 ]
 
 const STORAGE_KEY = 'lashdesigner:luma-thread:v2'
-const HISTORY_KEY = 'lashdesigner:luma-history:v1'
+type SavedConversation = { id: string; title: string; messages: Message[]; updatedAt: string; legacy?: boolean }
+const HISTORY_KEY = 'lashdesigner:luma-history:v2'
+const LEGACY_HISTORY_KEY = 'lashdesigner:luma-history:v1'
 const MAX_STORED_MESSAGES = 20
 const MAX_STORED_HISTORY = 8
 
@@ -154,15 +157,19 @@ function loadThread(scope: string): Message[] {
     .map((item) => ({ ...item, id: String(item.id || crypto.randomUUID()) }))
 }
 
-function loadHistory(scope: string): string[] {
-  const parsed = readStorage<unknown>(`${HISTORY_KEY}:${scope}`, [])
-  if (!Array.isArray(parsed)) return []
-  return parsed
-    .filter(
-      (item): item is string =>
-        typeof item === 'string' && item.trim().length > 0,
-    )
-    .slice(0, MAX_STORED_HISTORY)
+function loadHistory(scope: string): SavedConversation[] {
+  const parsed = readStorage<unknown>(`${HISTORY_KEY}:${scope}`, null)
+  if (Array.isArray(parsed)) return parsed.filter((item): item is SavedConversation => Boolean(item && typeof item.id === 'string' && typeof item.title === 'string' && Array.isArray(item.messages))).slice(0, MAX_STORED_HISTORY)
+  const legacy = readStorage<unknown>(`${LEGACY_HISTORY_KEY}:${scope}`, [])
+  if (!Array.isArray(legacy)) return []
+  return legacy.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).slice(0, MAX_STORED_HISTORY).map(text => ({ id: crypto.randomUUID(), title: text, messages: [{ id: crypto.randomUUID(), role: 'user', text }], updatedAt: '', legacy: true }))
+}
+
+function storedMessages(messages: Message[]) {
+  return messages.slice(-MAX_STORED_MESSAGES).map(message => ({...message, actions: message.actions?.map(action => {
+    if (action.type !== 'UPDATE_BRAND_IMAGE') return action
+    return {...action, payload: {}, ...(action.status !== 'done' ? {status: 'error' as const, feedback: 'Esta prévia não fica salva no navegador. Peça à Luma para preparar a imagem novamente antes de aplicar.'} : {})}
+  })}))
 }
 
 function persistThread(messages: Message[], scope: string) {
@@ -170,19 +177,19 @@ function persistThread(messages: Message[], scope: string) {
   try {
     window.sessionStorage.setItem(
       `${STORAGE_KEY}:${scope}`,
-      JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)),
+      JSON.stringify(storedMessages(messages)),
     )
   } catch {
     // Ignore storage failures.
   }
 }
 
-function persistHistory(entries: string[], scope: string) {
+function persistHistory(entries: SavedConversation[], scope: string) {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(
       `${HISTORY_KEY}:${scope}`,
-      JSON.stringify(entries.slice(0, MAX_STORED_HISTORY)),
+      JSON.stringify(entries.slice(0, MAX_STORED_HISTORY).map(item=>({...item,messages:storedMessages(item.messages)}))),
     )
   } catch {
     // Ignore storage failures.
@@ -254,7 +261,7 @@ export function LumaConversation({
     null,
   )
   const [messages, setMessages] = useState<Message[]>([])
-  const [recentPrompts, setRecentPrompts] = useState<string[]>([])
+  const [conversations, setConversations] = useState<SavedConversation[]>([])
   const [view, setView] = useState<'chat' | 'history'>('chat')
   const [historyQuery, setHistoryQuery] = useState('')
   const [attachment, setAttachment] = useState<ImageAttachment | null>(null)
@@ -265,6 +272,7 @@ export function LumaConversation({
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const conversationIdRef = useRef<string | null>(null)
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -273,8 +281,10 @@ export function LumaConversation({
       if (mountedRef.current && result.ok) {
         setUsage(result.data)
         if (result.data.storageScope) {
-          setMessages(loadThread(result.data.storageScope))
-          setRecentPrompts(loadHistory(result.data.storageScope))
+          const thread = loadThread(result.data.storageScope), saved = loadHistory(result.data.storageScope)
+          conversationIdRef.current = saved.find(item => thread.length && item.messages.at(-1)?.id === thread.at(-1)?.id)?.id ?? null
+          setMessages(thread)
+          setConversations(saved)
         }
       }
     })
@@ -295,12 +305,16 @@ export function LumaConversation({
       window.removeEventListener('lashdesigner:luma-credits-updated', refresh)
   }, [])
   useEffect(() => {
-    if (usage?.storageScope) persistThread(messages, usage.storageScope)
+    if (usage?.storageScope) {
+      persistThread(messages, usage.storageScope)
+      const first = messages.find(item => item.role === 'user')
+      if (first) { const id = conversationIdRef.current ?? first.id; conversationIdRef.current = id; setConversations(items => [{ id, title: items.find(item => item.id === id)?.title ?? first.text, messages: messages.slice(-MAX_STORED_MESSAGES), updatedAt: new Date().toISOString() }, ...items.filter(item => item.id !== id)].slice(0, MAX_STORED_HISTORY)) }
+    }
   }, [messages, usage?.storageScope])
 
   useEffect(() => {
-    if (usage?.storageScope) persistHistory(recentPrompts, usage.storageScope)
-  }, [recentPrompts, usage?.storageScope])
+    if (usage?.storageScope) persistHistory(conversations, usage.storageScope)
+  }, [conversations, usage?.storageScope])
 
   useEffect(() => {
     const clean = initialPrompt.trim()
@@ -340,7 +354,7 @@ export function LumaConversation({
         : null,
     [usage],
   )
-  const disabled = usage?.enabled === false
+  const disabled = !usage || usage.enabled === false
   const hasConversation = messages.length > 0
   const showFollowUps = hasConversation && !busy && messages.length < 6
   const showCreditUpsell =
@@ -348,24 +362,21 @@ export function LumaConversation({
     errorCode === 'ASSISTANT_DAILY_LIMIT' ||
     errorCode === 'ASSISTANT_MONTHLY_LIMIT'
 
-  function rememberPrompt(prompt: string) {
-    const clean = prompt.trim()
-    if (!clean) return
-    setRecentPrompts((items) =>
-      [clean, ...items.filter((item) => item !== clean)].slice(
-        0,
-        MAX_STORED_HISTORY,
-      ),
-    )
+  function openConversation(conversation: SavedConversation) {
+    if (busy) return
+    conversationIdRef.current = conversation.id
+    setMessages(conversation.messages.filter(item => item && (item.role === 'user' || item.role === 'assistant') && typeof item.text === 'string'))
+    setInput(''); setAttachment(null); setError(null); setErrorCode(null); setLastFailedMessage(null); setView('chat')
   }
 
   function clearHistory() {
-    setRecentPrompts([])
+    setConversations([])
     if (typeof window !== 'undefined')
-      window.localStorage.removeItem(`${HISTORY_KEY}:${usage?.storageScope}`)
+      { window.localStorage.removeItem(`${HISTORY_KEY}:${usage?.storageScope}`); window.localStorage.removeItem(`${LEGACY_HISTORY_KEY}:${usage?.storageScope}`) }
   }
 
   function startFresh() {
+    conversationIdRef.current = null
     abortRef.current?.abort()
     setBusy(false)
     setError(null)
@@ -398,7 +409,6 @@ export function LumaConversation({
     )
       history = history.slice(0, -1)
 
-    rememberPrompt(clean)
 
     const controller = new AbortController()
     abortRef.current?.abort()
@@ -788,8 +798,8 @@ export function LumaConversation({
 
   function renderConversationsView() {
     const query = historyQuery.trim().toLowerCase()
-    const items = recentPrompts.filter(
-      (item) => !query || item.toLowerCase().includes(query),
+    const items = conversations.filter(
+      (item) => !query || item.title.toLowerCase().includes(query),
     )
     return (
       <section
@@ -800,10 +810,10 @@ export function LumaConversation({
           <div>
             <strong>Conversas</strong>
             <span>
-              {recentPrompts.length} item{recentPrompts.length === 1 ? '' : 's'}
+              {conversations.length} item{conversations.length === 1 ? '' : 's'}
             </span>
           </div>
-          {recentPrompts.length ? (
+          {conversations.length ? (
             <button type="button" onClick={clearHistory}>
               Limpar
             </button>
@@ -829,17 +839,18 @@ export function LumaConversation({
 
         <div className="luma34-conversations-body">
           <div className="luma34-conversations-group">
-            <small>Último mês</small>
+            <small>Conversas recentes neste navegador</small>
             <div className="luma34-conversations-list">
               {items.length ? (
-                items.map((prompt) => (
+                items.map((conversation) => (
                   <button
                     type="button"
-                    key={prompt}
+                    key={conversation.id}
                     className="luma34-conversation-item"
-                    onClick={() => choosePrompt(prompt)}
+                    disabled={busy}
+                    onClick={() => openConversation(conversation)}
                   >
-                    <span title={prompt}>{historyTitle(prompt)}</span>
+                    <span title={conversation.title}>{historyTitle(conversation.title)}{conversation.legacy ? ' · Pergunta antiga' : ''}</span>
                     <ArrowRight size={15} aria-hidden="true" />
                   </button>
                 ))
@@ -906,6 +917,7 @@ export function LumaConversation({
           ) : null}
           <button
             type="button"
+            disabled={busy}
             className={`luma34-close luma34-history-toggle ${view === 'history' ? 'is-active' : ''}`}
             onClick={() =>
               setView((current) => (current === 'history' ? 'chat' : 'history'))
@@ -989,11 +1001,12 @@ export function LumaConversation({
                       <button
                         type="button"
                         className="btn btn-ghost"
+                        aria-label={variant === 'drawer' ? `${starter.compactTitle}: ${starter.title}` : starter.title}
                         key={starter.title}
                         onClick={() => choosePrompt(starter.prompt)}
                         disabled={disabled || busy}
                       >
-                        <span>{starter.title}</span>
+                        <span>{variant === 'drawer' ? starter.compactTitle || starter.title : starter.title}</span>
                         <ArrowRight size={14} aria-hidden="true" />
                       </button>
                     ))}
@@ -1059,7 +1072,7 @@ export function LumaConversation({
                                     </a>
                                   ) : null}
                                 </div>
-                                {action.status === 'done' ? (
+                                {action.type === 'UPDATE_BRAND_IMAGE' && !action.payload?.imageDataUrl && action.status !== 'done' ? null : action.status === 'done' ? (
                                   <span className="luma35-action-done">
                                     <CheckCircle2 size={17} /> Feito
                                   </span>

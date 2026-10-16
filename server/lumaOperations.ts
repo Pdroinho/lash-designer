@@ -172,7 +172,7 @@ export function executeOperationalTool(
         ok: true,
         reminders: db
           .prepare(
-            'SELECT id,body,due_at as dueAt,status FROM assistant_reminders WHERE tenant_id=? AND user_id=? ORDER BY due_at DESC LIMIT 50',
+            `SELECT id,body,due_at as dueAt,status FROM assistant_reminders WHERE tenant_id=? AND user_id=? ORDER BY CASE WHEN status IN ('SCHEDULED','SENDING') THEN 0 ELSE 1 END, CASE WHEN status IN ('SCHEDULED','SENDING') THEN due_at END ASC, due_at DESC LIMIT 100`,
           )
           .all(context.tenantId, context.userId),
       },

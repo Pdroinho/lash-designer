@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import test from 'node:test'
 import Database from 'better-sqlite3'
+import sharp from 'sharp'
 import express from 'express'
 import { handleError } from '../http.js'
 import type { WhatsappSettings } from './adminWhatsappSettingsRoutes.js'
@@ -53,6 +54,8 @@ test('campanhas WhatsApp preservam consentimento, fila, cancelamento e isolament
        '2099-01-01T00:00:00.000Z', NULL, NULL, NULL, NULL);
   `)
 
+  db.exec(`CREATE TABLE tenants(id TEXT,name TEXT);INSERT INTO tenants VALUES('${tenantOne}','Studio');`)
+  db.exec('ALTER TABLE whatsapp_marketing_campaigns ADD COLUMN image_data_url TEXT; ALTER TABLE whatsapp_marketing_recipients ADD COLUMN dispatch_started_at TEXT;')
   let promoEnabled = false
   const requireWhatsappSettings = (_tenantId: string): WhatsappSettings => ({
     ...defaultSettings,
@@ -89,7 +92,8 @@ test('campanhas WhatsApp preservam consentimento, fila, cancelamento e isolament
   assert.ok(address && typeof address === 'object')
   const baseUrl = `http://127.0.0.1:${address.port}`
   const headers = { 'content-type': 'application/json', 'x-test-admin': 'true' }
-  const campaignBody = JSON.stringify({ name: 'Semana especial', message: 'Temos uma condição especial para você.' })
+  const picture = await sharp({create:{width:16,height:12,channels:3,background:'#972d57'}}).png().toBuffer()
+  const campaignBody = JSON.stringify({ name: 'Semana especial', message: 'Temos uma condição especial para você.', imageDataUrl: `data:image/png;base64,${picture.toString('base64')}` })
 
   try {
     assert.equal((await fetch(`${baseUrl}/api/admin/whatsapp/campaigns`)).status, 401)
@@ -102,10 +106,11 @@ test('campanhas WhatsApp preservam consentimento, fila, cancelamento e isolament
     }
     assert.equal(initialList.enabled, true)
     assert.equal(initialList.maxRecipients, 2)
-    assert.equal(initialList.sendIntervalSeconds, 15)
+    assert.equal(initialList.sendIntervalSeconds, 60)
     assert.deepEqual(initialList.campaigns, [{
       id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       name: 'Finalizada',
+      hasImage: false,
       messageText: 'Mensagem anterior',
       status: 'COMPLETED',
       totalRecipients: 4,
@@ -151,13 +156,8 @@ test('campanhas WhatsApp preservam consentimento, fila, cancelamento e isolament
     const overLimit = await fetch(`${baseUrl}/api/admin/whatsapp/campaigns`, {
       method: 'POST', headers, body: campaignBody,
     })
-    assert.equal(overLimit.status, 400)
-    assert.equal((await overLimit.json() as { code: string }).code, 'WHATSAPP_CAMPAIGN_AUDIENCE_LIMIT')
-
-    db.prepare(`UPDATE clients SET marketing_whatsapp_opt_in = 0 WHERE id = 'client-3'`).run()
-    const createdResponse = await fetch(`${baseUrl}/api/admin/whatsapp/campaigns`, {
-      method: 'POST', headers, body: campaignBody,
-    })
+    // Large audiences are batched to the configured cap instead of blocking the studio.
+    const createdResponse = overLimit
     assert.equal(createdResponse.status, 200)
     const created = (await createdResponse.json() as {
       ok: boolean
@@ -171,6 +171,11 @@ test('campanhas WhatsApp preservam consentimento, fila, cancelamento e isolament
       SELECT tenant_id as tenantId, created_by_user_id as createdByUserId, message_text as messageText
       FROM whatsapp_marketing_campaigns WHERE id = ?
     `).get(created.id) as { tenantId: string; createdByUserId: string; messageText: string }
+    const image = db.prepare('SELECT image_data_url AS image FROM whatsapp_marketing_campaigns WHERE id=?').get(created.id) as {image:string}
+    assert.ok(image.image.startsWith('data:image/jpeg;base64,'))
+    const listing = await fetch(`${baseUrl}/api/admin/whatsapp/campaigns`,{headers}).then(response=>response.json()) as {campaigns:Array<{id:string;hasImage:boolean;imageDataUrl?:string}>}
+    assert.equal(listing.campaigns.find(row=>row.id===created.id)?.hasImage,true)
+    assert.equal(listing.campaigns.find(row=>row.id===created.id)?.imageDataUrl,undefined)
     assert.equal(storedCampaign.tenantId, tenantOne)
     assert.equal(storedCampaign.createdByUserId, 'admin-1')
     assert.match(storedCampaign.messageText, /responda SAIR\.$/)
@@ -220,6 +225,9 @@ test('campanhas WhatsApp preservam consentimento, fila, cancelamento e isolament
     const broadcast = await fetch(`${baseUrl}/api/admin/whatsapp/broadcast`, { method: 'POST', headers })
     assert.equal(broadcast.status, 403)
     assert.equal((await broadcast.json() as { code: string }).code, 'WHATSAPP_BROADCAST_REPLACED')
+    const tooLong = await fetch(`${baseUrl}/api/admin/whatsapp/campaigns`,{method:'POST',headers,body:JSON.stringify({name:'Texto longo',message:'a'.repeat(1024),imageDataUrl:`data:image/png;base64,${picture.toString('base64')}`})})
+    assert.equal(tooLong.status,400)
+    assert.equal((await tooLong.json() as {code:string}).code,'WHATSAPP_CAMPAIGN_MESSAGE_TOO_LONG')
   } finally {
     server.close()
     await once(server, 'close')
