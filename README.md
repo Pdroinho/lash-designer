@@ -2,9 +2,9 @@
 
 SaaS multi-tenant de agenda, clientes, serviços, finanças, billing e assistência de negócio para profissionais de extensão de cílios.
 
-**Release atual: 5.14.0 — Histórico da Luma sem reenvio, lembretes gerenciáveis e campanhas com imagem.**
+**Release atual: 5.14.1 — Agendamento mobile refinado, da escolha do serviço à confirmação.**
 
-Veja [as correções e a validação](docs/RELEASE_5_14_0.md). O ambiente Appmax é configurável; esta execução local não homologa cobrança real, WhatsApp externo ou a VPS de produção.
+Veja [as correções e a validação](docs/RELEASE_5_14_1.md). O ambiente Appmax é configurável; esta execução local não homologa cobrança real, WhatsApp externo ou a VPS de produção.
 
 ## Stack
 

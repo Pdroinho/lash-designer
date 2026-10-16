@@ -7,6 +7,8 @@ const bookingPage = fs.readFileSync('src/features/booking/BookingPage.tsx', 'utf
 const main = fs.readFileSync('src/main.tsx', 'utf8')
 const css = fs.readFileSync('src/mobile-experience-v511.css', 'utf8')
 
+const bookingMobile = fs.readFileSync('src/booking-mobile-refinement.css', 'utf8')
+
 const checks = [
   ['Camada 5.11 está importada por último', main.indexOf("import './mobile-experience-v511.css'") > main.indexOf("import './mobile-app-v510-part4.css'")],
   ['Dashboard possui composição mobile própria', dashboard.includes('ld-mobile-dashboard-stage') && dashboard.includes('ld-mobile-next-card') && dashboard.includes('ld-mobile-business-pulse')],
@@ -21,9 +23,10 @@ const checks = [
   ['Galeria de serviços continua usando serviços reais', bookingPage.includes('filteredServices.map((service, index)') && bookingPage.includes('service.coverUrl || bundledServiceCover(service.name)')],
   ['Navegação inferior vira dock flutuante', css.includes('.ld-mobile-tabbar {') && css.includes('border-radius: 24px') && css.includes('background: var(--ink-strong)')],
   ['Tela de agenda não é mera compressão do calendário desktop', css.includes('.ld-mobile-day-rail') && css.includes('.ld-mobile-agenda-event-body')],
-  ['Booking usa galeria horizontal com scroll snap', css.includes('.booking30-services') && css.includes('grid-auto-flow: column') && css.includes('scroll-snap-type: x mandatory')],
+  ['Booking mobile usa lista vertical de serviços', bookingMobile.includes('.booking30-services') && bookingMobile.includes('grid-auto-flow: row') && bookingMobile.includes('overflow: visible')],
   ['Horários mobile usam grupos de toque', css.includes('.booking30-mobile-time-groups') && css.includes('grid-template-columns: repeat(2, minmax(0, 1fr))')],
-  ['Sucesso do booking vira composição em sheet', css.includes('.booking30-success-copy') && css.includes('border-radius: 30px 30px 0 0')],
+  ['Confirmação prioriza dados da reserva sem foto gigante', bookingPage.includes('booking30-success-details') && bookingMobile.includes('.booking30-success-photo { display: none; }')],
+  ['Refino mobile é importado depois das camadas anteriores', main.indexOf("import './booking-mobile-refinement.css'") > main.indexOf("import './product-refinement-v5132.css'")],
   ['Camada nova não contém !important', !css.includes('!important')],
   ['Camada nova não contém 100vw/100dvw', !/100d?vw/.test(css)],
   ['Camada nova não cria paleta hex local', !/#[0-9a-fA-F]{3,8}\b/.test(css)],

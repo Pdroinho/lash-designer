@@ -178,6 +178,18 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
   const [saving, setSaving] = useState(false)
   const [confirmedAppointment, setConfirmedAppointment] = useState<{ id: string; status: string; professionalName?: string } | null>(null)
 
+  const stageHeadingRef = useRef<HTMLHeadingElement>(null)
+  const previousStageRef = useRef('1:false')
+  const bookingComplete = Boolean(confirmedAppointment)
+  useEffect(() => {
+    const stage = `${step}:${bookingComplete}`
+    if (previousStageRef.current === stage) return
+    previousStageRef.current = stage
+    // A long catalog must not leave the next step below the viewport.
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    stageHeadingRef.current?.focus({ preventScroll: true })
+  }, [step, bookingComplete])
+
   useEffect(() => {
     let mounted = true
     setLoading(true)
@@ -309,7 +321,7 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
 
   const summary = [
     selectedService ? { label: 'Serviço', value: selectedService.name } : null,
-    professionals.length > 1 ? { label: 'Profissional', value: professionals.find(person => person.id === selectedProfessionalId)?.name ?? 'Qualquer disponível' } : null,
+    step >= 3 && professionals.length > 1 ? { label: 'Profissional', value: professionals.find(person => person.id === selectedProfessionalId)?.name ?? 'Qualquer disponível' } : null,
     selectedDate ? { label: 'Data', value: formatYmdPtBr(selectedDate) } : null,
     selectedTime ? { label: 'Horário', value: selectedTime } : null,
   ].filter(Boolean) as Array<{label:string; value:string}>
@@ -331,6 +343,13 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
   }
 
   const socialPerson = professionals.find(person => person.id === selectedProfessionalId) ?? (professionals.length === 1 ? professionals[0] : null)
+  const professionalCards = <div className="booking30-professional-grid">
+                  {professionals.map(person => <label key={person.id}>
+                    <ProfessionalAvatar name={person.name} photoUrl={person.photoUrl} />
+                    <span><strong>{person.name}</strong><small>Atende este serviço</small></span>
+                    <input type="radio" name="book-professional" aria-label={person.name} checked={selectedProfessionalId === person.id} onChange={() => { setSelectedProfessionalId(person.id); setSelectedDate('') }} />
+                  </label>)}
+                </div>
   return <main className="booking30">
     <div className="booking30-shell">
       <header className="booking30-topbar">
@@ -364,7 +383,7 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
         <section className="booking30-workspace">
           <div className="booking30-kicker"><span>{stepLabel}</span><i /></div>
           <div className="booking30-heading">
-            <h1>{step === 1 ? 'Qual cuidado você quer hoje?' : step === 2 ? 'Com quem e quando você prefere?' : step === 3 ? 'Escolha o seu horário.' : 'Últimos detalhes.'}</h1>
+            <h1 ref={stageHeadingRef} tabIndex={-1}><span className="booking30-title-desktop">{step === 1 ? 'Qual cuidado você quer hoje?' : step === 2 ? 'Com quem e quando você prefere?' : step === 3 ? 'Escolha o seu horário.' : 'Últimos detalhes.'}</span><span className="booking30-title-mobile">{step === 1 ? 'Escolha seu cuidado.' : step === 2 ? 'Com quem e em qual dia?' : step === 3 ? 'Qual o melhor horário?' : 'Vamos reservar?'}</span></h1>
             <p>{step === 1 ? 'Escolha o atendimento e veja os horários disponíveis.' : step === 2 ? 'Escolha uma profissional ou encontre qualquer horário livre.' : step === 3 ? 'Estes horários estão livres agora.' : 'Seu nome e WhatsApp bastam para reservar.'}</p>
           </div>
 
@@ -379,7 +398,7 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
               {filteredServices.map((service, index) => <button type="button" key={service.id} className="booking30-service" onClick={() => { setSelectedServiceId(service.id); setSelectedProfessionalId(null); setSelectedDate(''); setSelectedTime(null); setStep(2) }}>
                 <div className="booking30-service-photo"><img src={service.coverUrl || bundledServiceCover(service.name)} alt="" onError={(e) => { e.currentTarget.src = '/placeholders/service-placeholder.webp' }} /><span className="booking30-service-index">{String(index + 1).padStart(2, '0')}</span></div>
                 <div className="booking30-service-copy"><strong>{service.name}</strong><span>{service.durationMinutes} min</span></div>
-                <div className="booking30-service-price"><strong>{money(service.priceCents)}</strong><span aria-hidden="true">↗</span></div>
+                <div className="booking30-service-price"><strong>{money(service.priceCents)}</strong><span aria-hidden="true"><ChevronRight size={16} /></span></div>
               </button>)}
               {!services.length ? <EmptyState image="/empty-states/empty-calendar.png" title="Nenhum serviço disponível" description="Este espaço ainda não publicou serviços para agendamento." /> : null}
               {services.length > 0 && !filteredServices.length ? <p role="status" className="booking30-no-results">Nenhum serviço corresponde à busca. Tente outro nome.</p> : null}
@@ -390,19 +409,13 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
               {professionals.length > 1 ? <fieldset className="booking30-professionals">
                 <legend>Quem você prefere?</legend>
                 <label className="booking30-professional-any">
+                  <span><strong>Sem preferência</strong><small>Encontre o primeiro horário disponível.</small></span>
                   <input type="radio" name="book-professional" checked={!selectedProfessionalId} onChange={() => { setSelectedProfessionalId(null); setSelectedDate('') }} />
-                  <span><strong>Qualquer profissional disponível</strong><small>Veja mais opções de horário para este serviço.</small></span>
                 </label>
-                <div className="booking30-professional-grid">
-                  {professionals.map(person => <label key={person.id}>
-                    <ProfessionalAvatar name={person.name} photoUrl={person.photoUrl} />
-                    <span><strong>{person.name}</strong><small>Atende este serviço</small></span>
-                    <input type="radio" name="book-professional" aria-label={person.name} checked={selectedProfessionalId === person.id} onChange={() => { setSelectedProfessionalId(person.id); setSelectedDate('') }} />
-                  </label>)}
-                </div>
+                {professionals.length > 3 ? <details className="booking30-professional-picker"><summary><span><strong>{professionals.find(person => person.id === selectedProfessionalId)?.name ?? 'Escolher uma profissional'}</strong><small>{professionals.length} profissionais neste serviço</small></span><ChevronRight size={18} aria-hidden="true" /></summary>{professionalCards}</details> : professionalCards}
               </fieldset> : professionals.length === 1 ? <div className="booking30-single-professional"><ProfessionalAvatar name={professionals[0].name} photoUrl={professionals[0].photoUrl} /><span><small>Você será atendida por</small><strong>{professionals[0].name}</strong></span></div> : null}
               {socialPerson && (socialPerson.instagram || socialPerson.tiktok) ? <details className="booking30-professional-social" key={socialPerson.id}><summary>Conheça o trabalho de {socialPerson.name.split(' ')[0]}</summary><div>{socialPerson.instagram ? <a href={`https://www.instagram.com/${encodeURIComponent(socialPerson.instagram)}/`} target="_blank" rel="noopener noreferrer">Instagram · @{socialPerson.instagram}<span className="sr-only"> (abre em outra aba)</span></a> : null}{socialPerson.tiktok ? <a href={`https://www.tiktok.com/@${encodeURIComponent(socialPerson.tiktok)}`} target="_blank" rel="noopener noreferrer">TikTok · @{socialPerson.tiktok}<span className="sr-only"> (abre em outra aba)</span></a> : null}</div></details> : null}
-              {professionalsLoading ? <p role="status">Consultando profissionais…</p> : professionals.length ? <DateScroller value={selectedDate} min={dateLimits.min} max={dateLimits.max} onChange={(value) => { setSelectedDate(value); setSelectedTime(null); setStep(3) }} getDateStatus={dateStatusFor} /> : <p role="status">{actionError ?? 'Este serviço ainda não tem uma profissional disponível. Escolha outro serviço.'}</p>}
+              {professionalsLoading ? <p role="status">Consultando profissionais…</p> : professionals.length ? <><h2 className="booking30-date-title">Escolha o dia</h2><DateScroller value={selectedDate} min={dateLimits.min} max={dateLimits.max} onChange={(value) => { setSelectedDate(value); setSelectedTime(null); setStep(3) }} getDateStatus={dateStatusFor} /></> : <p role="status">{actionError ?? 'Este serviço ainda não tem uma profissional disponível. Escolha outro serviço.'}</p>}
             </div> : null}
 
             {step === 3 ? <div className="booking30-times">
@@ -416,7 +429,7 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
             {step === 4 ? <div className="booking30-confirm">
               <div className="booking30-mobile-review">
                 <img src={sideImage} alt="" onError={(e) => { e.currentTarget.src = '/placeholders/service-placeholder.webp' }} />
-                <div><small>Seu horário</small><strong>{selectedService?.name}</strong><span>{selectedDate ? formatYmdPtBr(selectedDate) : ''} · {selectedTime}</span></div>
+                <div><small>Seu horário</small><strong>{selectedService?.name}</strong><span>{selectedDate ? formatYmdPtBr(selectedDate) : ''} · {selectedTime}</span><span>{socialPerson?.name ?? 'Profissional disponível'}</span></div>
                 <b>{selectedService ? money(selectedService.priceCents) : ''}</b>
               </div>
 
@@ -464,8 +477,13 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
       </div> : <div className="booking30-success">
         <div className="booking30-success-copy">
           <span>Agendamento realizado</span>
-          <h1>Seu horário está reservado, {clientName.split(' ')[0] || 'pronto'}.</h1>
-          <p>{selectedService?.name} · {selectedDate ? formatYmdPtBr(selectedDate) : ''} · {selectedTime}{confirmedAppointment?.professionalName ? ` · ${confirmedAppointment.professionalName}` : ''}</p>
+          <h1 ref={stageHeadingRef} tabIndex={-1}>Horário reservado{clientName.trim() ? `, ${clientName.trim().split(' ')[0]}` : ''}.</h1>
+          <dl className="booking30-success-details">
+            <div><dt>Serviço</dt><dd>{selectedService?.name}</dd></div>
+            <div><dt>Quando</dt><dd>{selectedDate ? formatYmdPtBr(selectedDate) : ''} às {selectedTime}</dd></div>
+            {confirmedAppointment.professionalName ? <div><dt>Profissional</dt><dd>{confirmedAppointment.professionalName}</dd></div> : null}
+            <div><dt>Valor</dt><dd>{selectedService ? money(selectedService.priceCents) : ''}</dd></div>
+          </dl>
           <small className="booking30-success-confirmation">Mais perto do atendimento, você recebe a confirmação pelo WhatsApp e responde por lá.</small>
           <div><button type="button" onClick={() => nav(withBasePath(basePath, '/cliente'))}>Ver meus horários <ArrowRight size={16} /></button><button type="button" onClick={resetBooking}>Fazer outra reserva</button></div>
         </div>

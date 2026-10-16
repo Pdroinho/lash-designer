@@ -5,11 +5,11 @@ f626e265586aceb11c241a9409a22b2b7c40dae4665a767020d8435d94597149  ./ALTERACOES.m
 cf32330c4eb72c14ce1395cac3a5b10a4736edeae12209d51c7154bc65a3cfa8  ./APPOINTMENT_LIFECYCLE_3.7.1.md
 e6d93508029cc77cef64dd02a999f49df0d56dbb50ac0bbf053e794cd1e5223d  ./ARCHITECTURE.md
 5720863377b98f02046cb78baeedbf6fc198fa6a97efd4e2b5d1a3df9c7777bd  ./BRANDING.md
-cd5d90e48ea1c171b55c7f92ce7f977b42d3bb323ce80d693f18af54d64dda98  ./CLAUDE.md
+88ae68efcfd17380ffb7159d1ff600e994eaaf06423a9559ff8be56f617acd1a  ./CLAUDE.md
 6d8775cfa767fb11985d19619dd813ac74bab5a11b2d5fff10c6408172ddf8c0  ./DEPLOY_VPS.md
 a40a9836a37c93bee266cf38c5656eda71eb4787ca957e998932eb504c7b2cba  ./ENTREGA_PRODUCAO.md
 a2d5ca47f3415e78785a5d87eaea5f5e9c558359fa450137a90b4c65dbe59a90  ./LUMA_RUNTIME_2.0_RELEASE.md
-6210f78521fef41c17b9058c9017a8e6795a395e80a3bfacc502e85e9e8099dd  ./README.md
+3939ca5d0b361bf662c1fb2e25d0dd3715753b6d2f5972e35b7217582233cfc2  ./README.md
 f29c9ea1b226d111bb493c5abca35e8a3dbef6ded38a86fbab197ae4d9bf302e  ./README_MVP.md
 6c4cca9f392d04556ae024d374cfad6313f9ce3781193426aea5c422c98c3ba2  ./RELATORIO_LashDesigner_3.9.0.md
 e93f1bf6cf205893d1bd00742ad646c98441b7a80960227a11992b1c69adbcfd  ./RELATORIO_LashDesigner_4.0.0.md
@@ -126,6 +126,7 @@ be51699d9630496299c6919e5e9c1248b6cfa34783d6b1508ea1c03055ff8f6b  ./docs/RELEASE
 a5bd5f027784b0b23eeb6ad82caa9245cc3577555b59ac355c30eb8a6156cbe1  ./docs/RELEASE_5_13_8.md
 49a63881cd14cd89c9d158689056218689f6333d4b025a831e2dd0c0328ae414  ./docs/RELEASE_5_13_9.md
 406594b1a1edb62a038c96d78d6e0729cacf47418fd084eaa02888518e2091cb  ./docs/RELEASE_5_14_0.md
+e1ce22439f9115b644ce7a534ffea9abb6f17b0bb56320cac3205cf06d7c1407  ./docs/RELEASE_5_14_1.md
 00c1c176388ab4d8d0a5ceab2ecf5059a12f2937ab0454239bdfec10751f8119  ./docs/RELEASE_CHECKLIST.md
 b72bc0dd6b27400055fc22edf24dc337bd473f78bab58330d54af2df7a7de058  ./docs/RESPONSIVE.md
 4d689655bbd5299beffd1bad19b151da5d240b99d74c0cbd1cc662b8b7f12ba3  ./docs/REVISAO_RELATORIO_EXECUTIVO_5_12_10.md
@@ -213,8 +214,8 @@ d764dc5bb73ec0be7cb29c117d80fe0462c9f5e8aab2d62681ef04fcc26042fe  ./docs/qa-3.2/
 05d6d0a9450b391690788ca11cd44d713beb60218f9edf274ebb007a081cc42b  ./docs/qa-3.2/luma-page-thread-desktop.png
 57240766ea4cf350473ca2f06f8cb16ff5708ea85fd4fc8718825083f7769382  ./eslint.config.js
 fea38e995c3d12d73fa76cff94842bedb6ba66db6a6513edb39ea9f53bd1fb4b  ./index.html
-2d148b29e998f504a741707c6bf32474932d04095c4b9134a0499132bac20e21  ./package-lock.json
-878300da31dd70793e336176b0524c5b2078da4e5b868fe2f5d89acf31f7df53  ./package.json
+3d1adebf2e5a91295789f391c345e1a59d6d6f4c9da4449786b5d2d87cf9845c  ./package-lock.json
+bea9cd7e3bb9d8af4cb13104f2ad6607dc01acdab9024e9c7b9660bc1024230a  ./package.json
 e5ca46ffb294bcdaf23c2d0d717e0af5c2fc90dbec656fdcb7f295538985db28  ./prettier.config.js
 8be3f9fd6ec0a71c310f90b6e4350cce0939400717513807c304af93ae9ace9e  ./public/ai/luma-editorial.webp
 b38cc3acd196fb99a95bf60d1e210637f573059caee90cab36acd1649693fde7  ./public/apple-touch-icon.png
@@ -300,7 +301,7 @@ f99d86a33e59dbd51d6a453482bd43aeb5511a0f157f196f766b9b4d8ee7083c  ./scripts/asse
 2caadcd20e02e9945799b2ff94e8d2575c5a8c0b7dfafbef08dd1a844dc40588  ./scripts/check-luma-integrated-ui.mjs
 6ecdaca30cc798c8cde7bb21495c7826a95a2065de1d18aebee572a3eee6b5ed  ./scripts/check-multistaff-live.py
 448c01bc5101e24716d88cfbb8a8b6e56b5d662e64404ad3fc28f27a04a7b994  ./scripts/check-password-recovery-ui.mjs
-732d1886726d12f80f27b8a69fa28381d0597f4ca9b258a2f3425db1fe4fd264  ./scripts/check-product-refinement-ui.mjs
+a1a582a6478794099fe7635a14faa3c14da207eca035dc9cf486ef9e1659e911  ./scripts/check-product-refinement-ui.mjs
 175647d6f4cba4493263c1704b83cbe92bbcfa0718a688447d47da16880ff5df  ./scripts/check-product-upgrade.py
 b2525e24c29a1016ae9a12a7e065cbd1f591baede2bcba95629adb6508499dc4  ./scripts/check-professional-migration.mjs
 5eae1cd585efc899901ffd580246dc867982a3a2abc478172d5c43c9715f5e88  ./scripts/check-recovery-ui.mjs
@@ -330,7 +331,7 @@ bc58e2ad8f7a156b2858c28fca9c34e491fe9e2a0552eee39aa9d4ae2316e574  ./scripts/mobi
 7e89fe4913259d6e77d89261dcb07f7cdb9fcd2fbb24e47eff31cc50fa7176e6  ./scripts/mobile-app-v510-part3-visual-qa.py
 5a623e85884e3fe34817b79df66bfce96ea2cbfadf28707766e4b18f2cd9cb5b  ./scripts/mobile-app-v510-part4-audit.mjs
 470d6e7847f72b972d0a03d1d508f1f2aa245f6e62a75ad8dfe397f5efafa5da  ./scripts/mobile-app-v510-part4-visual-qa.py
-f3e1729a43e00acd21c96e93ea53c7babc1d620f8bd295157b68e41e600c16f3  ./scripts/mobile-experience-v511-audit.mjs
+13c58f6b4d4e8139618e6ae23aaa26486ca66a612d6bf04752bd99ad6c1613cf  ./scripts/mobile-experience-v511-audit.mjs
 794912f1ff6949e0e247736a944348b8fcdbf8775f84d70b37fe49b78a0fc1dd  ./scripts/mobile-experience-v511-visual-qa.py
 13ec70b67318b539c327a39160c8ddb8542ec7edf514bbec9b33287693540484  ./scripts/onboarding-audit.mjs
 ae3cffd11adfa9309d39f666bd74df6eff5ad3036273ce940a44ee0c2d871748  ./scripts/overlay-shift-v24.py
@@ -564,6 +565,7 @@ be91f4cbcae30e416a1764c6d232fe7e0336fe76ad154789c71059314b14b0ba  ./src/agenda-v
 e7afc5af6b797de8d989de40a7ce3fcb2e9d7e034bac612f8603753e5f4201b7  ./src/appointment-lifecycle-v371.css
 1de78d9c5e60f956b659935bc6303666388b03872b1a7411a490dd4e4547b1bc  ./src/auth-v24.css
 7a1175edc039d373ee9ca3f6cd4111ebec17efecfdc4894b87f76a70cb039220  ./src/billing-v24.css
+d264f539d20875287aaa386f0d86f6add2136722e2c48be71847a85ef0c1c6b8  ./src/booking-mobile-refinement.css
 59696f5a37cfe091c495573bbb4447be80c166133c0e46ddff7411dca16def87  ./src/booking-v30.css
 4a5996bbcce339393d948ee9287feb926d0858e1e4bc8f2e72f003e61d250ca4  ./src/commercial.ts
 468bc86495a60828bc7c3cfbc9733463fa3e928ca1ed492b4232e97391ebf255  ./src/components/BillingCenter.tsx
@@ -607,7 +609,7 @@ d30f9233e2fde7d1b47c628a0f5cf99252154cf846fb7f48bd30809d49b2ff0f  ./src/dateTime
 b3bfcb2b6432a607cb22ed5500867210dcb048e6c7633120af9dfebc1cb932cf  ./src/design-system.css
 b67cee779919e0b3ec5ebea656c845b97752dce4229b6a518c02b2415773b2c3  ./src/features/admin/AdminApp.tsx
 795fda1f918b9afb43ec7301990ca79d65f2793fbe2b8efe976422bd7c135444  ./src/features/auth/Authentication.tsx
-135b7f500829a968143797f3e8cdc6c21ffa923e5554f31fe97bd5f157f4b9f6  ./src/features/booking/BookingPage.tsx
+65cda38d6ac333153cf4e86b9f58eaeb71049cfed31f6c72cb91b2d153ef53bf  ./src/features/booking/BookingPage.tsx
 2f13d135f0a17b098882c49891b0f11c402829a23a524984b4400a00a27bbcde  ./src/features/calendar/AdminCalendar.tsx
 c2e0e147713c4fde4efe0543fc9ddc8b9db775009abb82e061f161946811822b  ./src/features/calendar/AppointmentModals.tsx
 5c2597a26ed3d8fda6cffa7adb2dd6192e788ab178eb94f2f3fcc3a82446a39c  ./src/features/client/ClientPortal.tsx
@@ -666,7 +668,7 @@ c44adbfed0b2cfa70b8c1ece194a1c6926f029beaf817ca6b27601a904f0f1a6  ./src/legal-v5
 1888c623abc7b068d05c7725c6998727e7020107f82fa35907ac2a64aaeac624  ./src/lib/tourSteps.ts
 35db8fe16b631bc23967c85040ba26cbfdc6533e2ebe2229526359cb27a40569  ./src/luma-v32.css
 158d61588b5b4de7eee6009ea0740b4271e641b9f39a40533b8e5dd2bf990b64  ./src/luma-v35.css
-605d15aae3182745c8602ae8449435f9804aee1fb5a249365527c1f83e368548  ./src/main.tsx
+494d77596f44746a36f9b39064b9d551148043df96e706901acece17fe8177d3  ./src/main.tsx
 191b0c6c7182656cadba3b405804ac7242412d1045a991d5806db66461343af0  ./src/mobile-app-v510-part3.css
 81316c0b5b90f30a77347dcf9d577c78981352749f8bd297a90cb4ce57c29913  ./src/mobile-app-v510-part4.css
 fbd77f95a0c63d46b5bf2bfff6f8fa5bbe686642a6c07bdd5bb6c366c936e6e9  ./src/mobile-app-v510.css
