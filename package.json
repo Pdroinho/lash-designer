@@ -1,7 +1,7 @@
 {
   "name": "lashdesigner",
   "private": true,
-  "version": "5.13.8",
+  "version": "5.13.9",
   "description": "Agenda online para lash designers",
   "type": "module",
   "main": "dist/server/index.js",
@@ -59,24 +59,25 @@
     "test:product-form-controls-ui": "node scripts/check-product-refinement-ui.mjs --forms",
     "test:brand-presentation-ui": "node scripts/check-product-refinement-ui.mjs --branding",
     "test:settings-tabs-ui": "node scripts/check-product-refinement-ui.mjs --settings",
-    "test:settings-brand-ui": "node scripts/check-product-refinement-ui.mjs --settings-brand"
+    "test:settings-brand-ui": "node scripts/check-product-refinement-ui.mjs --settings-brand",
+    "test:logo-preparation-ui": "node scripts/check-product-refinement-ui.mjs --logo-preparation"
   },
   "dependencies": {
     "@phosphor-icons/react": "2.1.10",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
+    "chart.js": "4.5.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "gsap": "3.15.0",
     "helmet": "^8.1.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "7.18.2",
-    "zod": "^3.24.1",
-    "chart.js": "4.5.1",
-    "gsap": "3.15.0",
-    "sharp": "0.34.5"
+    "sharp": "0.34.5",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

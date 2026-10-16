@@ -131,3 +131,14 @@
 .booking30-brand .tenant-brand-name { overflow-wrap: normal; word-break: normal; text-wrap: balance; }
 .luma-logo-preview { display: grid; place-items: center; max-width: 100%; padding: 16px; margin-top: 12px; border: 1px solid var(--line); border-radius: var(--ld-radius-control); background: repeating-conic-gradient(#fff 0% 25%, #eee 0% 50%) 0 / 16px 16px; }
 .luma-logo-preview img { display: block; width: auto; height: auto; max-width: 100%; max-height: 160px; object-fit: contain; }
+
+/* Honest shared loading state: no empty card while tenant/session/chunks resolve. */
+.page-loading { min-height: 65dvh; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px; color: var(--ink-muted); font: 500 .9rem/1.5 var(--font-ui); }
+.page-loading.is-compact { min-height: 180px; }
+.page-loading .spinner { display: inline-block; width: 20px; height: 20px; flex: 0 0 20px; box-sizing: border-box; border: 2px solid var(--line-soft); border-top-color: var(--primary); border-radius: 50%; animation: page-loading-spin .8s linear infinite; }
+@keyframes page-loading-spin { to { transform: rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .page-loading .spinner { animation: none; } }
+.authRefTitle.authRefTitle-login { font-size: clamp(1.5rem, 2.5vw, 2rem); white-space: nowrap; text-wrap: nowrap; }
+.logo-preparation { grid-column: 1 / -1; min-width: 0; padding-block: 8px; }
+.brand-preview { background: var(--surface-raised); }
+@media(max-width:420px) { .authRefTitle.authRefTitle-login { font-size: 1.5rem; } }

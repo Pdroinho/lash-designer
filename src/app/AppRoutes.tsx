@@ -1,3 +1,4 @@
+import { PageLoading } from '../components/PageLoading'
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { api } from '../api'
@@ -47,14 +48,7 @@ function SlugToSubdomainRedirect() {
   )
 }
 
-function RouteLoading() {
-  return (
-    <main className="container" style={{paddingTop: 80}} aria-busy="true" aria-label="Carregando página">
-      <div className="card skeleton skeleton-card" style={{maxWidth: 480, margin: '0 auto', height: 160}} />
-    </main>
-  )
-}
-
+function RouteLoading() { return <PageLoading /> }
 
 export function AppRoutes() {
   const location = useLocation()
@@ -167,9 +161,7 @@ export function AppRoutes() {
 
   if (hostTenant === undefined) {
     return (
-      <div className="container" style={{paddingTop: 80}}>
-        <div className="card skeleton skeleton-card" style={{maxWidth: 480, margin: '0 auto', height: 160}} />
-      </div>
+      <PageLoading />
     )
   }
 

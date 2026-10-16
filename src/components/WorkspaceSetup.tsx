@@ -1,3 +1,4 @@
+import { LogoPreparationControls, prepareBrandImage } from './LogoPreparationControls'
 import { BrandPresentationControls } from './BrandPresentationControls'
 import { TenantBrand } from './TenantBrand'
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from 'react'
@@ -39,6 +40,7 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
   const [mode, setMode] = useState<SetupMode>('ASSISTED')
   const [step, setStep] = useState(0)
   const [businessName, setBusinessName] = useState(tenant?.name ?? '')
+  const [logoOriginal, setLogoOriginal] = useState(tenant?.logoUrl ?? '')
   const [logoUrl, setLogoUrl] = useState(tenant?.logoUrl ?? '')
   const [logoLayout, setLogoLayout] = useState<'SYMBOL_NAME' | 'FULL'>(tenant?.logoLayout ?? 'SYMBOL_NAME')
   const [logoSize, setLogoSize] = useState<'S' | 'M' | 'L'>(tenant?.logoSize ?? 'M')
@@ -65,7 +67,7 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
   useEffect(() => {
     if (tenant) {
       setBusinessName(tenant.name)
-      setLogoUrl(tenant.logoUrl ?? '')
+      setLogoUrl(tenant.logoUrl ?? ''); setLogoOriginal(tenant.logoUrl ?? '')
       setLogoLayout(tenant.logoLayout ?? 'SYMBOL_NAME')
       setLogoSize(tenant.logoSize ?? 'M')
     }
@@ -85,7 +87,13 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
     setLogoBusy(true)
     setLogoAdvice('')
     let prepared = ''
-    try { prepared = await optimizeLogo(file); setLogoUrl(prepared); setLogoLayout('SYMBOL_NAME'); setLogoSize('M') }
+    try {
+      prepared = await optimizeLogo(file); setLogoOriginal(prepared)
+      const result = await prepareBrandImage(prepared)
+      if (result.ok) prepared = result.data.imageDataUrl
+      else setError(`Imagem original preservada. ${result.error.message}`)
+      setLogoUrl(prepared); setLogoLayout('SYMBOL_NAME'); setLogoSize('M')
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível processar a logo.') }
     finally { event.target.value = ''; setLogoBusy(false) }
     if (prepared && mode === 'ASSISTED' && businessName.trim().length >= 2) void analyzeBrand(prepared)
@@ -248,7 +256,7 @@ export function WorkspaceSetup({ tenant, onComplete }: { tenant: TenantPublic | 
                 <strong>{option.name}</strong><small>{option.rationale}</small>{selectedPalette === index ? <Check size={16} /> : null}
               </button>)}
             </div>
-          <div className="workspace-brand-review"><BrandPresentationControls brand={{name:businessName,logoUrl,logoLayout,logoSize}} onLayout={setLogoLayout} onSize={setLogoSize} disabled={analyzing || logoBusy} />{logoAdvice ? <p className="form-help">Sugestão da Luma: {logoAdvice}</p> : null}</div>
+          <div className="workspace-brand-review"><BrandPresentationControls brand={{name:businessName,logoUrl,logoLayout,logoSize}} onLayout={setLogoLayout} onSize={setLogoSize} disabled={analyzing || logoBusy} imageEditor={<LogoPreparationControls originalUrl={logoOriginal} currentUrl={logoUrl} onChange={setLogoUrl} onBusy={setLogoBusy} disabled={analyzing || logoBusy || busy} />} />{logoAdvice ? <p className="form-help">Sugestão da Luma: {logoAdvice}</p> : null}</div>
             {analysisSource ? <p className="workspace-analysis-note">{analysisSource === 'VISION' ? 'Sugestões criadas a partir da sua identidade visual. Você continua no controle da escolha.' : 'Sugestões seguras da curadoria Lash Designer.'}</p> : null}
           </div> : null}
 

@@ -2,7 +2,10 @@
 // Compiled product in Chromium with controlled API fixtures; never contacts external services.
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import sharp from 'sharp'
+import { prepareLogoImage } from '../dist/server/logoImageProcessing.js'
 import path from 'node:path'
 import express from 'express'
 const { chromium } = await import(process.env.LASH_QA_PLAYWRIGHT_MODULE || 'playwright')
@@ -13,6 +16,8 @@ const server=app.listen(0,'127.0.0.1');await once(server,'listening');const orig
 const tenant={id:'studio',slug:'studio',name:'Studio QA',primaryColor:'#972d57'}
 const plans=[{code:'TEAM_3',seats:3,minProfessionals:1,label:'1 a 3 profissionais',amountCents:7490},{code:'TEAM_6',seats:6,minProfessionals:4,label:'4 a 6 profissionais',amountCents:9990},{code:'TEAM_15',seats:15,minProfessionals:7,label:'7 a 15 profissionais',amountCents:14900}]
 const snapshot={ym:'2026-10',entriesCents:20000,expensesCents:10000,balanceCents:10000,serviceEntriesCents:20000,manualIncomeCents:0,confirmedAppointments:2}
+const qaLogoDirectory=mkdtempSync(path.join(tmpdir(),'lash-logo-ui-'));const qaLogoPath=path.join(qaLogoDirectory,'logo.png');const ink=await sharp({create:{width:60,height:30,channels:4,background:'#972d57'}}).png().toBuffer();const whiteLogo=await sharp({create:{width:240,height:160,channels:4,background:'#fff'}}).composite([{input:ink,left:90,top:65}]).png().toBuffer();writeFileSync(qaLogoPath,whiteLogo)
+const logoPreparations=[];let tenantHold=null
 const requestedPaths=[]
 const omitted = new Set()
 const setupAnalyses=[],setupCompletions=[]
@@ -43,8 +48,9 @@ try{
  await page.route('**/api/**',async route=>{
   const url=new URL(route.request().url()), p=url.pathname.replace('/api/public/tenant/studio/','/api/public/').replace(/^\/api\/public\/tenant\/studio$/,'/api/public/tenant')
   requestedPaths.push(p)
-  if(p==='/api/public/tenant')return json(route,{tenant})
+  if(p==='/api/public/tenant'){if(tenantHold)await tenantHold;return json(route,{tenant})}
   if(p==='/api/auth/security')return json(route,{phone:null,whatsappMfaReady:false,devices:[],sessions:[]})
+  if(p==='/api/admin/brand/prepare-image'){const body=route.request().postDataJSON();logoPreparations.push(body);try{return json(route,await prepareLogoImage(body.imageDataUrl,body.mode))}catch(error){return json(route,{message:error.message,code:'LOGO_PREPARATION_FAILED'},400)}}
   if(p==='/api/auth/me')return json(route,{user:role?{id:'user',email:'qa@example.com',role,tenantId:'studio',tenantSlug:'studio',subscriptionStatus:'ACTIVE'}:null,isTestMode:false})
   if(p==='/api/auth/legal-preferences')return json(route,{currentDocuments:{termsVersion:'qa',privacyVersion:'qa',bundleHash:'qa'},latestAcceptance:{termsVersion:'qa',privacyVersion:'qa',bundleHash:'qa'},whatsappPromotions:false})
   if(p==='/api/public/client-access/request'){assert.equal(route.request().postDataJSON().phone,'5571999999999');return json(route,{sent:true})}
@@ -87,7 +93,18 @@ try{
   return json(route,{message:'Auxiliary fixture not supplied'},403)
  })
  role='ADMIN'
- if(process.argv.includes('--settings-brand')){
+ if(process.argv.includes('--logo-preparation')){
+ role=null;let release;tenantHold=new Promise(resolve=>{release=resolve});await page.goto(origin+'/login');await page.getByRole('status').filter({hasText:'Preparando seu espaço…'}).waitFor();assert.equal(await page.locator('.skeleton-card').count(),0);assert.ok(await page.locator('.page-loading .spinner').evaluate(el=>parseFloat(window.getComputedStyle(el).borderTopWidth)>0));await shot('page-loading-slow-request');release();tenantHold=null;await page.locator('.authRefTitle-login').waitFor();pass('held tenant request shows a readable loading state instead of an empty white card')
+ for(const width of [1440,768,390,320]) {
+  await page.setViewportSize({width,height:900});role=null;await page.goto(origin+'/login');const title=page.locator('.authRefTitle-login');await title.waitFor();assert.equal(await title.innerText(),'Entrar na conta');assert.equal(await title.evaluate(el=>{const range=document.createRange();range.selectNodeContents(el);return range.getClientRects().length}),1);await cleanLayout();await shot(`login-one-line-${width}`);pass(`login title stays on one line at ${width}px`)
+  role='ADMIN';tenant.logoUrl=null;tenant.logoLayout='SYMBOL_NAME';await page.goto(origin+'/admin?view=settings');await page.locator('.settings-logo-field input[type=file]').setInputFiles(qaLogoPath);await page.getByRole('button',{name:'Trocar logo',exact:true}).waitFor();const preview=page.locator('.brand-preview img');await preview.waitFor();await page.waitForFunction(()=>document.querySelector('.brand-preview img')?.naturalWidth>0);const prepared=await preview.getAttribute('src');assert.ok(logoPreparations.length>0);assert.ok(await preview.evaluate(el=>{const c=document.createElement('canvas');c.width=el.naturalWidth;c.height=el.naturalHeight;c.getContext('2d').drawImage(el,0,0);return c.width<240&&c.getContext('2d').getImageData(0,0,1,1).data[3]===0}));assert.equal(settingsAnalyses.at(-1).logoDataUrl,prepared);await cleanLayout();await shot(`logo-prepared-${width}`);pass(`settings upload prepares actual transparency/crop BEFORE AI at ${width}px`)
+  await page.getByRole('button',{name:'Fundo e margens da logo',exact:true}).click();await page.getByRole('option',{name:/^Usar original/}).click();const original=await preview.getAttribute('src');await preview.evaluate(el=>el.decode());assert.notEqual(original,prepared);assert.ok(await preview.evaluate(el=>{const c=document.createElement('canvas');c.width=el.naturalWidth;c.height=el.naturalHeight;c.getContext('2d').drawImage(el,0,0);return c.width===240&&c.getContext('2d').getImageData(0,0,1,1).data[3]===255}));await page.getByRole('button',{name:'Fundo e margens da logo',exact:true}).click();await page.getByRole('option',{name:/^Só cortar margens/}).click();await page.getByRole('status').filter({hasText:'Margens ajustadas. Confira a prévia.'}).waitFor();assert.equal(logoPreparations.at(-1).imageDataUrl,original);await page.getByRole('button',{name:'Fundo e margens da logo',exact:true}).click();await page.getByRole('option',{name:/^Sem fundo e sem margens/}).click();await page.getByRole('status').filter({hasText:'Fundo removido e margens ajustadas.'}).waitFor();await page.getByRole('button',{name:'Salvar Alterações',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.settings-panel button.btnPrimary')?.disabled);assert.equal(settingsWrites.at(-1).logoUrl,await preview.getAttribute('src'));await cleanLayout();pass(`original, crop-only, background removal and explicit save work at ${width}px`)
+ }
+ for(const width of [1440,320]) {
+  role='ADMIN';setupMode=true;tenant.logoUrl=null;await page.setViewportSize({width,height:900});await page.goto(origin+'/admin');await page.getByRole('heading',{name:'Como quer começar?',exact:true}).waitFor();await page.getByRole('button',{name:'Continuar',exact:true}).click();await page.locator('.workspace-logo-upload input[type=file]').setInputFiles(qaLogoPath);await page.getByText('Sugestão da Luma: Nome integrado na logo, com proporção preservada.',{exact:true}).waitFor();const preview=page.locator('.brand-preview img');await preview.evaluate(el=>el.decode());assert.ok(await preview.evaluate(el=>{const c=document.createElement('canvas');c.width=el.naturalWidth;c.height=el.naturalHeight;c.getContext('2d').drawImage(el,0,0);return c.width<240&&c.getContext('2d').getImageData(0,0,1,1).data[3]===0}));assert.equal(setupAnalyses.at(-1).logoDataUrl,await preview.getAttribute('src'));await page.getByRole('button',{name:'Fundo e margens da logo',exact:true}).click();await page.getByRole('option',{name:/^Usar original/}).click();await preview.evaluate(el=>el.decode());assert.equal(await preview.evaluate(el=>el.naturalWidth),240);await cleanLayout();await shot(`setup-logo-prepared-${width}`);pass(`setup shares automatic preparation, real pixels and original recovery at ${width}px`)
+ }
+ setupMode=false
+ }else if(process.argv.includes('--settings-brand')){
  for(const width of [1440,768,390,320]) {
   await page.setViewportSize({width,height:900});await page.goto(origin+'/admin?view=settings');await page.getByRole('tablist',{name:'Áreas das configurações',exact:true}).waitFor();settingsBrandMode='vision';let release,entered;const requested=new Promise(resolve=>{entered=resolve});settingsBrandHold={promise:new Promise(resolve=>{release=resolve}),entered};const before=settingsAnalyses.length;
   await page.locator('.settings-logo-field input[type=file]').setInputFiles(path.resolve('public/brand/logo-horizontal-dark.png'));await requested;await page.getByRole('button',{name:'Analisando sua marca…',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Salvar Alterações',exact:true}).isDisabled(),true);assert.equal(await page.getByLabel('Nome do Espaço',{exact:true}).isDisabled(),true);release();settingsBrandHold=null;
@@ -156,4 +173,4 @@ await page.locator('.dateCard:not(.disabled)').nth(1).click();await page.locator
  }
  assert.deepEqual(errors,[]);pass('no uncaught browser errors');console.log(`${count}/${count} product refinement checks passed; API fixtures, no external provider calls`);completed=true
 }catch(error){if(page&&!page.isClosed()){await page.screenshot({path:'/tmp/lash-report-debug.png'});console.error(await page.locator('body').innerText())}throw error}
-finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve))}
+finally{rmSync(qaLogoDirectory,{recursive:true,force:true});if(browser)await browser.close();await new Promise(resolve=>server.close(resolve))}

@@ -1,3 +1,4 @@
+import { prepareLogoImage } from '../logoImageProcessing.js'
 import { logoSuggestionSchema } from '../brandPresentation.js'
 import Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
@@ -460,6 +461,18 @@ export function createAdminLumaAssistantRouter(
       }
     },
   )
+
+  // Local logo processing is available without an LLM key or paid message credits.
+  router.post('/brand/prepare-image', lumaAssistantLimiter, requireRole('ADMIN'), async (req, res, next) => {
+    try {
+      if (!req.sessionUser?.tenantId) throw badRequest('Espaço inválido', 'INVALID_TENANT')
+      const body = z.object({ imageDataUrl: z.string().max(450_000), mode: z.enum(['REMOVE_BACKGROUND_AND_TRIM', 'TRIM']) }).strict().parse(req.body)
+      let prepared
+      try { prepared = await prepareLogoImage(body.imageDataUrl, body.mode) }
+      catch (error) { throw badRequest(error instanceof Error ? error.message : 'Não foi possível preparar a logo.', 'LOGO_PREPARATION_FAILED') }
+      res.json(prepared)
+    } catch (error) { next(error) }
+  })
 
   router.post('/assistant/brand-suggestions', lumaAssistantLimiter, requireRole('ADMIN'), async (req,res,next)=>{
     const usageId=randomUUID()

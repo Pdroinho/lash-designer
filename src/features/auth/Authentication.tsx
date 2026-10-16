@@ -1,3 +1,4 @@
+import { PageLoading } from '../../components/PageLoading'
 import { TenantBrand } from '../../components/TenantBrand'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
@@ -258,7 +259,7 @@ export function UnifiedLogin(props: { hostTenant?: TenantPublic | null; isDevHos
               </div>
             ) : (
               <>
-                <h1 className="authRefTitle">Entrar na sua conta</h1>
+                <h1 className="authRefTitle authRefTitle-login">Entrar na conta</h1>
             <p className="authRefSubtitle">Acesse o painel e continue de onde parou.</p>
 
             {allowDevBootstrap ? (
@@ -444,9 +445,7 @@ export function RootEntry(props: {
 
   if (checking) {
     return (
-      <div className="authContainer">
-        <div className="authCard skeleton skeleton-card" style={{height: 260}} />
-      </div>
+      <PageLoading />
     )
   }
 

@@ -1,3 +1,4 @@
+import sharp from 'sharp'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
@@ -58,3 +59,23 @@ test('simultaneous chat and brand requests cannot exceed the final included slot
  assert.equal((await f.call('/assistant/message',{message:'Concorrente'})).data.code,'ASSISTANT_INCLUDED_LIMIT');assert.equal(f.state.chatCalls,0);release();assert.equal((await pending).status,200);assert.equal((await f.call('/assistant/usage')).data.used,ASSISTANT_DAILY_LIMIT)
 }finally{release();await f.close()}})
 test('monthly quota and disabled provider prevent visual requests without charging',async()=>{const f=await fixture();try{f.seed(ASSISTANT_MONTHLY_LIMIT,true);assert.equal((await f.call('/assistant/brand-suggestions',body)).data.code,'ASSISTANT_INCLUDED_LIMIT');assert.equal(f.state.brandCalls,0)}finally{await f.close()}const off=await fixture(false);try{assert.equal((await off.call('/assistant/brand-suggestions',body)).data.code,'ASSISTANT_DISABLED');assert.equal((off.db.prepare('SELECT COUNT(*) AS n FROM assistant_usage').get() as {n:number}).n,0)}finally{await off.close()}})
+
+test('local logo preparation works with AI disabled, authenticates ADMIN, rejects URLs and never consumes credits', async () => {
+ const f=await fixture(false)
+ try {
+  const ink=await sharp({create:{width:40,height:20,channels:4,background:'#972d57'}}).png().toBuffer()
+  const input='data:image/png;base64,'+(await sharp({create:{width:100,height:80,channels:4,background:'#fff'}}).composite([{input:ink,left:30,top:30}]).png().toBuffer()).toString('base64')
+  const payload={imageDataUrl:input,mode:'REMOVE_BACKGROUND_AND_TRIM'}
+  assert.equal((await f.call('/brand/prepare-image',payload,'')).status,401)
+  assert.equal((await f.call('/brand/prepare-image',payload,'STAFF')).status,403)
+  const result=await f.call('/brand/prepare-image',payload)
+  assert.equal(result.status,200);assert.equal(result.data.width,44);assert.equal(result.data.height,24);assert.equal(result.data.removedBackground,true)
+  const pixel=await sharp(Buffer.from(result.data.imageDataUrl.split(',')[1],'base64')).ensureAlpha().raw().toBuffer();assert.equal(pixel[3],0)
+  assert.equal((await f.call('/brand/prepare-image',{...payload,mode:'TRIM'})).data.removedBackground,false)
+  assert.equal((await f.call('/brand/prepare-image',{...payload,imageDataUrl:'https://example.com/logo.png'})).status,400)
+  assert.equal((await f.call('/brand/prepare-image',{...payload,imageDataUrl:'data:image/png;base64,AAAA'})).status,400)
+  assert.equal((await f.call('/brand/prepare-image',{...payload,mode:'INVALID'})).status,400)
+  assert.equal(f.state.brandCalls,0)
+  assert.equal((f.db.prepare('SELECT COUNT(*) AS n FROM assistant_usage').get() as {n:number}).n,0)
+ } finally {await f.close()}
+})

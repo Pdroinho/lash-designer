@@ -1,3 +1,4 @@
+import { PageLoading } from '../../components/PageLoading'
 import { LumaContextAction } from '../../components/LumaContextAction'
 import '../luma/luma-workspace.css'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
@@ -41,15 +42,7 @@ const AdminCalendar = lazy(() => import('../calendar/AdminCalendar').then(module
 const AdminFinance = lazy(() => import('../finance/AdminFinance').then(module => ({ default: module.AdminFinance })))
 const AdminSettings = lazy(() => import('../settings/AdminSettings').then(module => ({ default: module.AdminSettings })))
 
-function AdminAreaLoading() {
-  return (
-    <div aria-busy="true" aria-label="Carregando área administrativa" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16}}>
-      <div className="card skeleton-card skeleton" style={{height: 140}} />
-      <div className="card skeleton-card skeleton" style={{height: 140}} />
-      <div className="card skeleton-card skeleton" style={{height: 140}} />
-    </div>
-  )
-}
+function AdminAreaLoading() { return <PageLoading compact /> }
 
 function AdminEvolutionAPI() {
     return <WhatsAppCenter />

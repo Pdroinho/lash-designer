@@ -123,7 +123,12 @@ export const env: Env = (() => {
   if (parsed.APPMAX_CHECKOUT_ENABLED && (!parsed.APPMAX_MERCHANT_CLIENT_ID || !parsed.APPMAX_MERCHANT_CLIENT_SECRET)) {
     throw new Error('APPMAX_CHECKOUT_ENABLED exige credenciais merchant Appmax.')
   }
-  // Checkout Appmax liberado em produção com validação de credenciais
+  if (parsed.NODE_ENV === 'production' && parsed.APPMAX_CHECKOUT_ENABLED) {
+    throw new Error('Checkout Appmax em produção aguarda conciliação de estornos, migração comercial e homologação sandbox.')
+  }
+  if (parsed.APPMAX_CHECKOUT_ENABLED && parsed.APPMAX_ENVIRONMENT !== 'sandbox') {
+    throw new Error('Nesta etapa, o checkout Appmax só pode ser habilitado no sandbox.')
+  }
   const encryptionKeyCandidate = (parsed.APP_ENCRYPTION_KEY ?? '').trim()
   const encryptionKey = (() => {
     if (/^[A-Za-z0-9_-]{43,}$/.test(encryptionKeyCandidate) && Buffer.from(encryptionKeyCandidate, 'base64url').length >= 32) {

@@ -1,3 +1,4 @@
+import { LogoPreparationControls, prepareBrandImage } from '../../components/LogoPreparationControls'
 import { BillingCenter } from '../../components/BillingCenter'
 import { BrandPresentationControls } from '../../components/BrandPresentationControls'
 import { useEffect, useId, useRef, useState } from 'react'
@@ -337,6 +338,7 @@ export function SecuritySettingsCard({ title = 'Segurança da conta' }: { title?
 export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | null; onUpdate?: (tenant: TenantPublic) => void }) {
     const [name, setName] = useState(tenant?.name ?? '')
     const [primaryColor, setPrimaryColor] = useState(tenant?.primaryColor ?? '#b43a68')
+    const [logoOriginal, setLogoOriginal] = useState(tenant?.logoUrl ?? '')
     const [logoUrl, setLogoUrl] = useState(tenant?.logoUrl ?? '')
     const [logoLayout, setLogoLayout] = useState<'SYMBOL_NAME'|'FULL'>(tenant?.logoLayout ?? 'SYMBOL_NAME')
     const [logoSize, setLogoSize] = useState<'S'|'M'|'L'>(tenant?.logoSize ?? 'M')
@@ -367,7 +369,7 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
         if(tenant) {
             setName(tenant.name)
             setPrimaryColor(tenant.primaryColor)
-            setLogoUrl(tenant.logoUrl || '')
+            setLogoUrl(tenant.logoUrl || '');setLogoOriginal(tenant.logoUrl || '')
             setLogoLayout(tenant.logoLayout ?? 'SYMBOL_NAME')
             setLogoSize(tenant.logoSize ?? 'M')
             setSecondaryColor(tenant.secondaryColor ?? null)
@@ -381,7 +383,12 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
         setLogoBusy(true);setLogoError(null);setLogoAdvice('')
         let uploaded=false
         try {
-            const dataUrl=await fileToOptimizedDataUrl(file)
+            let dataUrl=await fileToOptimizedDataUrl(file)
+            setLogoOriginal(dataUrl)
+            const preparation=await prepareBrandImage(dataUrl)
+            if(request!==logoRequest.current)return
+            if(preparation.ok) dataUrl=preparation.data.imageDataUrl
+            else setLogoError(`Imagem original preservada. ${preparation.error.message}`)
             if(request!==logoRequest.current)return
             setLogoUrl(dataUrl);setLogoLayout('SYMBOL_NAME');setLogoSize('M');uploaded=true
             const result=await api<{palettes:Array<{primary:string;secondary:string;background:string}>;logoPresentation:{layout:'SYMBOL_NAME'|'FULL';size:'S'|'M'|'L';rationale:string}}>('/api/admin/assistant/brand-suggestions',{method:'POST',timeoutMs:30_000,body:JSON.stringify({businessName:name.trim(),logoDataUrl:dataUrl,preferences:'Preserve a identidade da logo. Prefira uma interface elegante, legível e consistente.'})})
@@ -487,7 +494,7 @@ export function AdminSettings({ tenant, onUpdate }: { tenant: TenantPublic | nul
                                 </div>
                             </div>
 
-                            <BrandPresentationControls brand={{name,logoUrl,logoLayout,logoSize}} onLayout={setLogoLayout} onSize={setLogoSize} disabled={saving || logoBusy} />
+                            <BrandPresentationControls brand={{name,logoUrl,logoLayout,logoSize}} onLayout={setLogoLayout} onSize={setLogoSize} disabled={saving || logoBusy} imageEditor={<LogoPreparationControls originalUrl={logoOriginal} currentUrl={logoUrl} onChange={setLogoUrl} onBusy={setLogoBusy} disabled={saving || logoBusy} />} />
                             <div className="input-group">
                                 <label className="label">Cor Principal</label>
                                 <ColorPicker
