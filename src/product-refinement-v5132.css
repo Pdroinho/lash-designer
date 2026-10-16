@@ -142,3 +142,148 @@
 .logo-preparation { grid-column: 1 / -1; min-width: 0; padding-block: 8px; }
 .brand-preview { background: var(--surface-raised); }
 @media(max-width:420px) { .authRefTitle.authRefTitle-login { font-size: 1.5rem; } }
+
+/* Align visible artwork, not just its wider contain box, with the studio handle. */
+.tenant-brand-auth[data-layout=FULL] .tenant-brand-image { object-position: left center; }
+
+.auth-recovery-link { align-self: flex-end; justify-self: end; padding: 8px 0; min-height: 36px; border: 0; background: transparent; color: var(--auth-accent, var(--primary)); font: 600 .8rem/1.4 var(--font-ui); cursor: pointer; }
+.auth-recovery-link:hover { text-decoration: underline; }
+.auth-recovery-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 4px; }
+.password-recovery { min-width: 0; width: 100%; }
+.password-recovery .authRefTitle { font-size: clamp(1.5rem, 2.4vw, 2rem); }
+.recovery-code { letter-spacing: .25em; font-variant-numeric: tabular-nums; }
+.recovery-secondary { display: flex; flex-wrap: wrap; gap: 4px; justify-content: space-between; }
+.recovery-help { margin-top: 18px; line-height: 1.6; }
+
+.password-recovery .authRefError > svg { flex: 0 0 16px; align-self: flex-start; margin-top: 2px; }
+
+/* Mobile access: the studio's brand leads directly into the form.
+   Keep the photographic mood; promotional copy belongs to the desktop panel. */
+@media (max-width: 780px) {
+  .authRef { grid-template-columns: minmax(0, 1fr); justify-content: stretch; }
+  .authRefCard { min-height: 100dvh; grid-template-rows: auto 1fr; align-content: start; }
+  .authRefLeft {
+    height: clamp(156px, 22svh, 200px);
+    min-height: 156px;
+    flex: 0 0 auto;
+    justify-content: center;
+    padding: max(24px, env(safe-area-inset-top)) 24px 40px;
+  }
+  .authRefBrand { margin: 0; }
+  .authRefBrandSub, .authRefQuote, .authRefSubtitle-login { display: none; }
+  .authRefLeft::after {
+    background: linear-gradient(90deg, rgba(17, 17, 20, .65), rgba(17, 17, 20, .12));
+  }
+  .authRefRight {
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+    padding: 28px 24px max(24px, env(safe-area-inset-bottom));
+    background: var(--surface-raised);
+  }
+  .authRefRightInner { width: 100%; max-width: 440px; }
+  .authRefTitle-login + .authRefSubtitle + .authRefForm { margin-top: 24px; }
+  .authRefAccountHelp {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+    margin-top: 10px;
+    font-size: .78rem;
+    font-weight: 400;
+  }
+  .authRefAccountHelp > span { max-width: 34ch; }
+  .authRefAccountHelp .authRefLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 600;
+  }
+  .authRefLegal { margin-top: 0; gap: 0 20px; }
+  .authRefLegal a { display: inline-flex; align-items: center; min-height: 44px; }
+}
+@media (max-width: 360px) {
+  .authRefLeft { padding-inline: 20px; }
+  .authRefRight { padding-inline: 20px; }
+}
+
+/* Luma: restrained chat typography and content-sized product buttons.
+   Both page and drawer override the legacy wide grid/mobile carousel. */
+.luma34 .luma34-brand-row > .luma-brand-wordmark {
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--l34-ink);
+  font: 700 .95rem/1.2 var(--font-ui);
+}
+.luma34:is(.luma34--page, .luma34--drawer) .luma34-empty {
+  height: auto;
+  min-height: 100%;
+  align-content: center;
+  gap: 24px;
+  padding: 28px 24px;
+}
+.luma34:is(.luma34--page, .luma34--drawer) .luma34-empty-main { margin-top: 0; }
+.luma34:is(.luma34--page, .luma34--drawer) .luma34-hero {
+  width: 100%;
+  justify-items: center;
+  text-align: center;
+  gap: 10px;
+}
+.luma34:is(.luma34--page, .luma34--drawer) .luma34-hero h3 {
+  max-width: 26ch;
+  font: 700 clamp(1.35rem, 2.2vw, 1.875rem)/1.25 var(--font-ui);
+  letter-spacing: -.025em;
+}
+.luma34:is(.luma34--page, .luma34--drawer) .luma34-hero p {
+  max-width: 48ch;
+  font: 400 .875rem/1.55 var(--font-ui);
+  color: var(--l34-muted);
+}
+.luma34:is(.luma34--page, .luma34--drawer) .luma34-starters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  max-width: 580px;
+  margin: 0 auto;
+  padding: 0;
+  gap: 8px;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+.luma34:is(.luma34--page, .luma34--drawer) .luma34-starters button,
+.luma34:is(.luma34--page, .luma34--drawer) .luma34-starters button:last-child {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 12px 14px;
+  justify-content: center;
+  gap: 10px;
+  border-radius: var(--ld-radius-control);
+  font: 500 .8125rem/1.4 var(--font-ui);
+  white-space: normal;
+  text-align: left;
+  box-shadow: none;
+}
+.luma34 .luma34-starters button svg { flex: 0 0 14px; }
+.luma34 .luma34-starters button span { min-width: 0; overflow-wrap: anywhere; }
+.luma34.luma34--drawer .luma34-hero h3 { font-size: 1.5rem; }
+.luma34.luma34--drawer .luma34-starters { max-width: 300px; }
+.luma34 .luma34-composer-shell {
+  background: var(--l34-surface);
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--l34-ink) 5%, transparent);
+}
+.luma34 .luma34-composer textarea { font-size: .875rem; }
+.luma34 .luma-chat-capabilities summary { font-weight: 500; color: var(--l34-muted); }
+.luma34 .luma-chat-capabilities[open] { max-height: min(32dvh, 280px); overflow-y: auto; }
+.luma34 .luma-chat-capabilities[open] summary { position: sticky; top: 0; z-index: 1; background: var(--l34-surface); }
+@media (min-width: 769px) {
+  .luma-workspace .luma34--page { min-height: 440px; height: clamp(440px, calc(100dvh - 192px), 780px); }
+}
+@media (max-width: 768px) {
+  .luma34:is(.luma34--page, .luma34--drawer) .luma34-empty { padding: 20px 14px; gap: 18px; }
+  .luma34 .luma34-composer textarea { font-size: 16px; }
+}

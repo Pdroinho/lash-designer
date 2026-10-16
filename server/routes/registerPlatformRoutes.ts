@@ -70,6 +70,7 @@ export function registerPlatformRoutes(app: express.Express, options: PlatformRo
     authWhatsappOtpSendLimiter: limiters.authWhatsappOtpSendLimiter,
     authPasswordLimiter: limiters.authPasswordLimiter,
     authSessionRuntime: authSession,
+    platformWhatsappConfigured: () => { const config = platformEvolution.platformEvolutionConfig(); return Boolean(config.baseUrl && config.apiKey && config.instanceName) },
     sendPlatformWhatsappText: platformEvolution.sendPlatformWhatsappText,
     normalizeUserE164Phone: platformEvolution.normalizeUserE164Phone,
     maskE164Phone: platformEvolution.maskE164Phone,

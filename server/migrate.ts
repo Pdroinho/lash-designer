@@ -1,3 +1,4 @@
+import { createPasswordRecoverySchema } from './passwordRecoverySchema.js'
 import { createLumaOperationsSchema } from './lumaOperationsSchema.js'
 import { createAppmaxReferralSchema } from './appmaxReferralSchema.js'
 import { getDb } from './db.js'
@@ -1265,5 +1266,7 @@ export function migrate() {
     ALTER TABLE tenants ADD COLUMN brand_background TEXT;
     ALTER TABLE tenants ADD COLUMN brand_secondary TEXT;
   `))
+
+  apply(49, () => createPasswordRecoverySchema(db))
 
 }

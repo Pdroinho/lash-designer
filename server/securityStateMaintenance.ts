@@ -28,6 +28,7 @@ export function createSecurityStateMaintenance({
     db.transaction(() => {
       db.prepare(`DELETE FROM security_rate_limits WHERE updated_at < ?`).run(thirtyDaysAgo)
       db.prepare(`DELETE FROM auth_challenges WHERE expires_at < ? OR (consumed_at IS NOT NULL AND consumed_at < ?)`).run(oneDayAgo, oneDayAgo)
+      if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='password_reset_challenges'").get()) db.prepare('DELETE FROM password_reset_challenges WHERE expires_at < ? OR (consumed_at IS NOT NULL AND consumed_at < ?)').run(oneDayAgo, oneDayAgo)
       db.prepare(`DELETE FROM auth_sessions WHERE expires_at < ? OR (revoked_at IS NOT NULL AND revoked_at < ?)`).run(ninetyDaysAgo, ninetyDaysAgo)
       db.prepare(`DELETE FROM trusted_devices WHERE expires_at < ? OR (revoked_at IS NOT NULL AND revoked_at < ?)`).run(ninetyDaysAgo, ninetyDaysAgo)
     })()

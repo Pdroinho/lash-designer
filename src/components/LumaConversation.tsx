@@ -12,7 +12,6 @@ import { api } from '../api'
 import {
   ArrowRight,
   CheckCircle2,
-  Compass,
   Paperclip,
   Plus,
   Search,
@@ -609,15 +608,6 @@ export function LumaConversation({
         onSubmit={submit}
       >
         <div className="luma34-composer-shell">
-          <div className="luma34-composer-meta">
-            <div className="luma34-composer-brand">
-              <span>Pergunte à Luma</span>
-            </div>
-            {variant === 'page' ? (
-              <small>Agenda · Financeiro · Suporte · Lembretes</small>
-            ) : null}
-          </div>
-
           <label htmlFor={`luma-message-${variant}`} className="sr-only">
             Mensagem para a Luma
           </label>
@@ -672,7 +662,6 @@ export function LumaConversation({
               >
                 <Paperclip size={18} />
               </button>
-              {variant === 'page' ? <span>PNG, JPG ou WEBP</span> : null}
             </div>
             {busy ? (
               <button
@@ -985,10 +974,9 @@ export function LumaConversation({
                 >
                   <div className="luma34-empty-main">
                     <div className="luma34-hero">
-                      <span className="luma34-eyebrow">Luma AI</span>
                       <h3>Sua rotina, em uma conversa</h3>
                       <p>
-                        Peça do seu jeito. Eu consulto sua agenda, ajudo com o financeiro, acompanho chamados e preparo lembretes no WhatsApp. Você revisa antes de alterar qualquer coisa.
+                        Peça ajuda com agenda, financeiro, suporte ou lembretes.
                       </p>
                     </div>
                   </div>
@@ -1000,11 +988,11 @@ export function LumaConversation({
                     {starters.map((starter) => (
                       <button
                         type="button"
+                        className="btn btn-ghost"
                         key={starter.title}
                         onClick={() => choosePrompt(starter.prompt)}
                         disabled={disabled || busy}
                       >
-                        <Compass size={15} aria-hidden="true" />
                         <span>{starter.title}</span>
                         <ArrowRight size={14} aria-hidden="true" />
                       </button>

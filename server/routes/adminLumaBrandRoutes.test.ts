@@ -72,6 +72,7 @@ test('local logo preparation works with AI disabled, authenticates ADMIN, reject
   assert.equal(result.status,200);assert.equal(result.data.width,44);assert.equal(result.data.height,24);assert.equal(result.data.removedBackground,true)
   const pixel=await sharp(Buffer.from(result.data.imageDataUrl.split(',')[1],'base64')).ensureAlpha().raw().toBuffer();assert.equal(pixel[3],0)
   assert.equal((await f.call('/brand/prepare-image',{...payload,mode:'TRIM'})).data.removedBackground,false)
+  assert.equal((await f.call('/brand/prepare-image',{...payload,imageDataUrl:result.data.imageDataUrl,mode:'CLEAN_WHITE'})).status,200)
   assert.equal((await f.call('/brand/prepare-image',{...payload,imageDataUrl:'https://example.com/logo.png'})).status,400)
   assert.equal((await f.call('/brand/prepare-image',{...payload,imageDataUrl:'data:image/png;base64,AAAA'})).status,400)
   assert.equal((await f.call('/brand/prepare-image',{...payload,mode:'INVALID'})).status,400)

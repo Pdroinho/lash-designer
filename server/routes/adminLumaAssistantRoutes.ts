@@ -466,7 +466,7 @@ export function createAdminLumaAssistantRouter(
   router.post('/brand/prepare-image', lumaAssistantLimiter, requireRole('ADMIN'), async (req, res, next) => {
     try {
       if (!req.sessionUser?.tenantId) throw badRequest('Espaço inválido', 'INVALID_TENANT')
-      const body = z.object({ imageDataUrl: z.string().max(450_000), mode: z.enum(['REMOVE_BACKGROUND_AND_TRIM', 'TRIM']) }).strict().parse(req.body)
+      const body = z.object({ imageDataUrl: z.string().max(450_000), mode: z.enum(['REMOVE_BACKGROUND_AND_TRIM', 'TRIM', 'CLEAN_WHITE']) }).strict().parse(req.body)
       let prepared
       try { prepared = await prepareLogoImage(body.imageDataUrl, body.mode) }
       catch (error) { throw badRequest(error instanceof Error ? error.message : 'Não foi possível preparar a logo.', 'LOGO_PREPARATION_FAILED') }

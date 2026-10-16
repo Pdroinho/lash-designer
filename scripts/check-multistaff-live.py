@@ -53,14 +53,14 @@ def seed_session(dbpath, user_id):
             now.isoformat(), now.isoformat(), (now + dt.timedelta(hours=12)).isoformat()))
     return token
 
-with tempfile.TemporaryDirectory(prefix='lashdesigner-qa-', ignore_cleanup_errors=True) as temp:
+with tempfile.TemporaryDirectory(prefix='lashdesigner-qa-') as temp:
     root = pathlib.Path(temp)
     dbpath = root / 'qa.db'
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
     config = os.environ.copy()
-    config.update(NODE_ENV='test', PORT=str(port), DATABASE_PATH=str(dbpath), WHATSAPP_MEDIA_DIR=str(root/'media'), APP_BASE_URL='http://localhost', AI_ASSISTANT_ENABLED='false', DEV_HOST='')
+    config.update(NODE_ENV='test', PORT=str(port), DATABASE_PATH=str(dbpath), WHATSAPP_MEDIA_DIR=str(root/'media'), APP_BASE_URL='http://localhost')
     logpath = root / 'server.log'
     with logpath.open('w') as log:
         server = subprocess.Popen(['node','dist/server/index.js'], cwd=PROJECT, env=config, stdout=log, stderr=subprocess.STDOUT)
@@ -205,11 +205,11 @@ with tempfile.TemporaryDirectory(prefix='lashdesigner-qa-', ignore_cleanup_error
             expect('unknown API returns 404',request(port,'GET','/api/unknown')['status'],404)
         except Exception:
             log.flush()
-            print('SERVER LOG TAIL:', '\n'.join(logpath.read_text(encoding='utf-8', errors='replace').splitlines()[-20:]))
+            print('SERVER LOG TAIL:', '\n'.join(logpath.read_text().splitlines()[-20:]))
             raise
         finally:
             server.terminate()
             try: server.wait(timeout=6)
             except subprocess.TimeoutExpired: server.kill(); server.wait()
-        expect('server shuts down gracefully',server.returncode in (0, 1) if os.name == 'nt' else server.returncode, True if os.name == 'nt' else 0)
+        expect('server shuts down gracefully',server.returncode,0)
 print(f'{len(steps)} live checks passed')

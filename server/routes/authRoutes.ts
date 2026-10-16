@@ -1,3 +1,4 @@
+import { createPasswordRecoveryRouter } from './passwordRecoveryRoutes.js'
 import express, { type Request, type RequestHandler } from 'express'
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
@@ -20,7 +21,7 @@ import { PLATFORM_MARKETING_WHATSAPP_TEXT, PRIVACY_VERSION, TERMS_VERSION, curre
 import { hashPassword, verifyPassword } from '../security.js'
 import { revokeSession, revokeSessionsForUser } from '../session.js'
 
-type AuthRouterOptions = {
+export type AuthRouterOptions = {
   db: Database.Database
   nodeEnv: string
   isDevHost: (hostname: string) => boolean
@@ -29,6 +30,7 @@ type AuthRouterOptions = {
   authWhatsappOtpSendLimiter: RequestHandler
   authPasswordLimiter: RequestHandler
   authSessionRuntime: ReturnType<typeof createAuthSessionRuntime>
+  platformWhatsappConfigured?: () => boolean
   sendPlatformWhatsappText: (phone: string, text: string) => Promise<boolean>
   normalizeUserE164Phone: (raw: string) => string
   maskE164Phone: (raw: string) => string
@@ -64,6 +66,7 @@ export function createAuthRouter(options: AuthRouterOptions) {
     trustedDeviceCookieName,
   } = authSessionRuntime
   const router = express.Router()
+  router.use(createPasswordRecoveryRouter(options))
 
   router.get('/me', (req, res, next) => {
     try {

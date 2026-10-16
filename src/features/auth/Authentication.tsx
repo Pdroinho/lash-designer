@@ -1,3 +1,4 @@
+import { PasswordRecoveryForm } from '../../components/PasswordRecoveryForm'
 import { PageLoading } from '../../components/PageLoading'
 import { TenantBrand } from '../../components/TenantBrand'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -12,6 +13,7 @@ import type { CssVarStyle } from '../shared/types'
 import { Check, Eye, EyeOff, XCircle } from '../../components/Icons'
 
 export function UnifiedLogin(props: { hostTenant?: TenantPublic | null; isDevHost?: boolean } = {}) {
+  const [recovering, setRecovering] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [keepSigned, setKeepSigned] = useState(false)
@@ -204,7 +206,7 @@ export function UnifiedLogin(props: { hostTenant?: TenantPublic | null; isDevHos
 
         <div className="authRefRight">
           <div className="authRefRightInner">
-            {loginSuccess ? (
+            {recovering ? <PasswordRecoveryForm initialEmail={email} keepSigned={keepSigned} onCancel={() => setRecovering(false)} onSuccess={user => { setRecovering(false); finishProfessionalLogin(user) }} /> : loginSuccess ? (
               <div className="authRefSuccess">
                 <div className="authRefSuccessIcon">
                   <Check size={32} strokeWidth={3} />
@@ -260,7 +262,7 @@ export function UnifiedLogin(props: { hostTenant?: TenantPublic | null; isDevHos
             ) : (
               <>
                 <h1 className="authRefTitle authRefTitle-login">Entrar na conta</h1>
-            <p className="authRefSubtitle">Acesse o painel e continue de onde parou.</p>
+            <p className="authRefSubtitle authRefSubtitle-login">Acesse o painel e continue de onde parou.</p>
 
             {allowDevBootstrap ? (
               <div style={{
@@ -370,6 +372,8 @@ export function UnifiedLogin(props: { hostTenant?: TenantPublic | null; isDevHos
                   </button>
                 </div>
               </label>
+
+              <button type="button" className="auth-recovery-link" onClick={() => { setError(null); setRecovering(true) }}>Esqueci minha senha</button>
 
               <label className="authRefCheckbox">
                 <input

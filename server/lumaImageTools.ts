@@ -8,17 +8,17 @@ const hash = (value: string | null) => createHash('sha256').update(value || '').
 export const imageToolDefinitions = [{
   type: 'function', function: {
     name: 'prepare_brand_image',
-    description: 'Prepara uma prévia da logo: remove fundo liso e recorta margens vazias sem redesenhar a marca. Também restaura o original de uma edição anterior. Não funciona com fundos fotográficos/irregulares. Nunca aplica sem confirmação da usuária.',
+    description: 'Prepara uma prévia da logo: remove fundo liso e recorta margens vazias sem redesenhar a marca. Também restaura o original de uma edição anterior. CLEAN_WHITE limpa resíduos brancos em logos já transparentes, inclusive letras; avise que também remove detalhes brancos. Não funciona com fundos fotográficos/irregulares. Nunca aplica sem confirmação da usuária.',
     parameters: { type: 'object', properties: {
       source: { type: 'string', enum: ['CURRENT_LOGO', 'ATTACHMENT'] },
-      mode: { type: 'string', enum: ['REMOVE_BACKGROUND_AND_TRIM', 'TRIM', 'RESTORE_ORIGINAL'] },
+      mode: { type: 'string', enum: ['REMOVE_BACKGROUND_AND_TRIM', 'TRIM', 'CLEAN_WHITE', 'RESTORE_ORIGINAL'] },
     }, required: ['source', 'mode'], additionalProperties: false },
   },
 }]
 
 export async function executeLumaImageTool(context: LumaToolContext, name: string, args: unknown): Promise<LumaToolExecution | null> {
   if (name !== 'prepare_brand_image') return null
-  const parsed = z.object({ source: z.enum(['CURRENT_LOGO', 'ATTACHMENT']), mode: z.enum(['REMOVE_BACKGROUND_AND_TRIM', 'TRIM', 'RESTORE_ORIGINAL']) }).strict().parse(args)
+  const parsed = z.object({ source: z.enum(['CURRENT_LOGO', 'ATTACHMENT']), mode: z.enum(['REMOVE_BACKGROUND_AND_TRIM', 'TRIM', 'CLEAN_WHITE', 'RESTORE_ORIGINAL']) }).strict().parse(args)
   const db = getDb()
   const tenant = db.prepare('SELECT logo_url AS logo FROM tenants WHERE id = ?').get(context.tenantId) as { logo: string | null } | undefined
   if (!tenant) throw new Error('Espaço não encontrado.')

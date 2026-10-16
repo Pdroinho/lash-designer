@@ -259,7 +259,7 @@ const { chromium } = await import(
 let browser,page,checks=0
 const pass=label=>{checks++;console.log(`PASS ${label}`)}
 try{
- browser=await chromium.launch({headless:true,...(process.env.LASH_QA_CHROMIUM_PATH?{executablePath:process.env.LASH_QA_CHROMIUM_PATH}:{}),args:['--host-resolver-rules=MAP *.localhost 127.0.0.1','--no-sandbox','--disable-dev-shm-usage','--disable-gpu']})
+ browser=await chromium.launch({headless:true,...(process.env.LASH_QA_CHROMIUM_PATH?{executablePath:process.env.LASH_QA_CHROMIUM_PATH}:{}),args:['--host-resolver-rules=MAP *.localhost 127.0.0.1','--no-sandbox','--disable-dev-shm-usage',...(process.env.LASH_QA_MULTIPROCESS==='true'?[]:['--single-process']),'--no-zygote','--disable-gpu']})
  const context=await browser.newContext({timezoneId:'America/Bahia'});await context.addCookies([{name:'session',value:tokens.admin,url:origin}]);await context.addInitScript(()=>{localStorage.setItem('lashdesigner:tour:admin-dashboard:v4','done');localStorage.setItem('lashdesigner:tour:admin-team:v4','done');sessionStorage.setItem('lashdesigner:luma-thread:v2',JSON.stringify([{id:'old',role:'user',text:'PRIVATE_OLD_ACCOUNT'}]))})
  page=await context.newPage();page.setDefaultTimeout(12000);const errors=[];page.on('pageerror',e=>errors.push(e.message))
 
