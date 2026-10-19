@@ -23,7 +23,7 @@ const checks = [
   ['Galeria de serviços continua usando serviços reais', bookingPage.includes('filteredServices.map((service, index)') && bookingPage.includes('service.coverUrl || bundledServiceCover(service.name)')],
   ['Navegação inferior vira dock flutuante', css.includes('.ld-mobile-tabbar {') && css.includes('border-radius: 24px') && css.includes('background: var(--ink-strong)')],
   ['Tela de agenda não é mera compressão do calendário desktop', css.includes('.ld-mobile-day-rail') && css.includes('.ld-mobile-agenda-event-body')],
-  ['Booking mobile usa lista vertical de serviços', bookingMobile.includes('.booking30-services') && bookingMobile.includes('grid-auto-flow: row') && bookingMobile.includes('overflow: visible')],
+  ['Booking mobile usa grid fotográfico sem esconder opções', bookingMobile.includes('.booking30-services') && bookingMobile.includes('grid-template-columns: repeat(2, minmax(0, 1fr))') && bookingMobile.includes('overflow: visible')],
   ['Horários mobile usam grupos de toque', css.includes('.booking30-mobile-time-groups') && css.includes('grid-template-columns: repeat(2, minmax(0, 1fr))')],
   ['Confirmação prioriza dados da reserva sem foto gigante', bookingPage.includes('booking30-success-details') && bookingMobile.includes('.booking30-success-photo { display: none; }')],
   ['Refino mobile é importado depois das camadas anteriores', main.indexOf("import './booking-mobile-refinement.css'") > main.indexOf("import './product-refinement-v5132.css'")],

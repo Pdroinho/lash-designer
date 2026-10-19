@@ -9,7 +9,7 @@ import { formatBrazilPhoneInput, normalizeBrazilPhone } from '../../phone'
 import { bundledServiceCover, withBasePath } from '../../lib/runtime'
 import { addDaysToYmd, formatYmdPtBr, weekdayIndexForYmd, ymdInTimeZone, zonedDateTimeToUtc } from '../../dateTime'
 import { EmptyState } from '../../components/SharedUi'
-import { ArrowRight, ChevronLeft, ChevronRight, Clock, Search, ShieldCheck } from '../../components/Icons'
+import { ArrowRight, ChevronLeft, ChevronRight, Clock, Search, ShieldCheck, CheckCircle2, X } from '../../components/Icons'
 
 function DateScroller({
   value,
@@ -371,7 +371,7 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
               onClick={() => available && setStep(number)}
             >
               <span>{String(number).padStart(2, '0')}</span>
-              <strong>{label}</strong>
+              <strong>{label}</strong><em className="booking30-step-short" aria-hidden="true">{['Serviço', 'Dia', 'Horário', 'Reserva'][index]}</em>
             </button>
           })}
         </nav> : <span className="booking30-complete-label">Reserva concluída</span>}
@@ -379,21 +379,24 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
         {!confirmedAppointment ? <div className="booking30-step-count"><strong>{progress}</strong><span>/ 4</span></div> : null}
       </header>
 
-      {!confirmedAppointment ? <div className="booking30-body">
+      {!confirmedAppointment ? <div className="booking30-body" data-step={step}>
         <section className="booking30-workspace">
           <div className="booking30-kicker"><span>{stepLabel}</span><i /></div>
           <div className="booking30-heading">
-            <h1 ref={stageHeadingRef} tabIndex={-1}><span className="booking30-title-desktop">{step === 1 ? 'Qual cuidado você quer hoje?' : step === 2 ? 'Com quem e quando você prefere?' : step === 3 ? 'Escolha o seu horário.' : 'Últimos detalhes.'}</span><span className="booking30-title-mobile">{step === 1 ? 'Escolha seu cuidado.' : step === 2 ? 'Com quem e em qual dia?' : step === 3 ? 'Qual o melhor horário?' : 'Vamos reservar?'}</span></h1>
+            <h1 ref={stageHeadingRef} tabIndex={-1}><span className="booking30-title-desktop">{step === 1 ? 'Qual cuidado você quer hoje?' : step === 2 ? 'Com quem e quando você prefere?' : step === 3 ? 'Escolha o seu horário.' : 'Últimos detalhes.'}</span><span className="booking30-title-mobile">{step === 1 ? 'Um momento só seu.' : step === 2 ? 'Com quem e quando?' : step === 3 ? 'Encontre seu horário.' : 'Vamos confirmar?'}</span></h1>
             <p>{step === 1 ? 'Escolha o atendimento e veja os horários disponíveis.' : step === 2 ? 'Escolha uma profissional ou encontre qualquer horário livre.' : step === 3 ? 'Estes horários estão livres agora.' : 'Seu nome e WhatsApp bastam para reservar.'}</p>
           </div>
 
           {step < 4 && summary.length ? <div className="booking30-mobile-summary">
-            {summary.map((item) => <span key={item.label}><small>{item.label}</small><strong>{item.value}</strong></span>)}
+            <img src={sideImage} alt="" onError={(event) => { event.currentTarget.src = '/placeholders/service-placeholder.webp' }} />
+            <div>{summary.map((item) => <span key={item.label}><small>{item.label}</small><strong>{item.value}</strong></span>)}</div>
+            <button type="button" onClick={() => setStep(1)} aria-label="Alterar serviço">Alterar</button>
           </div> : null}
 
           <div className="booking30-content">
             {step === 1 ? <div className="booking30-service-catalog">
-              {services.length >= 6 ? <label className="booking30-service-search"><Search size={20} aria-hidden="true" /><span className="sr-only">Buscar serviço</span><input type="search" value={serviceQuery} onChange={event => setServiceQuery(event.target.value)} placeholder="Busque um serviço pelo nome" autoComplete="off" /></label> : null}
+              {services.length >= 6 ? <div className="booking30-service-search"><Search size={20} aria-hidden="true" /><label className="sr-only" htmlFor="booking-service-search">Buscar serviço</label><input id="booking-service-search" type="search" value={serviceQuery} onChange={event => setServiceQuery(event.target.value)} placeholder="Busque um serviço pelo nome" autoComplete="off" />{serviceQuery ? <button type="button" aria-label="Limpar busca" onClick={() => setServiceQuery('')}><X size={16} aria-hidden="true" /></button> : null}</div> : null}
+              <div className="booking30-catalog-heading"><h2>Nossos cuidados</h2><span>{filteredServices.length} {filteredServices.length === 1 ? 'opção' : 'opções'}</span></div>
               <div className="booking30-services">
               {filteredServices.map((service, index) => <button type="button" key={service.id} className="booking30-service" onClick={() => { setSelectedServiceId(service.id); setSelectedProfessionalId(null); setSelectedDate(''); setSelectedTime(null); setStep(2) }}>
                 <div className="booking30-service-photo"><img src={service.coverUrl || bundledServiceCover(service.name)} alt="" onError={(e) => { e.currentTarget.src = '/placeholders/service-placeholder.webp' }} /><span className="booking30-service-index">{String(index + 1).padStart(2, '0')}</span></div>
@@ -415,7 +418,7 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
                 {professionals.length > 3 ? <details className="booking30-professional-picker"><summary><span><strong>{professionals.find(person => person.id === selectedProfessionalId)?.name ?? 'Escolher uma profissional'}</strong><small>{professionals.length} profissionais neste serviço</small></span><ChevronRight size={18} aria-hidden="true" /></summary>{professionalCards}</details> : professionalCards}
               </fieldset> : professionals.length === 1 ? <div className="booking30-single-professional"><ProfessionalAvatar name={professionals[0].name} photoUrl={professionals[0].photoUrl} /><span><small>Você será atendida por</small><strong>{professionals[0].name}</strong></span></div> : null}
               {socialPerson && (socialPerson.instagram || socialPerson.tiktok) ? <details className="booking30-professional-social" key={socialPerson.id}><summary>Conheça o trabalho de {socialPerson.name.split(' ')[0]}</summary><div>{socialPerson.instagram ? <a href={`https://www.instagram.com/${encodeURIComponent(socialPerson.instagram)}/`} target="_blank" rel="noopener noreferrer">Instagram · @{socialPerson.instagram}<span className="sr-only"> (abre em outra aba)</span></a> : null}{socialPerson.tiktok ? <a href={`https://www.tiktok.com/@${encodeURIComponent(socialPerson.tiktok)}`} target="_blank" rel="noopener noreferrer">TikTok · @{socialPerson.tiktok}<span className="sr-only"> (abre em outra aba)</span></a> : null}</div></details> : null}
-              {professionalsLoading ? <p role="status">Consultando profissionais…</p> : professionals.length ? <><h2 className="booking30-date-title">Escolha o dia</h2><DateScroller value={selectedDate} min={dateLimits.min} max={dateLimits.max} onChange={(value) => { setSelectedDate(value); setSelectedTime(null); setStep(3) }} getDateStatus={dateStatusFor} /></> : <p role="status">{actionError ?? 'Este serviço ainda não tem uma profissional disponível. Escolha outro serviço.'}</p>}
+              {professionalsLoading ? <p role="status">Consultando profissionais…</p> : professionals.length ? <><div className="booking30-date-heading"><h2 className="booking30-date-title">Escolha o dia</h2><span>Deslize para ver mais <ChevronRight size={12} aria-hidden="true" /></span></div><DateScroller value={selectedDate} min={dateLimits.min} max={dateLimits.max} onChange={(value) => { setSelectedDate(value); setSelectedTime(null); setStep(3) }} getDateStatus={dateStatusFor} /></> : <p role="status">{actionError ?? 'Este serviço ainda não tem uma profissional disponível. Escolha outro serviço.'}</p>}
             </div> : null}
 
             {step === 3 ? <div className="booking30-times">
@@ -450,7 +453,7 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
               </div>
               {marketingDetailsOpen ? <p className="booking30-consent-detail">Opcional. Você autoriza este espaço a enviar promoções pelo WhatsApp. Isso não muda seu agendamento e pode ser desativado a qualquer momento em Meus horários ou respondendo SAIR. Consulte a <a href="/privacidade#marketing-whatsapp" target="_blank" rel="noopener noreferrer">Política de Privacidade</a>.</p> : null}
 
-              {actionError ? <div className="booking30-action-error">{actionError}</div> : null}
+              {actionError ? <div role="alert" className="booking30-action-error">{actionError}</div> : null}
               <button type="button" className="booking30-confirm-button" onClick={confirmBooking} disabled={saving}>
                 <span>{saving ? 'Reservando…' : `Reservar${selectedTime ? ` às ${selectedTime}` : ''}`}</span>
                 <i><ArrowRight size={17} /></i>
@@ -476,10 +479,10 @@ export function BookingPage(props: { tenant?: TenantPublic; tenantSlug?: string;
         </aside>
       </div> : <div className="booking30-success">
         <div className="booking30-success-copy">
-          <span>Agendamento realizado</span>
+          <span className="booking30-success-status"><CheckCircle2 size={22} aria-hidden="true" />Agendamento realizado</span>
           <h1 ref={stageHeadingRef} tabIndex={-1}>Horário reservado{clientName.trim() ? `, ${clientName.trim().split(' ')[0]}` : ''}.</h1>
           <dl className="booking30-success-details">
-            <div><dt>Serviço</dt><dd>{selectedService?.name}</dd></div>
+            <div className="booking30-success-service"><dt>Serviço</dt><dd><img src={sideImage} alt="" onError={(event) => { event.currentTarget.src = '/placeholders/service-placeholder.webp' }} /><span>{selectedService?.name}</span></dd></div>
             <div><dt>Quando</dt><dd>{selectedDate ? formatYmdPtBr(selectedDate) : ''} às {selectedTime}</dd></div>
             {confirmedAppointment.professionalName ? <div><dt>Profissional</dt><dd>{confirmedAppointment.professionalName}</dd></div> : null}
             <div><dt>Valor</dt><dd>{selectedService ? money(selectedService.priceCents) : ''}</dd></div>
